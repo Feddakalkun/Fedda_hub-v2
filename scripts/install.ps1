@@ -76,12 +76,153 @@ function Pause-Step {
 }
 
 Write-Log "========================================="
-Write-Log "Portable Installation Started"
+Write-Log " FEDDAKALKUN - Portable Installation"
 Write-Log "========================================="
 
-# ============================================================================ 
+# ============================================================================
+# 0. SYSTEM CHECK (Show specs, confirm before installing)
+# ============================================================================
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host "  FEDDAKALKUN - System Compatibility Check" -ForegroundColor Cyan
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+# --- Path Safety Check ---
+$UnsafePaths = @("$env:USERPROFILE\Desktop", "$env:USERPROFILE\Downloads", "$env:USERPROFILE\Documents", "$env:USERPROFILE\OneDrive")
+$IsUnsafe = $false
+foreach ($BadPath in $UnsafePaths) {
+    if ($RootPath.StartsWith($BadPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $IsUnsafe = $true
+        break
+    }
+}
+# Also warn if on C: system drive in general
+$IsCDrive = $RootPath.StartsWith("C:\", [System.StringComparison]::OrdinalIgnoreCase)
+
+if ($IsUnsafe) {
+    Write-Host "  WARNING: Installed in a system folder!" -ForegroundColor Red
+    Write-Host "  Current path: $RootPath" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  RECOMMENDATION: Move this folder to a dedicated location like:" -ForegroundColor Yellow
+    Write-Host "    D:\FeddaFront\  or  E:\FeddaFront\" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Installing in Desktop/Downloads/Documents can cause:" -ForegroundColor Yellow
+    Write-Host "    - OneDrive sync conflicts" -ForegroundColor Gray
+    Write-Host "    - Antivirus false positives" -ForegroundColor Gray
+    Write-Host "    - Permission issues" -ForegroundColor Gray
+    Write-Host "    - Accidental deletion" -ForegroundColor Gray
+    Write-Host ""
+    $PathConfirm = Read-Host "  Continue anyway? (Y/N)"
+    if ($PathConfirm -ne "Y" -and $PathConfirm -ne "y") {
+        Write-Host "`n  Move the folder and run install.bat again." -ForegroundColor Yellow
+        exit 0
+    }
+}
+elseif ($IsCDrive) {
+    Write-Host "  NOTE: Installed on C: drive. This works but a separate" -ForegroundColor Yellow
+    Write-Host "        drive (D:\, E:\) is recommended to avoid filling" -ForegroundColor Yellow
+    Write-Host "        your system drive (~8-15 GB total)." -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# --- Disclaimer ---
+Write-Host "  DISCLAIMER: This software is provided as-is by FEDDAKALKUN." -ForegroundColor Gray
+Write-Host "  It installs portable runtimes (Python, Node, Git) locally" -ForegroundColor Gray
+Write-Host "  in this folder only. It does NOT modify your system." -ForegroundColor Gray
+Write-Host ""
+
+# Gather system info
+$OSInfo = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+$CPUInfo = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
+$RAM_GB = if ($OSInfo) { [math]::Round($OSInfo.TotalVisibleMemorySize / 1MB) } else { 0 }
+
+Write-Host "  OS:       $($OSInfo.Caption) $($OSInfo.OSArchitecture)" -ForegroundColor White
+Write-Host "  CPU:      $($CPUInfo.Name)" -ForegroundColor White
+Write-Host "  RAM:      ${RAM_GB} GB" -ForegroundColor White
+
+# GPU Detection
+$VRAMWarning = ""
+try {
+    $GPUs = Get-CimInstance Win32_VideoController -ErrorAction Stop
+    $NvidiaGPU = $GPUs | Where-Object { $_.Name -match "NVIDIA" } | Select-Object -First 1
+
+    if (-not $NvidiaGPU) {
+        Write-Host "  GPU:      $(($GPUs | ForEach-Object { $_.Name }) -join ', ')" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  STATUS:   INCOMPATIBLE" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  This app requires an NVIDIA GPU with CUDA support." -ForegroundColor Red
+        Write-Host "  AMD and Intel GPUs are not supported." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Contact FEDDAKALKUN for help: https://x.com/feddakalkun" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Press any key to exit..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        exit 1
+    }
+
+    $GPUName = $NvidiaGPU.Name
+    $VRAM_MB = [math]::Round($NvidiaGPU.AdapterRAM / 1MB)
+    Write-Host "  GPU:      $GPUName" -ForegroundColor Green
+
+    if ($VRAM_MB -gt 0 -and $VRAM_MB -lt 65536) {
+        $VRAM_GB = [math]::Round($VRAM_MB / 1024)
+        Write-Host "  VRAM:     ${VRAM_GB} GB" -ForegroundColor $(if ($VRAM_GB -ge 8) { "Green" } elseif ($VRAM_GB -ge 6) { "Yellow" } else { "Red" })
+
+        if ($VRAM_MB -lt 6144) {
+            $VRAMWarning = "  WARNING: Less than 6GB VRAM. Generation may be very slow or fail."
+        }
+        elseif ($VRAM_MB -lt 8192) {
+            $VRAMWarning = "  NOTE: 6-8GB VRAM. Image gen OK, video may need lower resolution."
+        }
+    }
+    else {
+        Write-Host "  VRAM:     Could not detect (this is normal)" -ForegroundColor White
+    }
+}
+catch {
+    Write-Host "  GPU:      Detection failed (continuing anyway)" -ForegroundColor Yellow
+}
+
+# Disk space check
+$Drive = (Get-Item $RootPath).PSDrive
+$FreeSpace_GB = [math]::Round($Drive.Free / 1GB)
+Write-Host "  Disk:     ${FreeSpace_GB} GB free on $($Drive.Name):\" -ForegroundColor $(if ($FreeSpace_GB -ge 15) { "Green" } elseif ($FreeSpace_GB -ge 10) { "Yellow" } else { "Red" })
+
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+
+if ($VRAMWarning) {
+    Write-Host $VRAMWarning -ForegroundColor Yellow
+}
+if ($FreeSpace_GB -lt 10) {
+    Write-Host "  WARNING: Low disk space! Need at least 10GB free." -ForegroundColor Red
+}
+
+Write-Host ""
+Write-Host "  STATUS:   COMPATIBLE - Ready to install" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Install will download ~6-8 GB and take 20-60 minutes." -ForegroundColor White
+Write-Host ""
+Write-Host "  If something looks wrong, contact FEDDAKALKUN:" -ForegroundColor Gray
+Write-Host "  https://x.com/feddakalkun" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "================================================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Ask user to confirm
+$Confirm = Read-Host "  Does this look correct? Press ENTER to install, or type N to cancel"
+if ($Confirm -eq "N" -or $Confirm -eq "n") {
+    Write-Host "`n  Installation cancelled. Contact FEDDAKALKUN for help." -ForegroundColor Yellow
+    exit 0
+}
+
+Write-Log "System check passed. GPU: $GPUName | RAM: ${RAM_GB}GB | Disk: ${FreeSpace_GB}GB free"
+
+# ============================================================================
 # 1. BOOTSTRAP PORTABLE TOOLS
-# ============================================================================ 
+# ============================================================================
 
 # --- 1.1 Portable Python ---
 $PyDir = Join-Path $RootPath "python_embeded"
@@ -277,12 +418,16 @@ $ComfyDir = Join-Path $RootPath "ComfyUI"
 Write-Log "Upgrading pip..."
 Run-Pip "install --upgrade pip wheel setuptools"
 
-Write-Log "Installing PyTorch (CUDA 12.1) + Xformers..."
-Run-Pip "install torch torchvision torchaudio xformers --index-url https://download.pytorch.org/whl/cu121 --extra-index-url https://pypi.org/simple"
+Write-Log "Installing PyTorch (CUDA 12.4)..."
+# CUDA 12.4 has latest PyTorch builds and supports GPUs from GTX 1060 to RTX 5090
+Run-Pip "install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124"
 if ($LASTEXITCODE -ne 0) {
-    Write-Log "CUDA PyTorch failed, trying CPU..."
+    Write-Log "CUDA PyTorch failed, trying CPU fallback..."
     Run-Pip "install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
 }
+
+Write-Log "Installing Xformers..."
+Run-Pip "install xformers --index-url https://download.pytorch.org/whl/cu124"
 
 Write-Log "Installing ComfyUI requirements..."
 $ReqFile = Join-Path $ComfyDir "requirements.txt"
@@ -708,6 +853,11 @@ try:
     print(f'PyTorch {torch.__version__} - CUDA: {gpu}')
     if gpu:
         print(f'  GPU: {torch.cuda.get_device_name(0)}')
+    else:
+        if '+cpu' in torch.__version__:
+            errors.append('PyTorch CPU-only version installed! CUDA build required.')
+        else:
+            errors.append('CUDA not available. Check NVIDIA drivers.')
 except Exception as e:
     errors.append(f'PyTorch: {e}')
 

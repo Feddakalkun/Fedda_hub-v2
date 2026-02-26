@@ -392,13 +392,19 @@ function Install-Ollama {
 # ============================================================================ 
 
 # 4. Setup ComfyUI Repository
-Write-Log "`n[ComfyUI 4/9] Setting up ComfyUI repository..."
+# Pinned to tested stable commit to prevent breaking changes for users
+$ComfyUICommit = "0467f69"  # 2026-02 stable: comfy aimdo 0.2.2
+Write-Log "`n[ComfyUI 4/9] Setting up ComfyUI repository (pinned: $ComfyUICommit)..."
 $ComfyDir = Join-Path $RootPath "ComfyUI"
 if (-not (Test-Path $ComfyDir)) {
     Write-Log "Cloning ComfyUI repository (official)..."
     try {
-        Run-Git "clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git `"$ComfyDir`""
-        Write-Log "ComfyUI cloned successfully."
+        Run-Git "clone https://github.com/comfyanonymous/ComfyUI.git `"$ComfyDir`""
+        # Checkout pinned commit for stability
+        Set-Location $ComfyDir
+        Run-Git "checkout $ComfyUICommit"
+        Set-Location $RootPath
+        Write-Log "ComfyUI cloned and pinned to $ComfyUICommit."
     }
     catch {
         Write-Log "ERROR: Failed to clone ComfyUI repository."
@@ -589,7 +595,7 @@ Run-Pip "install $($Deps -join ' ')"
 # 7.3 Install llama-cpp-python separately (with pre-built wheel preference)
 Write-Log "Installing llama-cpp-python..."
 # Try installing with --prefer-binary to avoid building from source if possible
-Run-Pip "install llama-cpp-python --prefer-binary --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121"
+Run-Pip "install llama-cpp-python --prefer-binary --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124"
 
 # 7.4 Install VoxCPM (TTS Engine)
 function Install-VoxCPM {

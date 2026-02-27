@@ -146,7 +146,7 @@ if (Test-Path $FrontendDir) {
 # 6. Cleanup Old Files
 Write-Host "`n[6/6] Cleaning up deprecated files..." -ForegroundColor Yellow
 $FilesToDelete = @(
-    "check_vibevoice_files.py", 
+    "check_vibevoice_files.py",
     "cleanup_vibevoice.py",
     "create_reference_audio.py",
     "debug-comfyui.bat",
@@ -161,11 +161,40 @@ $FilesToDelete = @(
     "VOICE_FEATURES_README.md"
 )
 
+# Clean up duplicate/legacy folders
+$FoldersToDelete = @(
+    "assets\loading-screen",
+    "assets\workflows"
+)
+
+# Clean up duplicate loading videos (now in frontend/public/loading/pingpong/)
+$LegacyLoadingFiles = @(
+    "frontend\public\loading\bg.mp4",
+    "frontend\public\loading\done-loading.mp4",
+    "frontend\public\loading\grok.mp4"
+)
+
 foreach ($file in $FilesToDelete) {
     $path = Join-Path $RootPath $file
     if (Test-Path $path) {
         Remove-Item -Path $path -Force -ErrorAction SilentlyContinue
         Write-Host "  - Removed: $file"
+    }
+}
+
+foreach ($folder in $FoldersToDelete) {
+    $path = Join-Path $RootPath $folder
+    if (Test-Path $path) {
+        Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "  - Removed folder: $folder"
+    }
+}
+
+foreach ($file in $LegacyLoadingFiles) {
+    $path = Join-Path $RootPath $file
+    if (Test-Path $path) {
+        Remove-Item -Path $path -Force -ErrorAction SilentlyContinue
+        Write-Host "  - Removed legacy: $file"
     }
 }
 

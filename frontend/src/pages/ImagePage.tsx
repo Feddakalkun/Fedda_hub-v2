@@ -1,6 +1,6 @@
 // Image Generation Page
-import { useState, useEffect, useCallback } from 'react';
-import { Sparkles, ChevronRight, Maximize2, X, Loader2, Eye, Upload, Download, Trash2, Video, BookOpen } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sparkles, ChevronRight, Maximize2, X, Loader2, Eye, Upload, Trash2, Video, BookOpen } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { comfyService } from '../services/comfyService';
 import { assistantService } from '../services/assistantService';
@@ -8,6 +8,7 @@ import { ollamaService } from '../services/ollamaService';
 import { useComfyExecution } from '../contexts/ComfyExecutionContext';
 import { useToast } from '../components/ui/Toast';
 import { PromptLibrary } from '../components/PromptLibrary';
+import { ModelDownloader } from '../components/ModelDownloader';
 
 interface ImagePageProps {
     modelId: string;
@@ -46,45 +47,6 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
 
     // Prompt Library state
     const [showPromptLibrary, setShowPromptLibrary] = useState(false);
-
-    // Model download state
-    const [modelStatus, setModelStatus] = useState<any[]>([]);
-    const [isCheckingModels, setIsCheckingModels] = useState(true);
-    const [isDownloading, setIsDownloading] = useState(false);
-
-    // Fetch models status
-    const checkModels = useCallback(async () => {
-        try {
-            const resp = await fetch('http://localhost:8000/api/models/status?group=z-image');
-            const data = await resp.json();
-            if (data.success) {
-                setModelStatus(data.models);
-            }
-        } catch (e) {
-            console.error('Failed to check models:', e);
-        } finally {
-            setIsCheckingModels(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        checkModels();
-        // Poll status if downloading
-        let interval: any;
-        if (isDownloading) {
-            interval = setInterval(checkModels, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [checkModels, isDownloading]);
-
-    const handleDownloadModel = async (modelId: string) => {
-        setIsDownloading(true);
-        try {
-            await fetch(`http://localhost:8000/api/models/download?model_id=${modelId}`, { method: 'POST' });
-        } catch (e) {
-            console.error('Download trigger failed:', e);
-        }
-    };
     const [dualPersonMode, setDualPersonMode] = useState(false);
     interface PersonConfig {
         lora: string;
@@ -584,618 +546,579 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
     };
 
     return (
-        <div className={`p-8 grid grid-cols-1 ${showGallery ? 'lg:grid-cols-3' : 'lg:grid-cols-1 w-full'} gap-8 h-full transition-all duration-500`}>
-            {/* Left: Controls */}
-            <div className={`space-y-6 ${showGallery ? 'lg:col-span-1' : 'w-full max-w-full'}`}>
+        <div className="flex flex-col h-full overflow-hidden">
+            {/* Model Downloader stays fixed at the top if models are missing */}
+            <ModelDownloader modelGroup="z-image" />
 
-                {/* Prompt Container (Drag Target) */}
-                <div
-                    className={`bg-[#121218] border transition-all duration-300 rounded-2xl p-6 shadow-xl relative overflow-hidden group/prompt ${isDragging ? 'border-white/50 bg-white/5' : 'border-white/5'}`}
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={handleDrop}
-                >
-                    {/* Drag Overlay */}
-                    <div className={`absolute inset-0 z-50 flex items-center justify-center bg-[#121218]/90 backdrop-blur-sm transition-opacity duration-300 pointer-events-none ${isDragging ? 'opacity-100' : 'opacity-0'}`}>
-                        <div className="text-white font-bold text-lg animate-bounce flex flex-col items-center gap-2">
-                            <Upload className="w-8 h-8" />
-                            Drop Image to Analyze
-                        </div>
-                    </div>
+            <div className={`p-8 grid grid-cols-1 ${showGallery ? 'lg:grid-cols-3' : 'lg:grid-cols-1 w-full'} gap-8 h-full transition-all duration-500 overflow-y-auto custom-scrollbar`}>
+                {/* Left: Controls */}
+                <div className={`space-y-6 ${showGallery ? 'lg:col-span-1' : 'w-full max-w-full'}`}>
 
-                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">
-                        Prompt
-                    </label>
-
-                    <textarea
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                                e.preventDefault();
-                                handleGenerate();
-                            }
-                        }}
-                        className="w-full h-40 bg-[#0a0a0f] border border-white/10 rounded-xl p-4 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none transition-all"
-                        placeholder={`Describe what you want to create... (Ctrl + Enter to generate)\nOr Drag & Drop an Image here to Capture`}
-                    />
-
-                    <div className="flex items-center justify-between mt-2">
-                        <p className="text-xs text-slate-500 flex items-center gap-2">
-                            <Eye className="w-3 h-3" />
-                            <span>Tip: Drag an image to auto-generate a prompt</span>
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setShowPromptLibrary(true)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white hover:from-indigo-500 hover:to-purple-500 transition-all"
-                            >
-                                <BookOpen className="w-3 h-3" />
-                                Library
-                            </button>
-                            <button
-                                onClick={enhancePrompt}
-                                disabled={isEnhancing || !prompt.trim()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-purple-600/80 to-blue-600/80 text-white hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                            >
-                                {isEnhancing ? (
-                                    <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>
-                                ) : (
-                                    <><Sparkles className="w-3 h-3" /> Enhance Prompt</>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Scan Image Modal */}
-                    {showScanModal && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                            <div className="bg-[#18181b] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl relative">
-                                <button
-                                    onClick={() => setShowScanModal(false)}
-                                    className="absolute top-4 right-4 text-slate-500 hover:text-white"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-
-                                <div className="text-center space-y-4">
-                                    <div className="mx-auto w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
-                                        <Eye className="w-8 h-8 text-blue-400" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white">Scan Image to Prompt</h3>
-                                    <p className="text-sm text-slate-400">
-                                        Drag & drop an image here, or click to browse your files.
-                                        The AI will analyze it and write a prompt for you.
-                                    </p>
-
-                                    <div
-                                        className="border-2 border-dashed border-white/10 hover:border-blue-500/50 hover:bg-blue-500/5 rounded-xl p-10 cursor-pointer transition-all"
-                                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const file = e.dataTransfer.files[0];
-                                            if (file && file.type.startsWith('image/')) {
-                                                processImage(file);
-                                                setShowScanModal(false);
-                                            }
-                                        }}
-                                        onClick={() => document.getElementById('modal-upload-trigger')?.click()}
-                                    >
-                                        <Upload className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Drop Image Here</span>
-                                    </div>
-                                    <input
-                                        type="file"
-                                        id="modal-upload-trigger"
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            if (e.target.files?.[0]) {
-                                                processImage(e.target.files[0]);
-                                                setShowScanModal(false);
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="mt-6">
-                        <Button
-                            variant="primary"
-                            size="lg"
-                            className="w-full bg-white hover:bg-slate-200 text-black border-none shadow-lg transition-all duration-300 rounded-xl font-bold tracking-wide"
-                            isLoading={isGenerating}
-                            onClick={handleGenerate}
-                            disabled={!prompt.trim()}
-                        >
-                            {isGenerating ? 'Generating...' : 'Generate'}
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Advanced Settings (Collapsible) */}
-                <div className="bg-[#121218] border border-white/5 rounded-2xl p-6 shadow-xl leading-relaxed">
-                    <button
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                        className="w-full flex items-center justify-between text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                    {/* Prompt Container (Drag Target) */}
+                    <div
+                        className={`bg-[#121218] border transition-all duration-300 rounded-2xl p-6 shadow-xl relative overflow-hidden group/prompt ${isDragging ? 'border-white/50 bg-white/5' : 'border-white/5'}`}
+                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={handleDrop}
                     >
-                        <span>Advanced Settings</span>
-                        <ChevronRight
-                            className={`w-4 h-4 transition-transform duration-200 ${showAdvanced ? 'rotate-90' : ''
-                                }`}
+                        {/* Drag Overlay */}
+                        <div className={`absolute inset-0 z-50 flex items-center justify-center bg-[#121218]/90 backdrop-blur-sm transition-opacity duration-300 pointer-events-none ${isDragging ? 'opacity-100' : 'opacity-0'}`}>
+                            <div className="text-white font-bold text-lg animate-bounce flex flex-col items-center gap-2">
+                                <Upload className="w-8 h-8" />
+                                Drop Image to Analyze
+                            </div>
+                        </div>
+
+                        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">
+                            Prompt
+                        </label>
+
+                        <textarea
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                    e.preventDefault();
+                                    handleGenerate();
+                                }
+                            }}
+                            className="w-full h-40 bg-[#0a0a0f] border border-white/10 rounded-xl p-4 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none transition-all"
+                            placeholder={`Describe what you want to create... (Ctrl + Enter to generate)\nOr Drag & Drop an Image here to Capture`}
                         />
-                    </button>
 
-                    {showAdvanced && (
-                        <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
-                            {/* Face Detailer Toggle */}
-                            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                                <label className="text-xs text-slate-400 uppercase tracking-wider">
-                                    Face Detailer (Auto-Fix)
-                                </label>
+                        <div className="flex items-center justify-between mt-2">
+                            <p className="text-xs text-slate-500 flex items-center gap-2">
+                                <Eye className="w-3 h-3" />
+                                <span>Tip: Drag an image to auto-generate a prompt</span>
+                            </p>
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setUseFaceDetailer(!useFaceDetailer)}
-                                    className={`w-12 h-6 rounded-full transition-colors duration-200 flex items-center px-1 ${useFaceDetailer ? 'bg-blue-600' : 'bg-slate-700'
-                                        }`}
+                                    onClick={() => setShowPromptLibrary(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white hover:from-indigo-500 hover:to-purple-500 transition-all"
                                 >
-                                    <div
-                                        className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${useFaceDetailer ? 'translate-x-6' : 'translate-x-0'
-                                            }`}
-                                    />
+                                    <BookOpen className="w-3 h-3" />
+                                    Library
+                                </button>
+                                <button
+                                    onClick={enhancePrompt}
+                                    disabled={isEnhancing || !prompt.trim()}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-purple-600/80 to-blue-600/80 text-white hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                >
+                                    {isEnhancing ? (
+                                        <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>
+                                    ) : (
+                                        <><Sparkles className="w-3 h-3" /> Enhance Prompt</>
+                                    )}
                                 </button>
                             </div>
-                            {/* Missing Models Warning */}
-                            {!isCheckingModels && modelStatus.some(m => !m.exists) && (
-                                <div className="mb-6 p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md animate-in fade-in slide-in-from-top-4 duration-500">
-                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                                                <Download className="w-6 h-6 text-amber-500" />
-                                            </div>
-                                            <div>
-                                                <h2 className="text-lg font-bold text-white tracking-tight">Missing Models Required</h2>
-                                                <p className="text-sm text-slate-400 mt-1 max-w-md">
-                                                    To use Z-Image, you need to download the base models (approx. 19GB). These will be saved directly to your ComfyUI folder.
-                                                </p>
-                                            </div>
+                        </div>
+
+                        {/* Scan Image Modal */}
+                        {showScanModal && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                                <div className="bg-[#18181b] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl relative">
+                                    <button
+                                        onClick={() => setShowScanModal(false)}
+                                        className="absolute top-4 right-4 text-slate-500 hover:text-white"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+
+                                    <div className="text-center space-y-4">
+                                        <div className="mx-auto w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
+                                            <Eye className="w-8 h-8 text-blue-400" />
                                         </div>
-                                        <div className="flex flex-wrap gap-3">
-                                            {modelStatus.map(m => (
-                                                <div key={m.id} className="flex flex-col gap-2 min-w-[160px]">
-                                                    <button
-                                                        disabled={m.exists || m.progress.status === 'downloading'}
-                                                        onClick={() => handleDownloadModel(m.id)}
-                                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${m.exists
-                                                            ? 'bg-green-500/20 text-green-400 border border-green-500/20 cursor-default'
-                                                            : m.progress.status === 'downloading'
-                                                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
-                                                                : 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20'
-                                                            }`}
-                                                    >
-                                                        {m.exists ? '✓ Installed' : m.progress.status === 'downloading' ? 'Downloading...' : `Download ${m.id.toUpperCase()}`}
-                                                    </button>
-                                                    {m.progress.status === 'downloading' && (
-                                                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="bg-blue-500 h-full transition-all duration-300"
-                                                                style={{ width: `${(m.progress.downloaded / m.progress.total) * 100}%` }}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+                                        <h3 className="text-xl font-bold text-white">Scan Image to Prompt</h3>
+                                        <p className="text-sm text-slate-400">
+                                            Drag & drop an image here, or click to browse your files.
+                                            The AI will analyze it and write a prompt for you.
+                                        </p>
+
+                                        <div
+                                            className="border-2 border-dashed border-white/10 hover:border-blue-500/50 hover:bg-blue-500/5 rounded-xl p-10 cursor-pointer transition-all"
+                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                            onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const file = e.dataTransfer.files[0];
+                                                if (file && file.type.startsWith('image/')) {
+                                                    processImage(file);
+                                                    setShowScanModal(false);
+                                                }
+                                            }}
+                                            onClick={() => document.getElementById('modal-upload-trigger')?.click()}
+                                        >
+                                            <Upload className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+                                            <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Drop Image Here</span>
                                         </div>
+                                        <input
+                                            type="file"
+                                            id="modal-upload-trigger"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                if (e.target.files?.[0]) {
+                                                    processImage(e.target.files[0]);
+                                                    setShowScanModal(false);
+                                                }
+                                            }}
+                                        />
                                     </div>
                                 </div>
-                            )}
-                            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                                <label className="text-xs text-slate-400 uppercase tracking-wider">
-                                    Dual Person Mode
-                                </label>
-                                <button
-                                    onClick={() => setDualPersonMode(!dualPersonMode)}
-                                    className={`w-12 h-6 rounded-full transition-colors duration-200 flex items-center px-1 ${dualPersonMode ? 'bg-purple-600' : 'bg-slate-700'}`}
-                                >
-                                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${dualPersonMode ? 'translate-x-6' : 'translate-x-0'}`} />
-                                </button>
                             </div>
+                        )}
 
-                            {/* Dual Person Cards */}
-                            {dualPersonMode && (
-                                <div className="space-y-4 border-b border-white/5 pb-4">
-                                    {/* Person A */}
-                                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 space-y-3">
-                                        <label className="block text-xs font-bold text-purple-300 uppercase tracking-wider">Person A</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={personA.lora ? personA.lora : personALoraSearch}
-                                                onChange={(e) => { setPersonALoraSearch(e.target.value); setPersonA({ ...personA, lora: '' }); setShowPersonALoraList(true); }}
-                                                onFocus={() => setShowPersonALoraList(true)}
-                                                onBlur={() => setTimeout(() => setShowPersonALoraList(false), 200)}
-                                                placeholder="Select LoRA..."
-                                                className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-                                            />
-                                            {personA.lora && (
-                                                <button onClick={() => setPersonA({ ...personA, lora: '' })} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                            {showPersonALoraList && (
-                                                <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
-                                                    {availableLoras.filter(l => l.toLowerCase().includes(personALoraSearch.toLowerCase())).map((l, idx) => (
-                                                        <button key={idx} onClick={() => selectPersonALora(l)}
-                                                            className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors">{l}</button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-slate-500 w-8">Str</span>
-                                            <input type="range" min="0" max="2" step="0.05" value={personA.strength}
-                                                onChange={(e) => setPersonA({ ...personA, strength: parseFloat(e.target.value) })}
-                                                className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-400" />
-                                            <span className="text-xs text-slate-400 w-8 text-right">{personA.strength}</span>
-                                        </div>
-                                        <input type="text" value={personA.label} onChange={(e) => setPersonA({ ...personA, label: e.target.value })}
-                                            placeholder="Florence2 label (e.g. man)"
-                                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/30" />
-                                        <textarea value={personA.description} onChange={(e) => setPersonA({ ...personA, description: e.target.value })}
-                                            placeholder="Person A face description for detailer..."
-                                            className="w-full h-16 bg-[#0a0a0f] border border-white/10 rounded-lg p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/30 resize-none" />
-                                    </div>
+                        <div className="mt-6">
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                className="w-full bg-white hover:bg-slate-200 text-black border-none shadow-lg transition-all duration-300 rounded-xl font-bold tracking-wide"
+                                isLoading={isGenerating}
+                                onClick={handleGenerate}
+                                disabled={!prompt.trim()}
+                            >
+                                {isGenerating ? 'Generating...' : 'Generate'}
+                            </Button>
+                        </div>
+                    </div>
 
-                                    {/* Person B */}
-                                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
-                                        <label className="block text-xs font-bold text-blue-300 uppercase tracking-wider">Person B</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={personB.lora ? personB.lora : personBLoraSearch}
-                                                onChange={(e) => { setPersonBLoraSearch(e.target.value); setPersonB({ ...personB, lora: '' }); setShowPersonBLoraList(true); }}
-                                                onFocus={() => setShowPersonBLoraList(true)}
-                                                onBlur={() => setTimeout(() => setShowPersonBLoraList(false), 200)}
-                                                placeholder="Select LoRA..."
-                                                className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                                            />
-                                            {personB.lora && (
-                                                <button onClick={() => setPersonB({ ...personB, lora: '' })} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                            {showPersonBLoraList && (
-                                                <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
-                                                    {availableLoras.filter(l => l.toLowerCase().includes(personBLoraSearch.toLowerCase())).map((l, idx) => (
-                                                        <button key={idx} onClick={() => selectPersonBLora(l)}
-                                                            className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors">{l}</button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-slate-500 w-8">Str</span>
-                                            <input type="range" min="0" max="2" step="0.05" value={personB.strength}
-                                                onChange={(e) => setPersonB({ ...personB, strength: parseFloat(e.target.value) })}
-                                                className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-400" />
-                                            <span className="text-xs text-slate-400 w-8 text-right">{personB.strength}</span>
-                                        </div>
-                                        <input type="text" value={personB.label} onChange={(e) => setPersonB({ ...personB, label: e.target.value })}
-                                            placeholder="Florence2 label (e.g. woman)"
-                                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                                        <textarea value={personB.description} onChange={(e) => setPersonB({ ...personB, description: e.target.value })}
-                                            placeholder="Person B face description for detailer..."
-                                            className="w-full h-16 bg-[#0a0a0f] border border-white/10 rounded-lg p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
-                                    </div>
-                                </div>
-                            )}
+                    {/* Advanced Settings (Collapsible) */}
+                    <div className="bg-[#121218] border border-white/5 rounded-2xl p-6 shadow-xl leading-relaxed">
+                        <button
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="w-full flex items-center justify-between text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                        >
+                            <span>Advanced Settings</span>
+                            <ChevronRight
+                                className={`w-4 h-4 transition-transform duration-200 ${showAdvanced ? 'rotate-90' : ''
+                                    }`}
+                            />
+                        </button>
 
-                            {/* LoRA Stack (hidden in dual mode) */}
-                            {!dualPersonMode && (
-                                <div className="space-y-4 border-b border-white/5 pb-4">
-                                    <label className="block text-xs text-slate-400 uppercase tracking-wider">
-                                        LoRA Stack
+                        {showAdvanced && (
+                            <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                                {/* Face Detailer Toggle */}
+                                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                    <label className="text-xs text-slate-400 uppercase tracking-wider">
+                                        Face Detailer (Auto-Fix)
                                     </label>
+                                    <button
+                                        onClick={() => setUseFaceDetailer(!useFaceDetailer)}
+                                        className={`w-12 h-6 rounded-full transition-colors duration-200 flex items-center px-1 ${useFaceDetailer ? 'bg-blue-600' : 'bg-slate-700'
+                                            }`}
+                                    >
+                                        <div
+                                            className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${useFaceDetailer ? 'translate-x-6' : 'translate-x-0'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                    <label className="text-xs text-slate-400 uppercase tracking-wider">
+                                        Dual Person Mode
+                                    </label>
+                                    <button
+                                        onClick={() => setDualPersonMode(!dualPersonMode)}
+                                        className={`w-12 h-6 rounded-full transition-colors duration-200 flex items-center px-1 ${dualPersonMode ? 'bg-purple-600' : 'bg-slate-700'}`}
+                                    >
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${dualPersonMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </button>
+                                </div>
 
-                                    {/* LoRA Builder Input */}
-                                    <div className="space-y-3 bg-black/20 p-3 rounded-lg border border-white/5">
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={currentLora}
-                                                onChange={(e) => {
-                                                    setCurrentLora(e.target.value);
-                                                    setShowLoraList(true);
-                                                }}
-                                                onFocus={() => setShowLoraList(true)}
-                                                onBlur={() => setTimeout(() => setShowLoraList(false), 200)}
-                                                placeholder="Select LoRA..."
-                                                className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
-                                            />
-                                            {showLoraList && filteredLoras.length > 0 && (
-                                                <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
-                                                    {filteredLoras.map((l, idx) => (
-                                                        <button
-                                                            key={idx}
-                                                            onClick={() => {
-                                                                setCurrentLora(l);
-                                                                setShowLoraList(false);
-                                                            }}
-                                                            className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-                                                        >
-                                                            {l}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="2"
-                                                step="0.1"
-                                                value={currentLoraStrength}
-                                                onChange={(e) => setCurrentLoraStrength(parseFloat(e.target.value))}
-                                                className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
-                                            />
-                                            <span className="text-xs text-slate-400 w-8 text-right">{currentLoraStrength}</span>
-                                            <Button
-                                                size="sm"
-                                                variant="secondary"
-                                                onClick={addLora}
-                                                disabled={!currentLora}
-                                                className="h-7 text-xs"
-                                            >
-                                                Add
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    {/* Selected LoRAs List */}
-                                    {selectedLoras.length > 0 && (
-                                        <div className="space-y-2">
-                                            {selectedLoras.map((l, idx) => (
-                                                <div key={idx} className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg text-sm border border-white/5">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-slate-200 truncate max-w-[150px]" title={l.name}>{l.name}</span>
-                                                        <span className="text-xs text-slate-500">Str: {l.strength}</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => removeLora(idx)}
-                                                        className="text-slate-500 hover:text-red-400 transition-colors"
-                                                    >
+                                {/* Dual Person Cards */}
+                                {dualPersonMode && (
+                                    <div className="space-y-4 border-b border-white/5 pb-4">
+                                        {/* Person A */}
+                                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4 space-y-3">
+                                            <label className="block text-xs font-bold text-purple-300 uppercase tracking-wider">Person A</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={personA.lora ? personA.lora : personALoraSearch}
+                                                    onChange={(e) => { setPersonALoraSearch(e.target.value); setPersonA({ ...personA, lora: '' }); setShowPersonALoraList(true); }}
+                                                    onFocus={() => setShowPersonALoraList(true)}
+                                                    onBlur={() => setTimeout(() => setShowPersonALoraList(false), 200)}
+                                                    placeholder="Select LoRA..."
+                                                    className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                                                />
+                                                {personA.lora && (
+                                                    <button onClick={() => setPersonA({ ...personA, lora: '' })} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
                                                         <X className="w-4 h-4" />
                                                     </button>
-                                                </div>
-                                            ))}
+                                                )}
+                                                {showPersonALoraList && (
+                                                    <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
+                                                        {availableLoras.filter(l => l.toLowerCase().includes(personALoraSearch.toLowerCase())).map((l, idx) => (
+                                                            <button key={idx} onClick={() => selectPersonALora(l)}
+                                                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors">{l}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs text-slate-500 w-8">Str</span>
+                                                <input type="range" min="0" max="2" step="0.05" value={personA.strength}
+                                                    onChange={(e) => setPersonA({ ...personA, strength: parseFloat(e.target.value) })}
+                                                    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-400" />
+                                                <span className="text-xs text-slate-400 w-8 text-right">{personA.strength}</span>
+                                            </div>
+                                            <input type="text" value={personA.label} onChange={(e) => setPersonA({ ...personA, label: e.target.value })}
+                                                placeholder="Florence2 label (e.g. man)"
+                                                className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/30" />
+                                            <textarea value={personA.description} onChange={(e) => setPersonA({ ...personA, description: e.target.value })}
+                                                placeholder="Person A face description for detailer..."
+                                                className="w-full h-16 bg-[#0a0a0f] border border-white/10 rounded-lg p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/30 resize-none" />
                                         </div>
-                                    )}
-                                </div>
-                            )}
 
-                            {/* Negative Prompt */}
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2 uppercase tracking-wider">
-                                    Negative Prompt
-                                </label>
-                                <textarea
-                                    value={negativePrompt}
-                                    onChange={(e) => setNegativePrompt(e.target.value)}
-                                    className="w-full h-24 bg-[#0a0a0f] border border-white/10 rounded-xl p-3 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none transition-all"
-                                    placeholder="Things to avoid... (e.g. blurry, low quality)"
-                                />
-                            </div>
-
-                            {/* Steps */}
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2">
-                                    Steps: {steps}
-                                </label>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max="50"
-                                    value={steps}
-                                    onChange={(e) => setSteps(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
-                                />
-                            </div>
-
-                            {/* CFG Scale */}
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2">
-                                    CFG Scale: {cfg}
-                                </label>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max="20"
-                                    step="0.5"
-                                    value={cfg}
-                                    onChange={(e) => setCfg(parseFloat(e.target.value))}
-                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
-                                />
-                            </div>
-
-                            {/* Dimensions */}
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2">
-                                    Dimensions
-                                </label>
-                                <select
-                                    value={dimensions}
-                                    onChange={(e) => setDimensions(e.target.value)}
-                                    className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
-                                >
-                                    <option value="1504x1504">1504x1504 (1:1)</option>
-                                    <option value="1920x1080">1920x1080 (16:9)</option>
-                                    <option value="1080x1920">1080x1920 (9:16)</option>
-                                    <option value="1024x1024">1024x1024 (1:1)</option>
-                                </select>
-                            </div>
-
-                            {/* Style */}
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2">
-                                    Style
-                                </label>
-                                <select
-                                    value={style}
-                                    onChange={(e) => setStyle(e.target.value)}
-                                    className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
-                                >
-                                    {availableStyles.map((s) => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Seed */}
-                            <div>
-                                <label className="block text-xs text-slate-400 mb-2">
-                                    Seed (-1 for random)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={seed}
-                                    onChange={(e) => setSeed(parseInt(e.target.value))}
-                                    className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Right: Gallery / Preview */}
-            {showGallery && (
-                <div className="lg:col-span-2 bg-[#121218] border border-white/5 rounded-2xl p-1 flex flex-col items-center justify-center relative overflow-hidden group min-h-[600px] animate-in slide-in-from-right-4 duration-500">
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
-
-                    {isGenerating || execState === 'executing' ? (
-                        <div className="z-10 w-full max-w-md p-8 text-center space-y-6">
-                            <div className="relative w-24 h-24 mx-auto">
-                                <div className="absolute inset-0 border-4 border-white/20 rounded-full animate-pulse"></div>
-                                <div className="absolute inset-0 border-t-4 border-white rounded-full animate-spin"></div>
-                                <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-white animate-bounce" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <p className="text-white font-medium text-lg tracking-tight">{currentNodeName || 'Initializing...'}</p>
-                                {execProgress > 0 && <p className="text-white font-bold text-2xl">{execProgress}%</p>}
-                            </div>
-
-                            {execProgress > 0 && (
-                                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-white transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.3)]"
-                                        style={{ width: `${execProgress}%` }}
-                                    ></div>
-                                </div>
-                            )}
-
-                            <p className="text-slate-500 text-sm animate-pulse">Processing your vision...</p>
-                        </div>
-                    ) : generatedImages.length === 0 ? (
-                        <div className="text-center">
-                            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-500">
-                                <Sparkles className="w-10 h-10 text-slate-600" />
-                            </div>
-                            <p className="text-slate-500 font-medium">Ready for input</p>
-                            <p className="text-xs text-slate-600 mt-1">Generate a masterpiece</p>
-                        </div>
-                    ) : (
-                        <div className="w-full h-full p-4 overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {generatedImages.map((img, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="group relative aspect-square bg-black/20 rounded-xl overflow-hidden border border-white/10 hover:border-white/50 transition-all duration-300"
-                                    >
-                                        <img
-                                            src={img}
-                                            alt={`Generated ${idx}`}
-                                            className="w-full h-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-110"
-                                            onClick={() => setSelectedImage(img)}
-                                        />
-
-                                        {/* Hover Actions */}
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedImage(img);
-                                                }}
-                                                className="p-3 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"
-                                            >
-                                                <Maximize2 className="w-5 h-5 text-white" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    localStorage.setItem('active_input_image', img);
-                                                    toast('Image selected for Video generation! Go to Video tab.', 'success');
-                                                }}
-                                                className="p-3 bg-blue-500/20 hover:bg-blue-500/30 rounded-full backdrop-blur-sm transition-all"
-                                                title="Use as input for Video (LTX)"
-                                            >
-                                                <Video className="w-5 h-5 text-blue-400" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (confirm('Delete this image permanently?')) {
-                                                        handleDeleteImage(img, idx);
-                                                    }
-                                                }}
-                                                className="p-3 bg-red-500/20 hover:bg-red-500/30 rounded-full backdrop-blur-sm transition-all"
-                                            >
-                                                <Trash2 className="w-5 h-5 text-red-400" />
-                                            </button>
+                                        {/* Person B */}
+                                        <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
+                                            <label className="block text-xs font-bold text-blue-300 uppercase tracking-wider">Person B</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={personB.lora ? personB.lora : personBLoraSearch}
+                                                    onChange={(e) => { setPersonBLoraSearch(e.target.value); setPersonB({ ...personB, lora: '' }); setShowPersonBLoraList(true); }}
+                                                    onFocus={() => setShowPersonBLoraList(true)}
+                                                    onBlur={() => setTimeout(() => setShowPersonBLoraList(false), 200)}
+                                                    placeholder="Select LoRA..."
+                                                    className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                                                />
+                                                {personB.lora && (
+                                                    <button onClick={() => setPersonB({ ...personB, lora: '' })} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                {showPersonBLoraList && (
+                                                    <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
+                                                        {availableLoras.filter(l => l.toLowerCase().includes(personBLoraSearch.toLowerCase())).map((l, idx) => (
+                                                            <button key={idx} onClick={() => selectPersonBLora(l)}
+                                                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors">{l}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs text-slate-500 w-8">Str</span>
+                                                <input type="range" min="0" max="2" step="0.05" value={personB.strength}
+                                                    onChange={(e) => setPersonB({ ...personB, strength: parseFloat(e.target.value) })}
+                                                    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-400" />
+                                                <span className="text-xs text-slate-400 w-8 text-right">{personB.strength}</span>
+                                            </div>
+                                            <input type="text" value={personB.label} onChange={(e) => setPersonB({ ...personB, label: e.target.value })}
+                                                placeholder="Florence2 label (e.g. woman)"
+                                                className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                                            <textarea value={personB.description} onChange={(e) => setPersonB({ ...personB, description: e.target.value })}
+                                                placeholder="Person B face description for detailer..."
+                                                className="w-full h-16 bg-[#0a0a0f] border border-white/10 rounded-lg p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
                                         </div>
                                     </div>
-                                ))}
+                                )}
+
+                                {/* LoRA Stack (hidden in dual mode) */}
+                                {!dualPersonMode && (
+                                    <div className="space-y-4 border-b border-white/5 pb-4">
+                                        <label className="block text-xs text-slate-400 uppercase tracking-wider">
+                                            LoRA Stack
+                                        </label>
+
+                                        {/* LoRA Builder Input */}
+                                        <div className="space-y-3 bg-black/20 p-3 rounded-lg border border-white/5">
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={currentLora}
+                                                    onChange={(e) => {
+                                                        setCurrentLora(e.target.value);
+                                                        setShowLoraList(true);
+                                                    }}
+                                                    onFocus={() => setShowLoraList(true)}
+                                                    onBlur={() => setTimeout(() => setShowLoraList(false), 200)}
+                                                    placeholder="Select LoRA..."
+                                                    className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                                                />
+                                                {showLoraList && filteredLoras.length > 0 && (
+                                                    <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
+                                                        {filteredLoras.map((l, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    setCurrentLora(l);
+                                                                    setShowLoraList(false);
+                                                                }}
+                                                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                                                            >
+                                                                {l}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="2"
+                                                    step="0.1"
+                                                    value={currentLoraStrength}
+                                                    onChange={(e) => setCurrentLoraStrength(parseFloat(e.target.value))}
+                                                    className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
+                                                />
+                                                <span className="text-xs text-slate-400 w-8 text-right">{currentLoraStrength}</span>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={addLora}
+                                                    disabled={!currentLora}
+                                                    className="h-7 text-xs"
+                                                >
+                                                    Add
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* Selected LoRAs List */}
+                                        {selectedLoras.length > 0 && (
+                                            <div className="space-y-2">
+                                                {selectedLoras.map((l, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg text-sm border border-white/5">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-slate-200 truncate max-w-[150px]" title={l.name}>{l.name}</span>
+                                                            <span className="text-xs text-slate-500">Str: {l.strength}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => removeLora(idx)}
+                                                            className="text-slate-500 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Negative Prompt */}
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2 uppercase tracking-wider">
+                                        Negative Prompt
+                                    </label>
+                                    <textarea
+                                        value={negativePrompt}
+                                        onChange={(e) => setNegativePrompt(e.target.value)}
+                                        className="w-full h-24 bg-[#0a0a0f] border border-white/10 rounded-xl p-3 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none transition-all"
+                                        placeholder="Things to avoid... (e.g. blurry, low quality)"
+                                    />
+                                </div>
+
+                                {/* Steps */}
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2">
+                                        Steps: {steps}
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="50"
+                                        value={steps}
+                                        onChange={(e) => setSteps(parseInt(e.target.value))}
+                                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
+                                    />
+                                </div>
+
+                                {/* CFG Scale */}
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2">
+                                        CFG Scale: {cfg}
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="20"
+                                        step="0.5"
+                                        value={cfg}
+                                        onChange={(e) => setCfg(parseFloat(e.target.value))}
+                                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
+                                    />
+                                </div>
+
+                                {/* Dimensions */}
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2">
+                                        Dimensions
+                                    </label>
+                                    <select
+                                        value={dimensions}
+                                        onChange={(e) => setDimensions(e.target.value)}
+                                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                                    >
+                                        <option value="1504x1504">1504x1504 (1:1)</option>
+                                        <option value="1920x1080">1920x1080 (16:9)</option>
+                                        <option value="1080x1920">1080x1920 (9:16)</option>
+                                        <option value="1024x1024">1024x1024 (1:1)</option>
+                                    </select>
+                                </div>
+
+                                {/* Style */}
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2">
+                                        Style
+                                    </label>
+                                    <select
+                                        value={style}
+                                        onChange={(e) => setStyle(e.target.value)}
+                                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                                    >
+                                        {availableStyles.map((s) => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Seed */}
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-2">
+                                        Seed (-1 for random)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={seed}
+                                        onChange={(e) => setSeed(parseInt(e.target.value))}
+                                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-            )}
 
-            {/* Prompt Library Drawer */}
-            <PromptLibrary
-                isOpen={showPromptLibrary}
-                onClose={() => setShowPromptLibrary(false)}
-                onSelect={(positive, negative) => {
-                    setPrompt(positive);
-                    if (negative) setNegativePrompt(negative);
-                }}
-            />
+                {/* Right: Gallery / Preview */}
+                {showGallery && (
+                    <div className="lg:col-span-2 bg-[#121218] border border-white/5 rounded-2xl p-1 flex flex-col items-center justify-center relative overflow-hidden group min-h-[600px] animate-in slide-in-from-right-4 duration-500">
+                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
 
-            {/* Lightbox / Fullscreen Preview */}
-            {selectedImage && (
-                <div
-                    className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200"
-                    onClick={() => setSelectedImage(null)}
-                >
-                    <button
+                        {isGenerating || execState === 'executing' ? (
+                            <div className="z-10 w-full max-w-md p-8 text-center space-y-6">
+                                <div className="relative w-24 h-24 mx-auto">
+                                    <div className="absolute inset-0 border-4 border-white/20 rounded-full animate-pulse"></div>
+                                    <div className="absolute inset-0 border-t-4 border-white rounded-full animate-spin"></div>
+                                    <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-white animate-bounce" />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-white font-medium text-lg tracking-tight">{currentNodeName || 'Initializing...'}</p>
+                                    {execProgress > 0 && <p className="text-white font-bold text-2xl">{execProgress}%</p>}
+                                </div>
+
+                                {execProgress > 0 && (
+                                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-white transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+                                            style={{ width: `${execProgress}%` }}
+                                        ></div>
+                                    </div>
+                                )}
+
+                                <p className="text-slate-500 text-sm animate-pulse">Processing your vision...</p>
+                            </div>
+                        ) : generatedImages.length === 0 ? (
+                            <div className="text-center">
+                                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-500">
+                                    <Sparkles className="w-10 h-10 text-slate-600" />
+                                </div>
+                                <p className="text-slate-500 font-medium">Ready for input</p>
+                                <p className="text-xs text-slate-600 mt-1">Generate a masterpiece</p>
+                            </div>
+                        ) : (
+                            <div className="w-full h-full p-4 overflow-y-auto custom-scrollbar">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {generatedImages.map((img, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="group relative aspect-square bg-black/20 rounded-xl overflow-hidden border border-white/10 hover:border-white/50 transition-all duration-300"
+                                        >
+                                            <img
+                                                src={img}
+                                                alt={`Generated ${idx}`}
+                                                className="w-full h-full object-cover cursor-pointer transition-transform duration-500 group-hover:scale-110"
+                                                onClick={() => setSelectedImage(img)}
+                                            />
+
+                                            {/* Hover Actions */}
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedImage(img);
+                                                    }}
+                                                    className="p-3 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all"
+                                                >
+                                                    <Maximize2 className="w-5 h-5 text-white" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        localStorage.setItem('active_input_image', img);
+                                                        toast('Image selected for Video generation! Go to Video tab.', 'success');
+                                                    }}
+                                                    className="p-3 bg-blue-500/20 hover:bg-blue-500/30 rounded-full backdrop-blur-sm transition-all"
+                                                    title="Use as input for Video (LTX)"
+                                                >
+                                                    <Video className="w-5 h-5 text-blue-400" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm('Delete this image permanently?')) {
+                                                            handleDeleteImage(img, idx);
+                                                        }
+                                                    }}
+                                                    className="p-3 bg-red-500/20 hover:bg-red-500/30 rounded-full backdrop-blur-sm transition-all"
+                                                >
+                                                    <Trash2 className="w-5 h-5 text-red-400" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Prompt Library Drawer */}
+                <PromptLibrary
+                    isOpen={showPromptLibrary}
+                    onClose={() => setShowPromptLibrary(false)}
+                    onSelect={(positive, negative) => {
+                        setPrompt(positive);
+                        if (negative) setNegativePrompt(negative);
+                    }}
+                />
+
+                {/* Lightbox / Fullscreen Preview */}
+                {selectedImage && (
+                    <div
+                        className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200"
                         onClick={() => setSelectedImage(null)}
-                        className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                     >
-                        <X className="w-6 h-6" />
-                    </button>
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
 
-                    <img
-                        src={selectedImage}
-                        alt="Full size"
-                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                </div>
-            )}
+                        <img
+                            src={selectedImage}
+                            alt="Full size"
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

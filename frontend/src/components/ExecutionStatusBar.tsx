@@ -1,7 +1,7 @@
 // Live ComfyUI Execution Status Bar
 // Shows under the header during workflow execution
 import { useComfyExecution } from '../contexts/ComfyExecutionContext';
-import { Loader2, Download, CheckCircle2, AlertTriangle, Cpu } from 'lucide-react';
+import { Loader2, Download, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export const ExecutionStatusBar = () => {
     const {
@@ -19,6 +19,10 @@ export const ExecutionStatusBar = () => {
 
     // Error state
     if (state === 'error' && error) {
+        // Suppress "Value not in list" errors (model selection errors)
+        // since we handle these with our own Model Downloader UI
+        if (error.message.includes('Value not in list')) return null;
+
         return (
             <div className="h-10 bg-red-500/10 border-b border-red-500/20 flex items-center px-6 gap-3 animate-in slide-in-from-top-2 duration-300">
                 <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
@@ -79,11 +83,10 @@ export const ExecutionStatusBar = () => {
             {/* Progress bar */}
             <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden ml-2">
                 <div
-                    className={`h-full rounded-full transition-all duration-300 ease-out ${
-                        isDownloaderNode
-                            ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.4)]'
-                            : 'bg-white/70 shadow-[0_0_8px_rgba(255,255,255,0.2)]'
-                    }`}
+                    className={`h-full rounded-full transition-all duration-300 ease-out ${isDownloaderNode
+                        ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.4)]'
+                        : 'bg-white/70 shadow-[0_0_8px_rgba(255,255,255,0.2)]'
+                        }`}
                     style={{ width: `${progress}%` }}
                 />
             </div>

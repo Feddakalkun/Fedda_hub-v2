@@ -1,5 +1,5 @@
 // Image Generation Page
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Sparkles, ChevronRight, Maximize2, X, Loader2, Eye, Upload, Download, Trash2, Video, BookOpen } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { comfyService } from '../services/comfyService';
@@ -47,7 +47,44 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
     // Prompt Library state
     const [showPromptLibrary, setShowPromptLibrary] = useState(false);
 
-    // Dual Person Mode
+    // Model download state
+    const [modelStatus, setModelStatus] = useState<any[]>([]);
+    const [isCheckingModels, setIsCheckingModels] = useState(true);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    // Fetch models status
+    const checkModels = useCallback(async () => {
+        try {
+            const resp = await fetch('http://localhost:8000/api/models/status?group=z-image');
+            const data = await resp.json();
+            if (data.success) {
+                setModelStatus(data.models);
+            }
+        } catch (e) {
+            console.error('Failed to check models:', e);
+        } finally {
+            setIsCheckingModels(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        checkModels();
+        // Poll status if downloading
+        let interval: any;
+        if (isDownloading) {
+            interval = setInterval(checkModels, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [checkModels, isDownloading]);
+
+    const handleDownloadModel = async (modelId: string) => {
+        setIsDownloading(true);
+        try {
+            await fetch(`http://localhost:8000/api/models/download?model_id=${modelId}`, { method: 'POST' });
+        } catch (e) {
+            console.error('Download trigger failed:', e);
+        }
+    };
     const [dualPersonMode, setDualPersonMode] = useState(false);
     interface PersonConfig {
         lora: string;
@@ -710,7 +747,50 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                     />
                                 </button>
                             </div>
-                            {/* Dual Person Mode Toggle */}
+                            {/* Missing Models Warning */}
+                            {!isCheckingModels && modelStatus.some(m => !m.exists) && (
+                                <div className="mb-6 p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 backdrop-blur-md animate-in fade-in slide-in-from-top-4 duration-500">
+                                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                                <Download className="w-6 h-6 text-amber-500" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-bold text-white tracking-tight">Missing Models Required</h2>
+                                                <p className="text-sm text-slate-400 mt-1 max-w-md">
+                                                    To use Z-Image, you need to download the base models (approx. 19GB). These will be saved directly to your ComfyUI folder.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-3">
+                                            {modelStatus.map(m => (
+                                                <div key={m.id} className="flex flex-col gap-2 min-w-[160px]">
+                                                    <button
+                                                        disabled={m.exists || m.progress.status === 'downloading'}
+                                                        onClick={() => handleDownloadModel(m.id)}
+                                                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${m.exists
+                                                            ? 'bg-green-500/20 text-green-400 border border-green-500/20 cursor-default'
+                                                            : m.progress.status === 'downloading'
+                                                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
+                                                                : 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20'
+                                                            }`}
+                                                    >
+                                                        {m.exists ? '✓ Installed' : m.progress.status === 'downloading' ? 'Downloading...' : `Download ${m.id.toUpperCase()}`}
+                                                    </button>
+                                                    {m.progress.status === 'downloading' && (
+                                                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="bg-blue-500 h-full transition-all duration-300"
+                                                                style={{ width: `${(m.progress.downloaded / m.progress.total) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex items-center justify-between border-b border-white/5 pb-4">
                                 <label className="text-xs text-slate-400 uppercase tracking-wider">
                                     Dual Person Mode

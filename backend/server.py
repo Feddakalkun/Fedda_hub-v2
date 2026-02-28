@@ -3,6 +3,8 @@ Simple FastAPI server for audio transcription
 Runs on port 8000
 """
 import sys
+import threading
+import requests
 from pathlib import Path
 
 # Add backend directory to Python path
@@ -766,6 +768,99 @@ async def expand_wildcards(text: str):
     except Exception as e:
         print(f"Wildcard expansion error: {e}")
         return {"success": False, "error": str(e), "expanded": text}
+
+
+# === MODEL MANAGER ===
+
+COMFY_MODELS_DIR = Path(__file__).parent.parent / "ComfyUI" / "models"
+
+REQUIRED_MODELS = {
+    "z-image": [
+        {
+            "id": "unet",
+            "name": "z_image_turbo_bf16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+            "path": "diffusion_models/z_image_turbo_bf16.safetensors",
+            "size_gb": 11.5
+        },
+        {
+            "id": "clip",
+            "name": "qwen_3_4b.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors",
+            "path": "clip/qwen_3_4b.safetensors",
+            "size_gb": 7.5
+        },
+        {
+            "id": "vae",
+            "name": "z-image-vae.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors",
+            "path": "vae/z-image-vae.safetensors",
+            "size_gb": 0.4
+        }
+    ]
+}
+
+download_progress = {} # { model_id: { downloaded: 0, total: 0, status: 'idle' } }
+
+def start_download(model_info):
+    model_id = model_info['id']
+    target_path = COMFY_MODELS_DIR / model_info['path']
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    download_progress[model_id] = {"status": "downloading", "downloaded": 0, "total": 0, "name": model_info['name']}
+    
+    try:
+        response = requests.get(model_info['url'], stream=True, timeout=30)
+        total_size = int(response.headers.get('content-length', 0))
+        download_progress[model_id]['total'] = total_size
+        
+        with open(target_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=1024*1024): # 1MB chunks
+                if chunk:
+                    f.write(chunk)
+                    download_progress[model_id]['downloaded'] += len(chunk)
+        
+        download_progress[model_id]['status'] = "completed"
+    except Exception as e:
+        print(f"Download error for {model_id}: {e}")
+        download_progress[model_id]['status'] = "error"
+        download_progress[model_id]['error'] = str(e)
+
+@app.get("/api/models/status")
+async def get_models_status(group: str = "z-image"):
+    """Check which models are missing and return current download progress."""
+    if group not in REQUIRED_MODELS:
+        return {"success": False, "error": "Unknown model group"}
+    
+    results = []
+    for m in REQUIRED_MODELS[group]:
+        full_path = COMFY_MODELS_DIR / m['path']
+        exists = full_path.exists()
+        current_prog = download_progress.get(m['id'], {"status": "idle", "downloaded": 0, "total": 0})
+        
+        results.append({
+            **m,
+            "exists": exists,
+            "progress": current_prog
+        })
+    
+    return {"success": True, "models": results}
+
+@app.post("/api/models/download")
+async def trigger_download(model_id: str, group: str = "z-image"):
+    """Trigger background download for a specific model."""
+    if group not in REQUIRED_MODELS:
+        return {"success": False, "error": "Unknown group"}
+    
+    model_to_download = next((m for m in REQUIRED_MODELS[group] if m['id'] == model_id), None)
+    if not model_to_download:
+        return {"success": False, "error": "Model ID not found"}
+        
+    # Start thread
+    thread = threading.Thread(target=start_download, args=(model_to_download,))
+    thread.start()
+    
+    return {"success": True, "message": f"Download started for {model_id}"}
 
 
 if __name__ == "__main__":

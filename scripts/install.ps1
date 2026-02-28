@@ -708,7 +708,6 @@ Write-Log "`n[ComfyUI 8.5/9] Installing Character Workflow Nodes..."
 Write-Log "  - ComfyUI-Impact-Pack (SAM, FaceDetailer)"
 Write-Log "  - ComfyUI InstantID (facial identity)"
 Write-Log "  - AutoCropFaces (intelligent detection)"
-Write-Log "  - Chibi Nodes (UI components)"
 
 $CustomNodesDir = Join-Path $ComfyDir "custom_nodes"
 
@@ -757,7 +756,6 @@ function Install-CustomNode {
 Install-CustomNode "ComfyUI-Impact-Pack" "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git" "ComfyUI-Impact-Pack"
 Install-CustomNode "ComfyUI InstantID" "https://github.com/cubiq/ComfyUI_InstantID.git" "comfyui_instantid"
 Install-CustomNode "AutoCropFaces" "https://github.com/liusida/ComfyUI-AutoCropFaces.git" "ComfyUI-AutoCropFaces"
-Install-CustomNode "Chibi Nodes" "https://github.com/CheapCyborg/Chibi-Nodes.git" "chibi"
 Install-CustomNode "ComfyUI_LayerStyle_Advance" "https://github.com/chflame163/ComfyUI_LayerStyle_Advance.git" "ComfyUI_LayerStyle_Advance"
 
 Set-Location $RootPath

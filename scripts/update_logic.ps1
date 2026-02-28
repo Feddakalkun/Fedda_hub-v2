@@ -165,7 +165,29 @@ $FilesToDelete = @(
 $FoldersToDelete = @(
     "assets\loading-screen",
     "assets\workflows",
-    "ComfyUI\custom_nodes\ComfyUI_Searge_LLM"
+    "ComfyUI\custom_nodes\ComfyUI_Searge_LLM",
+    "ComfyUI\custom_nodes\SeargeSDXL",
+    "ComfyUI\custom_nodes\ComfyUI-Custom-Nodes",
+    "ComfyUI\custom_nodes\ComfyUI-Workspace-Manager",
+    "ComfyUI\custom_nodes\ComfyUI-AutoConnect",
+    "ComfyUI\custom_nodes\ComfyUI-Auto-Nodes-Layout",
+    "ComfyUI\custom_nodes\ComfyUI-Align",
+    "ComfyUI\custom_nodes\ComfyUI-Dev-Utils",
+    "ComfyUI\custom_nodes\ComfyUI-FlowBuilder-Nodes",
+    "ComfyUI\custom_nodes\ComfyUI-Aspire",
+    "ComfyUI\custom_nodes\ComfyUI-AnimateDiff-Evolved",
+    "ComfyUI\custom_nodes\ComfyMath",
+    "ComfyUI\custom_nodes\mikey_nodes",
+    "ComfyUI\custom_nodes\joycaption_comfyui",
+    "ComfyUI\custom_nodes\ComfyUI-Image-Selector",
+    "ComfyUI\custom_nodes\masquerade-nodes-comfyui",
+    "ComfyUI\custom_nodes\ComfyUI_Comfyroll_CustomNodes",
+    "ComfyUI\custom_nodes\chibi",
+    "ComfyUI\custom_nodes\comfy-image-saver",
+    "ComfyUI\custom_nodes\ComfyUI-Timer-Nodes",
+    "ComfyUI\custom_nodes\comfyui-various",
+    "ComfyUI\custom_nodes\was-node-suite-comfyui",
+    "ComfyUI\custom_nodes\ComfyUI-Image-Saver"
 )
 
 # Clean up duplicate loading videos (now in frontend/public/loading/pingpong/)

@@ -15,51 +15,6 @@
     "folder": "ComfyUI-Impact-Pack"
   },
   {
-    "name": "ComfyUI-Custom-Nodes (Zuellni)",
-    "url": "https://github.com/Zuellni/ComfyUI-Custom-Nodes.git",
-    "folder": "ComfyUI-Custom-Nodes"
-  },
-  {
-    "name": "WAS Node Suite",
-    "url": "https://github.com/WASasquatch/was-node-suite-comfyui.git",
-    "folder": "was-node-suite-comfyui"
-  },
-  {
-    "name": "ComfyUI-Workspace-Manager",
-    "url": "https://github.com/11cafe/comfyui-workspace-manager.git",
-    "folder": "ComfyUI-Workspace-Manager"
-  },
-  {
-    "name": "ComfyUI-AutoConnect",
-    "url": "https://github.com/palant/autoconnect-comfyui.git",
-    "folder": "ComfyUI-AutoConnect"
-  },
-  {
-    "name": "ComfyUI-Auto-Nodes-Layout",
-    "url": "https://github.com/phineas-pta/comfyui-auto-nodes-layout.git",
-    "folder": "ComfyUI-Auto-Nodes-Layout"
-  },
-  {
-    "name": "ComfyUI-Align",
-    "url": "https://github.com/Moooonet/ComfyUI-Align.git",
-    "folder": "ComfyUI-Align"
-  },
-  {
-    "name": "ComfyUI-Dev-Utils",
-    "url": "https://github.com/ty0x2333/ComfyUI-Dev-Utils.git",
-    "folder": "ComfyUI-Dev-Utils"
-  },
-  {
-    "name": "ComfyUI-FlowBuilder Nodes",
-    "url": "https://github.com/komojini/komojini-comfyui-nodes.git",
-    "folder": "ComfyUI-FlowBuilder-Nodes"
-  },
-  {
-    "name": "ComfyUI-Studio Nodes",
-    "url": "https://github.com/comfyuistudio/ComfyUI-Studio-nodes.git",
-    "folder": "ComfyUI-Studio-nodes"
-  },
-  {
     "name": "ComfyUI-VideoHelperSuite",
     "url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git",
     "folder": "ComfyUI-VideoHelperSuite"
@@ -100,11 +55,6 @@
     "folder": "ComfyUI-Inspire-Pack"
   },
   {
-    "name": "ComfyMath",
-    "url": "https://github.com/evanspearman/ComfyMath.git",
-    "folder": "ComfyMath"
-  },
-  {
     "name": "ComfyUI-WanVideoWrapper",
     "url": "https://github.com/kijai/ComfyUI-WanVideoWrapper.git",
     "folder": "ComfyUI-WanVideoWrapper"
@@ -113,11 +63,6 @@
     "name": "ComfyUI_LayerStyle",
     "url": "https://github.com/chflame163/ComfyUI_LayerStyle.git",
     "folder": "ComfyUI_LayerStyle"
-  },
-  {
-    "name": "ComfyUI-Image-Selector",
-    "url": "https://github.com/SLAPaper/ComfyUI-Image-Selector.git",
-    "folder": "ComfyUI-Image-Selector"
   },
   {
     "name": "ComfyUI-Frame-Interpolation",
@@ -130,29 +75,9 @@
     "folder": "ComfyUI-Easy-Use"
   },
   {
-    "name": "mikey_nodes",
-    "url": "https://github.com/bash-j/mikey_nodes.git",
-    "folder": "mikey_nodes"
-  },
-  {
-    "name": "ComfyUI-JoyCaption",
-    "url": "https://github.com/fpgaminer/joycaption_comfyui.git",
-    "folder": "joycaption_comfyui"
-  },
-  {
     "name": "ComfyUI-GGUF",
     "url": "https://github.com/city96/ComfyUI-GGUF.git",
     "folder": "ComfyUI-GGUF"
-  },
-  {
-    "name": "SeargeSDXL",
-    "url": "https://github.com/SeargeDP/SeargeSDXL.git",
-    "folder": "SeargeSDXL"
-  },
-  {
-    "name": "ComfyUI_Searge_LLM",
-    "url": "https://github.com/SeargeDP/ComfyUI_Searge_LLM.git",
-    "folder": "ComfyUI_Searge_LLM"
   },
   {
     "name": "ComfyUI-Florence2",
@@ -171,11 +96,6 @@
     "folder": "ComfyUI-Styles_CSV_Loader"
   },
   {
-    "name": "ComfyUI-Image-Saver",
-    "url": "https://github.com/farizrifqi/ComfyUI-Image-Saver.git",
-    "folder": "ComfyUI-Image-Saver"
-  },
-  {
     "name": "ComfyUI-Image-Filters",
     "url": "https://github.com/spacepxl/ComfyUI-Image-Filters.git",
     "folder": "ComfyUI-Image-Filters"
@@ -186,16 +106,6 @@
     "folder": "comfyui_face_parsing"
   },
   {
-    "name": "Masquerade Nodes",
-    "url": "https://github.com/BadCafeCode/masquerade-nodes-comfyui.git",
-    "folder": "masquerade-nodes-comfyui"
-  },
-  {
-    "name": "ComfyRoll Custom Nodes",
-    "url": "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git",
-    "folder": "ComfyUI_Comfyroll_CustomNodes"
-  },
-  {
     "name": "InstantID",
     "url": "https://github.com/cubiq/ComfyUI_InstantID.git",
     "folder": "comfyui_instantid"
@@ -204,11 +114,6 @@
     "name": "AutoCropFaces",
     "url": "https://github.com/liusida/ComfyUI-AutoCropFaces.git",
     "folder": "ComfyUI-AutoCropFaces"
-  },
-  {
-    "name": "Chibi Custom Nodes",
-    "url": "https://github.com/CheapCyborg/Chibi-Nodes.git",
-    "folder": "chibi"
   },
   {
     "name": "ComfyUI_LayerStyle_Advance",
@@ -231,6 +136,11 @@
     "folder": "ComfyUI-Custom-Scripts"
   },
   {
+    "name": "ComfyUI-Studio Nodes",
+    "url": "https://github.com/comfyuistudio/ComfyUI-Studio-nodes.git",
+    "folder": "ComfyUI-Studio-nodes"
+  },
+  {
     "name": "cg-use-everywhere",
     "url": "https://github.com/chrisgoringe/cg-use-everywhere.git",
     "folder": "cg-use-everywhere"
@@ -241,24 +151,9 @@
     "folder": "ComfyUI_tinyterraNodes"
   },
   {
-    "name": "ComfyUI-SaveImageWithMetaData",
-    "url": "https://github.com/giriss/comfy-image-saver.git",
-    "folder": "comfy-image-saver"
-  },
-  {
     "name": "ComfyUI-segment-anything-2",
     "url": "https://github.com/kijai/ComfyUI-segment-anything-2.git",
     "folder": "ComfyUI-segment-anything-2"
-  },
-  {
-    "name": "ComfyUI-Aspire",
-    "url": "https://github.com/kijai/ComfyUI-Aspire.git",
-    "folder": "ComfyUI-Aspire"
-  },
-  {
-    "name": "ComfyUI-AnimateDiff-Evolved",
-    "url": "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved.git",
-    "folder": "ComfyUI-AnimateDiff-Evolved"
   },
   {
     "name": "ComfyUI-MelBandRoFormer",
@@ -269,16 +164,6 @@
     "name": "ComfyUI-LTXVideo",
     "url": "https://github.com/Lightricks/ComfyUI-LTXVideo",
     "folder": "ComfyUI-LTXVideo"
-  },
-  {
-    "name": "ComfyUI-Timer-Nodes",
-    "url": "https://github.com/Shannooty/ComfyUI-Timer-Nodes",
-    "folder": "ComfyUI-Timer-Nodes"
-  },
-  {
-    "name": "comfyui-various",
-    "url": "https://github.com/jamesWalker55/comfyui-various",
-    "folder": "comfyui-various"
   },
   {
     "name": "audio-separation-nodes-comfyui",

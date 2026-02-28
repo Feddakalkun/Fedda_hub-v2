@@ -1,12 +1,13 @@
 // Image Generation Page
 import { useState, useEffect } from 'react';
-import { Sparkles, ChevronRight, Maximize2, X, Loader2, Eye, Upload, Download, Trash2, Video } from 'lucide-react';
+import { Sparkles, ChevronRight, Maximize2, X, Loader2, Eye, Upload, Download, Trash2, Video, BookOpen } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { comfyService } from '../services/comfyService';
 import { assistantService } from '../services/assistantService';
 import { ollamaService } from '../services/ollamaService';
 import { useComfyExecution } from '../contexts/ComfyExecutionContext';
 import { useToast } from '../components/ui/Toast';
+import { PromptLibrary } from '../components/PromptLibrary';
 
 interface ImagePageProps {
     modelId: string;
@@ -42,6 +43,9 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
 
     // Gallery Toggle State
     const [showGallery, setShowGallery] = useState(true);
+
+    // Prompt Library state
+    const [showPromptLibrary, setShowPromptLibrary] = useState(false);
 
     // Dual Person Mode
     const [dualPersonMode, setDualPersonMode] = useState(false);
@@ -566,17 +570,26 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                             <Eye className="w-3 h-3" />
                             <span>Tip: Drag an image to auto-generate a prompt</span>
                         </p>
-                        <button
-                            onClick={enhancePrompt}
-                            disabled={isEnhancing || !prompt.trim()}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-purple-600/80 to-blue-600/80 text-white hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                        >
-                            {isEnhancing ? (
-                                <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>
-                            ) : (
-                                <><Sparkles className="w-3 h-3" /> Enhance Prompt</>
-                            )}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowPromptLibrary(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white hover:from-indigo-500 hover:to-purple-500 transition-all"
+                            >
+                                <BookOpen className="w-3 h-3" />
+                                Library
+                            </button>
+                            <button
+                                onClick={enhancePrompt}
+                                disabled={isEnhancing || !prompt.trim()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-purple-600/80 to-blue-600/80 text-white hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                            >
+                                {isEnhancing ? (
+                                    <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>
+                                ) : (
+                                    <><Sparkles className="w-3 h-3" /> Enhance Prompt</>
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     {/* Scan Image Modal */}
@@ -702,14 +715,14 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                             <input
                                                 type="text"
                                                 value={personA.lora ? personA.lora : personALoraSearch}
-                                                onChange={(e) => { setPersonALoraSearch(e.target.value); setPersonA({...personA, lora: ''}); setShowPersonALoraList(true); }}
+                                                onChange={(e) => { setPersonALoraSearch(e.target.value); setPersonA({ ...personA, lora: '' }); setShowPersonALoraList(true); }}
                                                 onFocus={() => setShowPersonALoraList(true)}
                                                 onBlur={() => setTimeout(() => setShowPersonALoraList(false), 200)}
                                                 placeholder="Select LoRA..."
                                                 className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
                                             />
                                             {personA.lora && (
-                                                <button onClick={() => setPersonA({...personA, lora: ''})} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
+                                                <button onClick={() => setPersonA({ ...personA, lora: '' })} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
                                                     <X className="w-4 h-4" />
                                                 </button>
                                             )}
@@ -725,14 +738,14 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs text-slate-500 w-8">Str</span>
                                             <input type="range" min="0" max="2" step="0.05" value={personA.strength}
-                                                onChange={(e) => setPersonA({...personA, strength: parseFloat(e.target.value)})}
+                                                onChange={(e) => setPersonA({ ...personA, strength: parseFloat(e.target.value) })}
                                                 className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-400" />
                                             <span className="text-xs text-slate-400 w-8 text-right">{personA.strength}</span>
                                         </div>
-                                        <input type="text" value={personA.label} onChange={(e) => setPersonA({...personA, label: e.target.value})}
+                                        <input type="text" value={personA.label} onChange={(e) => setPersonA({ ...personA, label: e.target.value })}
                                             placeholder="Florence2 label (e.g. man)"
                                             className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/30" />
-                                        <textarea value={personA.description} onChange={(e) => setPersonA({...personA, description: e.target.value})}
+                                        <textarea value={personA.description} onChange={(e) => setPersonA({ ...personA, description: e.target.value })}
                                             placeholder="Person A face description for detailer..."
                                             className="w-full h-16 bg-[#0a0a0f] border border-white/10 rounded-lg p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/30 resize-none" />
                                     </div>
@@ -744,14 +757,14 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                             <input
                                                 type="text"
                                                 value={personB.lora ? personB.lora : personBLoraSearch}
-                                                onChange={(e) => { setPersonBLoraSearch(e.target.value); setPersonB({...personB, lora: ''}); setShowPersonBLoraList(true); }}
+                                                onChange={(e) => { setPersonBLoraSearch(e.target.value); setPersonB({ ...personB, lora: '' }); setShowPersonBLoraList(true); }}
                                                 onFocus={() => setShowPersonBLoraList(true)}
                                                 onBlur={() => setTimeout(() => setShowPersonBLoraList(false), 200)}
                                                 placeholder="Select LoRA..."
                                                 className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                                             />
                                             {personB.lora && (
-                                                <button onClick={() => setPersonB({...personB, lora: ''})} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
+                                                <button onClick={() => setPersonB({ ...personB, lora: '' })} className="absolute right-2 top-2 text-slate-500 hover:text-red-400">
                                                     <X className="w-4 h-4" />
                                                 </button>
                                             )}
@@ -767,14 +780,14 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs text-slate-500 w-8">Str</span>
                                             <input type="range" min="0" max="2" step="0.05" value={personB.strength}
-                                                onChange={(e) => setPersonB({...personB, strength: parseFloat(e.target.value)})}
+                                                onChange={(e) => setPersonB({ ...personB, strength: parseFloat(e.target.value) })}
                                                 className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-400" />
                                             <span className="text-xs text-slate-400 w-8 text-right">{personB.strength}</span>
                                         </div>
-                                        <input type="text" value={personB.label} onChange={(e) => setPersonB({...personB, label: e.target.value})}
+                                        <input type="text" value={personB.label} onChange={(e) => setPersonB({ ...personB, label: e.target.value })}
                                             placeholder="Florence2 label (e.g. woman)"
                                             className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                                        <textarea value={personB.description} onChange={(e) => setPersonB({...personB, description: e.target.value})}
+                                        <textarea value={personB.description} onChange={(e) => setPersonB({ ...personB, description: e.target.value })}
                                             placeholder="Person B face description for detailer..."
                                             className="w-full h-16 bg-[#0a0a0f] border border-white/10 rounded-lg p-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
                                     </div>
@@ -783,87 +796,87 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
 
                             {/* LoRA Stack (hidden in dual mode) */}
                             {!dualPersonMode && (
-                            <div className="space-y-4 border-b border-white/5 pb-4">
-                                <label className="block text-xs text-slate-400 uppercase tracking-wider">
-                                    LoRA Stack
-                                </label>
+                                <div className="space-y-4 border-b border-white/5 pb-4">
+                                    <label className="block text-xs text-slate-400 uppercase tracking-wider">
+                                        LoRA Stack
+                                    </label>
 
-                                {/* LoRA Builder Input */}
-                                <div className="space-y-3 bg-black/20 p-3 rounded-lg border border-white/5">
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={currentLora}
-                                            onChange={(e) => {
-                                                setCurrentLora(e.target.value);
-                                                setShowLoraList(true);
-                                            }}
-                                            onFocus={() => setShowLoraList(true)}
-                                            onBlur={() => setTimeout(() => setShowLoraList(false), 200)}
-                                            placeholder="Select LoRA..."
-                                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
-                                        />
-                                        {showLoraList && filteredLoras.length > 0 && (
-                                            <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
-                                                {filteredLoras.map((l, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => {
-                                                            setCurrentLora(l);
-                                                            setShowLoraList(false);
-                                                        }}
-                                                        className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-                                                    >
-                                                        {l}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max="2"
-                                            step="0.1"
-                                            value={currentLoraStrength}
-                                            onChange={(e) => setCurrentLoraStrength(parseFloat(e.target.value))}
-                                            className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
-                                        />
-                                        <span className="text-xs text-slate-400 w-8 text-right">{currentLoraStrength}</span>
-                                        <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={addLora}
-                                            disabled={!currentLora}
-                                            className="h-7 text-xs"
-                                        >
-                                            Add
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* Selected LoRAs List */}
-                                {selectedLoras.length > 0 && (
-                                    <div className="space-y-2">
-                                        {selectedLoras.map((l, idx) => (
-                                            <div key={idx} className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg text-sm border border-white/5">
-                                                <div className="flex flex-col">
-                                                    <span className="text-slate-200 truncate max-w-[150px]" title={l.name}>{l.name}</span>
-                                                    <span className="text-xs text-slate-500">Str: {l.strength}</span>
+                                    {/* LoRA Builder Input */}
+                                    <div className="space-y-3 bg-black/20 p-3 rounded-lg border border-white/5">
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={currentLora}
+                                                onChange={(e) => {
+                                                    setCurrentLora(e.target.value);
+                                                    setShowLoraList(true);
+                                                }}
+                                                onFocus={() => setShowLoraList(true)}
+                                                onBlur={() => setTimeout(() => setShowLoraList(false), 200)}
+                                                placeholder="Select LoRA..."
+                                                className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                                            />
+                                            {showLoraList && filteredLoras.length > 0 && (
+                                                <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar">
+                                                    {filteredLoras.map((l, idx) => (
+                                                        <button
+                                                            key={idx}
+                                                            onClick={() => {
+                                                                setCurrentLora(l);
+                                                                setShowLoraList(false);
+                                                            }}
+                                                            className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                                                        >
+                                                            {l}
+                                                        </button>
+                                                    ))}
                                                 </div>
-                                                <button
-                                                    onClick={() => removeLora(idx)}
-                                                    className="text-slate-500 hover:text-red-400 transition-colors"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="2"
+                                                step="0.1"
+                                                value={currentLoraStrength}
+                                                onChange={(e) => setCurrentLoraStrength(parseFloat(e.target.value))}
+                                                className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white"
+                                            />
+                                            <span className="text-xs text-slate-400 w-8 text-right">{currentLoraStrength}</span>
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={addLora}
+                                                disabled={!currentLora}
+                                                className="h-7 text-xs"
+                                            >
+                                                Add
+                                            </Button>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
+
+                                    {/* Selected LoRAs List */}
+                                    {selectedLoras.length > 0 && (
+                                        <div className="space-y-2">
+                                            {selectedLoras.map((l, idx) => (
+                                                <div key={idx} className="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg text-sm border border-white/5">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-200 truncate max-w-[150px]" title={l.name}>{l.name}</span>
+                                                        <span className="text-xs text-slate-500">Str: {l.strength}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => removeLora(idx)}
+                                                        className="text-slate-500 hover:text-red-400 transition-colors"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
                             {/* Negative Prompt */}
@@ -1053,6 +1066,16 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                     )}
                 </div>
             )}
+
+            {/* Prompt Library Drawer */}
+            <PromptLibrary
+                isOpen={showPromptLibrary}
+                onClose={() => setShowPromptLibrary(false)}
+                onSelect={(positive, negative) => {
+                    setPrompt(positive);
+                    if (negative) setNegativePrompt(negative);
+                }}
+            />
 
             {/* Lightbox / Fullscreen Preview */}
             {selectedImage && (

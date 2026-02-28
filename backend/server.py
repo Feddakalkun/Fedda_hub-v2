@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 import uvicorn
 from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech
 from lipsync_service import generate_lipsync
-from lora_service import start_lora_download, get_download_status, refresh_comfy_models
+from lora_service import start_lora_download, get_download_status, refresh_comfy_models, sync_premium_folder, get_installed_premium_loras
 from pathlib import Path
 from pydantic import BaseModel
 import json
@@ -219,6 +219,33 @@ async def get_lora_status(filename: str):
     Check the current status/progress of a specific download.
     """
     return get_download_status(filename)
+
+
+@app.post("/api/lora/sync-premium")
+async def sync_premium_loras():
+    """
+    Download ALL premium LoRAs from Google Drive folder.
+    Skips already-installed files.
+    """
+    try:
+        result = sync_premium_folder()
+        return result
+    except Exception as e:
+        print(f"❌ Sync premium error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/lora/installed")
+async def list_installed_loras():
+    """
+    Check which premium LoRAs are installed on disk.
+    Returns { filename: size_mb } for each installed LoRA.
+    """
+    try:
+        installed = get_installed_premium_loras()
+        return {"success": True, "installed": installed}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/comfy/refresh-models")
@@ -637,6 +664,52 @@ async def get_lora_descriptions():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# === PROMPT LIBRARY ENDPOINTS ===
+
+PROMPT_LIBRARY_PATH = Path(__file__).parent.parent / "config" / "prompt_library.json"
+
+@app.get("/api/prompts/library")
+async def get_prompt_library():
+    """
+    Serve the harvested prompt library JSON.
+    Returns all prompts with metadata (title, positive, negative, characters, category, source).
+    """
+    try:
+        if not PROMPT_LIBRARY_PATH.exists():
+            return {"success": False, "error": "Prompt library not found. Run the harvester first.", "prompts": [], "total_prompts": 0}
+        data = json.loads(PROMPT_LIBRARY_PATH.read_text(encoding="utf-8"))
+        return {"success": True, **data}
+    except Exception as e:
+        print(f"Error reading prompt library: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/prompts/harvest")
+async def run_harvester():
+    """
+    Re-run the prompt harvester script to refresh the library.
+    This scans all generate_*.py files and rebuilds prompt_library.json.
+    """
+    try:
+        harvester_path = Path(__file__).parent / "prompt_harvester.py"
+        if not harvester_path.exists():
+            raise HTTPException(status_code=404, detail="Harvester script not found")
+        result = subprocess.run(
+            [sys.executable, str(harvester_path)],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=result.stderr or "Harvester failed")
+        # Read updated library
+        data = json.loads(PROMPT_LIBRARY_PATH.read_text(encoding="utf-8"))
+        return {"success": True, "total_prompts": data.get("total_prompts", 0), "message": "Prompt library refreshed!"}
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Harvester timed out after 120s")
+    except Exception as e:
+        print(f"Harvest error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
-    print("🎤 Audio Transcription Server starting on port 8000...")
+    print("Audio Transcription Server starting on port 8000...")
     uvicorn.run(app, host="0.0.0.0", port=8000)

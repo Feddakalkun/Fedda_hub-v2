@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Download, CheckCircle2, Info } from 'lucide-react';
+import { Download, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 
 interface ModelInfo {
     id: string;
@@ -10,17 +10,14 @@ interface ModelInfo {
         status: string;
         downloaded: number;
         total: number;
-        name: string;
-        error?: string;
     };
 }
 
 interface ModelDownloaderProps {
     modelGroup?: string;
-    onReady?: () => void;
 }
 
-export const ModelDownloader = ({ modelGroup = "z-image", onReady }: ModelDownloaderProps) => {
+export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps) => {
     const [modelStatus, setModelStatus] = useState<ModelInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -31,14 +28,8 @@ export const ModelDownloader = ({ modelGroup = "z-image", onReady }: ModelDownlo
             const data = await resp.json();
             if (data.success) {
                 setModelStatus(data.models);
-
-                // If all exist, notify parent
-                if (data.models.every((m: ModelInfo) => m.exists) && onReady) {
-                    onReady();
-                }
-
-                // If any are downloading, continue polling
-                const downloading = data.models.some((m: ModelInfo) => m.progress.status === 'downloading');
+                const results = data.models;
+                const downloading = results.some((m: any) => m.progress.status === 'downloading');
                 setIsDownloading(downloading);
             }
         } catch (e) {
@@ -46,7 +37,7 @@ export const ModelDownloader = ({ modelGroup = "z-image", onReady }: ModelDownlo
         } finally {
             setIsLoading(false);
         }
-    }, [modelGroup, onReady]);
+    }, [modelGroup]);
 
     useEffect(() => {
         checkStatus();
@@ -57,104 +48,67 @@ export const ModelDownloader = ({ modelGroup = "z-image", onReady }: ModelDownlo
         return () => clearInterval(interval);
     }, [checkStatus, isDownloading, modelStatus]);
 
-    const handleDownload = async (modelId: string) => {
-        try {
-            await fetch(`http://localhost:8000/api/models/download?model_id=${modelId}&group=${modelGroup}`, { method: 'POST' });
-            setIsDownloading(true);
-        } catch (e) {
-            console.error('Download trigger failed:', e);
+    const handleDownloadAll = async () => {
+        setIsDownloading(true);
+        const missing = modelStatus.filter(m => !m.exists);
+        for (const m of missing) {
+            try {
+                await fetch(`http://localhost:8000/api/models/download?model_id=${m.id}&group=${modelGroup}`, { method: 'POST' });
+            } catch (e) {
+                console.error(`Failed to start download for ${m.id}`, e);
+            }
         }
     };
 
     if (isLoading) return null;
+    const allInstalled = modelStatus.every(m => m.exists);
+    if (allInstalled) return null;
 
-    // Show nothing if all models exist
-    if (modelStatus.every(m => m.exists)) return null;
+    const totalDownloaded = modelStatus.reduce((acc, m) => acc + (m.progress.downloaded || 0), 0);
+    const totalSize = modelStatus.reduce((acc, m) => acc + (m.progress.total || 0), 0);
+    const percent = totalSize > 0 ? (totalDownloaded / totalSize) * 100 : 0;
 
     return (
-        <div className="mx-8 mt-6 overflow-hidden bg-[#18181b]/40 backdrop-blur-xl border border-amber-500/20 rounded-2xl shadow-2xl animate-in slide-in-from-top-4 duration-500 ring-1 ring-white/5">
-            <div className="flex flex-col lg:flex-row items-stretch">
-                {/* Left Info Panel */}
-                <div className="lg:w-[340px] p-6 bg-gradient-to-br from-amber-500/10 to-transparent flex flex-col justify-center gap-4 border-b lg:border-b-0 lg:border-r border-white/5">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                            <Download className="w-5 h-5 text-amber-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-sm font-bold text-white uppercase tracking-tight">Downloader Engaged</h2>
-                            <p className="text-[10px] font-bold text-amber-500/60 uppercase tracking-widest">Required Assets Missing</p>
-                        </div>
+        <div className="mx-8 mt-6 bg-[#121218] border border-white/10 rounded-xl overflow-hidden animate-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center justify-between px-6 py-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center border border-white/10">
+                        {isDownloading ? (
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                        ) : (
+                            <Download className="w-5 h-5 text-white/60" />
+                        )}
                     </div>
-
-                    <div className="space-y-2">
-                        <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                            The professional flux model (~19GB) is not detected in your local ComfyUI directory.
-                        </p>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-500 py-1 px-2.5 rounded-lg bg-black/20 border border-white/5 w-fit">
-                            <Info className="w-3 h-3 text-amber-500/50" />
-                            <span>Destination: /ComfyUI/models/</span>
-                        </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-white uppercase tracking-tight">Required Models Missing</h3>
+                        <p className="text-[11px] text-slate-500 font-medium">Flux base models are required for generation (~19.4GB total)</p>
                     </div>
                 </div>
 
-                {/* Right Progress/Action Panel */}
-                <div className="flex-1 p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {modelStatus.map(m => {
-                        const isInstalling = m.progress.status === 'downloading';
-                        const percent = m.progress.total > 0 ? (m.progress.downloaded / m.progress.total) * 100 : 0;
-
-                        return (
-                            <div key={m.id} className="group relative bg-black/20 border border-white/5 rounded-xl p-4 flex flex-col justify-between transition-all hover:border-amber-500/20">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{m.id}</span>
-                                        <span className="text-xs font-bold text-slate-200 truncate max-w-[120px]">{m.name}</span>
-                                    </div>
-                                    <span className="text-[10px] text-slate-600 font-mono">~{m.size_gb}GB</span>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {m.exists ? (
-                                        <div className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold transition-all animate-in zoom-in-95">
-                                            <CheckCircle2 className="w-3.5 h-3.5" />
-                                            Ready
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {isInstalling ? (
-                                                <div className="space-y-2 animate-in fade-in">
-                                                    <div className="flex justify-between text-[10px] font-mono text-blue-400">
-                                                        <span>Downloading...</span>
-                                                        <span>{Math.round(percent)}%</span>
-                                                    </div>
-                                                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.3)] transition-all duration-300"
-                                                            style={{ width: `${percent}%` }}
-                                                        />
-                                                    </div>
-                                                    <p className="text-[9px] text-slate-600 truncate">{Math.round(m.progress.downloaded / (1024 * 1024))} / {Math.round(m.progress.total / (1024 * 1024))} MB</p>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => handleDownload(m.id)}
-                                                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold transition-all active:scale-95 shadow-lg shadow-amber-500/10"
-                                                >
-                                                    <Download className="w-3.5 h-3.5" />
-                                                    Get Model
-                                                </button>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
+                <div className="flex items-center gap-6">
+                    {isDownloading ? (
+                        <div className="flex flex-col items-end gap-1.5 min-w-[200px]">
+                            <div className="flex justify-between w-full text-[10px] font-mono text-slate-400">
+                                <span>Downloading Assets...</span>
+                                <span>{Math.round(percent)}%</span>
                             </div>
-                        );
-                    })}
+                            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-white transition-all duration-500"
+                                    style={{ width: `${percent}%` }}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleDownloadAll}
+                            className="px-6 py-2.5 bg-white hover:bg-slate-200 text-black text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all active:scale-95"
+                        >
+                            Download All Models
+                        </button>
+                    )}
                 </div>
             </div>
-
-            {/* Bottom Glow */}
-            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
         </div>
     );
 };

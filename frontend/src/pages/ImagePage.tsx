@@ -594,7 +594,7 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setShowPromptLibrary(true)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-indigo-600/80 to-purple-600/80 text-white hover:from-indigo-500 hover:to-purple-500 transition-all"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/15 transition-all"
                                 >
                                     <BookOpen className="w-3 h-3" />
                                     Library
@@ -602,7 +602,7 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                 <button
                                     onClick={enhancePrompt}
                                     disabled={isEnhancing || !prompt.trim()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gradient-to-r from-purple-600/80 to-blue-600/80 text-white hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-black hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                                 >
                                     {isEnhancing ? (
                                         <><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>

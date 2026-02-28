@@ -36,16 +36,16 @@ interface PromptLibraryProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-    concert: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    duo: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    explicit: 'bg-red-500/20 text-red-300 border-red-500/30',
-    general: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-    music: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    portrait: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-    pregnancy: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-    social: 'bg-green-500/20 text-green-300 border-green-500/30',
-    train: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    video: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    concert: 'bg-white/5 text-slate-300 border-white/10',
+    duo: 'bg-white/5 text-slate-300 border-white/10',
+    explicit: 'bg-white/5 text-slate-300 border-white/10',
+    general: 'bg-white/5 text-slate-300 border-white/10',
+    music: 'bg-white/5 text-slate-300 border-white/10',
+    portrait: 'bg-white/5 text-slate-300 border-white/10',
+    pregnancy: 'bg-white/5 text-slate-300 border-white/10',
+    social: 'bg-white/5 text-slate-300 border-white/10',
+    train: 'bg-white/5 text-slate-300 border-white/10',
+    video: 'bg-white/5 text-slate-300 border-white/10',
 };
 
 // High-quality hardcoded templates for Flux
@@ -172,10 +172,10 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                 <div className="flex flex-col flex-shrink-0 bg-[#121218]/50 backdrop-blur-md">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/10">
                                 <Sparkles className="w-4 h-4 text-white" />
                             </div>
-                            <h2 className="text-sm font-bold text-white tracking-tight">Flux Prompt Forge</h2>
+                            <h2 className="text-sm font-bold text-white tracking-tight uppercase">Flux Prompt Forge</h2>
                         </div>
                         <button
                             onClick={onClose}
@@ -190,7 +190,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                         <button
                             onClick={() => setActiveTab('builder')}
                             className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'builder'
-                                ? 'border-indigo-500 text-indigo-400'
+                                ? 'border-white text-white'
                                 : 'border-transparent text-slate-500 hover:text-slate-300'
                                 }`}
                         >
@@ -200,7 +200,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                         <button
                             onClick={() => setActiveTab('library')}
                             className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'library'
-                                ? 'border-indigo-500 text-indigo-400'
+                                ? 'border-white text-white'
                                 : 'border-transparent text-slate-500 hover:text-slate-300'
                                 }`}
                         >
@@ -227,9 +227,9 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                         <button
                                             key={idx}
                                             onClick={() => setBuilderPrompt(t.prompt)}
-                                            className="group text-left bg-[#1a1a24] hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/30 rounded-xl p-4 transition-all"
+                                            className="group text-left bg-[#1a1a24] hover:bg-white/5 border border-white/5 hover:border-white/20 rounded-xl p-4 transition-all"
                                         >
-                                            <h4 className="text-xs font-bold text-slate-300 group-hover:text-indigo-300 transition-colors mb-2">{t.title}</h4>
+                                            <h4 className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors mb-2">{t.title}</h4>
                                             <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed">{t.prompt}</p>
                                         </button>
                                     ))}
@@ -263,7 +263,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                             onSelect(builderPrompt, "");
                                             onClose();
                                         }}
-                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:hover:bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                                        className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-white text-black text-xs font-bold rounded-xl shadow-xl transition-all active:scale-95"
                                     >
                                         <Zap className="w-3.5 h-3.5" />
                                         Apply to Generation
@@ -279,7 +279,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                         <div key={wild.name} className="bg-[#121218] border border-white/5 rounded-xl p-4 hover:border-white/15 transition-all">
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                                                    <Tag className="w-3.5 h-3.5 text-slate-400" />
                                                     <span className="text-xs font-bold text-slate-300 capitalize">{wild.name.replace(/_/g, ' ')}</span>
                                                     <span className="text-[9px] bg-white/5 text-slate-500 px-1.5 py-0.5 rounded uppercase font-bold tracking-tight">
                                                         {wild.count} variations
@@ -287,7 +287,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                                 </div>
                                                 <button
                                                     onClick={() => insertWildcard(wild.name)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-[10px] font-bold text-indigo-400 rounded-lg border border-indigo-500/20 transition-all"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-[10px] font-bold text-white rounded-lg border border-white/10 transition-all"
                                                 >
                                                     <MousePointer2 className="w-3 h-3" />
                                                     Use Dynamic Tag
@@ -336,7 +336,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                     <span className="text-[10px] font-bold text-slate-600 uppercase mr-2.5">Category:</span>
                                     <button
                                         onClick={() => setActiveCategory('all')}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${activeCategory === 'all' ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white/5 text-slate-500 border-white/5'
+                                        className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${activeCategory === 'all' ? 'bg-white text-black border-white' : 'bg-white/5 text-slate-500 border-white/5'
                                             }`}
                                     >
                                         All
@@ -345,7 +345,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                         <button
                                             key={cat}
                                             onClick={() => setActiveCategory(cat)}
-                                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all capitalize ${activeCategory === cat ? CATEGORY_COLORS[cat] : 'bg-white/5 text-slate-500 border-white/5'
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all capitalize ${activeCategory === cat ? 'bg-white/20 text-white border-white/40' : 'bg-white/5 text-slate-500 border-white/5'
                                                 }`}
                                         >
                                             {cat}
@@ -357,7 +357,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                     <span className="text-[10px] font-bold text-slate-600 uppercase mr-2.5">Character:</span>
                                     <button
                                         onClick={() => setActiveChar('all')}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${activeChar === 'all' ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white/5 text-slate-500 border-white/5'
+                                        className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${activeChar === 'all' ? 'bg-white text-black border-white' : 'bg-white/5 text-slate-500 border-white/5'
                                             }`}
                                     >
                                         All
@@ -366,7 +366,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                         <button
                                             key={char}
                                             onClick={() => setActiveChar(char)}
-                                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${activeChar === char ? 'bg-white/15 text-white border-indigo-500' : 'bg-white/5 text-slate-500 border-white/5'
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-all ${activeChar === char ? 'bg-white/20 text-white border-white/40' : 'bg-white/5 text-slate-500 border-white/5'
                                                 }`}
                                         >
                                             {char}
@@ -409,7 +409,7 @@ export function PromptLibrary({ onSelect, isOpen, onClose }: PromptLibraryProps)
                                                             onSelect(entry.positive, entry.negative);
                                                             onClose();
                                                         }}
-                                                        className="opacity-0 group-hover:opacity-100 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded-lg transition-all"
+                                                        className="opacity-0 group-hover:opacity-100 px-2.5 py-1 bg-white text-black text-[10px] font-bold rounded-lg transition-all"
                                                     >
                                                         Use
                                                     </button>

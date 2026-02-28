@@ -571,9 +571,9 @@ Pause-Step
 # 7. Comprehensive Dependencies (Updated with fixes)
 Write-Log "`n[ComfyUI 7/9] Installing comprehensive dependencies..."
 
-# 7.1 Install Build Tools first (Fix for llama-cpp-python and insightface)
+# 7.1 Install Build Tools first (Fix for insightface)
 Write-Log "Installing build dependencies..."
-Run-Pip "install scikit-build-core cmake ninja Cython"
+Run-Pip "install cmake ninja Cython"
 
 # 7.1.5 Install insightface early with pre-built wheel (avoid compilation)
 Write-Log "Installing insightface (pre-built wheel)..."
@@ -599,10 +599,7 @@ $Deps = @(
 )
 Run-Pip "install $($Deps -join ' ')"
 
-# 7.3 Install llama-cpp-python separately (with pre-built wheel preference)
-Write-Log "Installing llama-cpp-python..."
-# Try installing with --prefer-binary to avoid building from source if possible
-Run-Pip "install llama-cpp-python --prefer-binary --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124"
+# 7.3 (Removed) llama-cpp-python no longer needed - Ollama handles all LLM tasks
 
 # 7.4 Install VoxCPM (TTS Engine)
 function Install-VoxCPM {

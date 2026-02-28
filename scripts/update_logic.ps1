@@ -164,7 +164,8 @@ $FilesToDelete = @(
 # Clean up duplicate/legacy folders
 $FoldersToDelete = @(
     "assets\loading-screen",
-    "assets\workflows"
+    "assets\workflows",
+    "ComfyUI\custom_nodes\ComfyUI_Searge_LLM"
 )
 
 # Clean up duplicate loading videos (now in frontend/public/loading/pingpong/)

@@ -284,8 +284,6 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
     const generateSeed = () => Math.floor(Math.random() * 1000000000000000);
 
     // AI Assist
-    const [isEnhancing, setIsEnhancing] = useState(false);
-
     const handleEnhancePrompt = async () => {
         if (!prompt.trim()) return;
         setIsEnhancing(true);

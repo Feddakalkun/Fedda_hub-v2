@@ -795,7 +795,7 @@ REQUIRED_MODELS = {
             "name": "z-image-vae.safetensors",
             "url": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors",
             "path": "vae/z-image-vae.safetensors",
-            "size_gb": 0.4
+            "size_gb": 0.312
         }
     ]
 }

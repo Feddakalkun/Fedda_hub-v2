@@ -378,10 +378,25 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                 const now = new Date();
                 const dateFolder = now.toISOString().split('T')[0];
                 workflow["145"].inputs.filename_prefix = `z-image-dual/${dateFolder}/${now.getTime()}_`;
+                // Node 147: Save - delete folder for dual
                 workflow["147"].inputs.filename_prefix = "delete/pre_dual";
 
             } else {
                 // === SINGLE PERSON WORKFLOW (z-image.json) ===
+
+                // === WILDCARD EXPANSION ===
+                let processedPrompt = finalPrompt;
+                try {
+                    console.log('🔍 Expanding Wildcards for Prompt:', finalPrompt);
+                    const expandResp = await fetch(`http://localhost:8000/api/wildcards/expand?text=${encodeURIComponent(finalPrompt)}`);
+                    const expandData = await expandResp.json();
+                    if (expandData.success && expandData.expanded) {
+                        processedPrompt = expandData.expanded;
+                        console.log('✨ Expanded Prompt:', processedPrompt);
+                    }
+                } catch (e) {
+                    console.error('Wildcard expansion failed, using fallback:', e);
+                }
 
                 // Node 3: KSampler (Seed, Steps, CFG)
                 if (workflow["3"]) {
@@ -390,12 +405,12 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                     workflow["3"].inputs.cfg = cfg;
                 }
 
-                // Node 33 & 6: Positive Prompt (Bypassing Text Concatenate Node 32)
+                // Updated Nodes with PROCESSED (expanded) prompt
                 if (workflow["33"]) {
-                    workflow["33"].inputs.string = finalPrompt;
+                    workflow["33"].inputs.string = processedPrompt;
                 }
                 if (workflow["6"]) {
-                    workflow["6"].inputs.text = finalPrompt;
+                    workflow["6"].inputs.text = processedPrompt;
                 }
 
                 // Node 34: Negative Prompt

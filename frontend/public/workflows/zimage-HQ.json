@@ -14,16 +14,7 @@
   },
   "5": {
     "inputs": {
-      "text": [
-        "147",
-        0
-      ],
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      },
+      "text": "",
       "clip": [
         "125",
         1
@@ -37,12 +28,6 @@
   "6": {
     "inputs": {
       "text": "cartoon, anime, 3d render, bad anatomy, blurry, watermark, face hidden, flat lighting",
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      },
       "clip": [
         "125",
         1
@@ -133,12 +118,6 @@
       "do_sample": false,
       "output_mask_select": "0",
       "seed": 116674603397183,
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      },
       "image": [
         "13",
         0
@@ -155,16 +134,7 @@
   },
   "65": {
     "inputs": {
-      "text": [
-        "119",
-        0
-      ],
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      },
+      "text": "",
       "clip": [
         "124",
         1
@@ -211,10 +181,7 @@
   },
   "85": {
     "inputs": {
-      "index": [
-        "136",
-        0
-      ],
+      "index": "0",
       "batch": false,
       "data": [
         "53",
@@ -246,12 +213,6 @@
       "noise_mask_feather": 20,
       "tiled_encode": false,
       "tiled_decode": false,
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      },
       "image": [
         "13",
         0
@@ -331,21 +292,6 @@
       "title": "GrowMask"
     }
   },
-  "119": {
-    "inputs": {
-      "text": "",
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      }
-    },
-    "class_type": "Text Multiline",
-    "_meta": {
-      "title": "Detailer Face Prompt"
-    }
-  },
   "124": {
     "inputs": {
       "lora_name": "",
@@ -382,15 +328,6 @@
     "class_type": "LoraLoader",
     "_meta": {
       "title": "LoRA (Main)"
-    }
-  },
-  "136": {
-    "inputs": {
-      "string": "0"
-    },
-    "class_type": "Simple String",
-    "_meta": {
-      "title": "Choose person"
     }
   },
   "141": {
@@ -434,21 +371,6 @@
     "class_type": "SaveImage",
     "_meta": {
       "title": "Save Image (Final)"
-    }
-  },
-  "147": {
-    "inputs": {
-      "text": "",
-      "speak_and_recognation": {
-        "__value__": [
-          false,
-          true
-        ]
-      }
-    },
-    "class_type": "Text Multiline",
-    "_meta": {
-      "title": "Prompt"
     }
   }
 }

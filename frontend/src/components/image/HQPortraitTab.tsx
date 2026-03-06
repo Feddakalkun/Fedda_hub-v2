@@ -91,12 +91,12 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
             workflow["46"].inputs.steps = steps;
             workflow["46"].inputs.cfg = cfg;
 
-            // Node 147: Main prompt (concat with person B description if dual mode)
+            // Node 5: Positive Prompt (CLIPTextEncode)
             let fullPrompt = finalPrompt;
             if (dualPersonMode && personB.description) {
                 fullPrompt = `${finalPrompt}, ${personB.description}`;
             }
-            workflow["147"].inputs.text = fullPrompt;
+            workflow["5"].inputs.text = fullPrompt;
 
             // Node 6: Negative prompt
             workflow["6"].inputs.text = negativePrompt;
@@ -122,10 +122,10 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
 
                 // Person labels for Florence2
                 workflow["53"].inputs.text_input = personA.label;
-                workflow["136"].inputs.string = "0";
+                // Person index hardcoded in workflow
 
                 // Detailer face descriptions
-                workflow["119"].inputs.text = personA.description;
+                workflow["65"].inputs.text = personA.description;
 
                 // Save to dual person path
                 workflow["145"].inputs.filename_prefix = "FEDDA/Image/z-image-2person";
@@ -142,11 +142,11 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
                 }
 
                 if (personA.description) {
-                    workflow["119"].inputs.text = personA.description;
+                    workflow["65"].inputs.text = personA.description;
                 }
 
                 workflow["53"].inputs.text_input = personA.label || "person";
-                workflow["136"].inputs.string = "0";
+                // Person index hardcoded in workflow
             }
 
             await queueWorkflow(workflow);

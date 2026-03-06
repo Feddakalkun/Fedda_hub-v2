@@ -468,8 +468,8 @@ foreach ($Node in $NodesConfig) {
     $NodeInstallDir = Join-Path $CustomNodesDir $Node.folder
     if (-not (Test-Path $NodeInstallDir)) {
         Write-Log "Installing $($Node.name)..."
-        Run-Git "clone --depth 1 $($Node.url) `"$NodeInstallDir`""
-        if ($LASTEXITCODE -eq 0) {
+        $GitResult = Run-Git "clone --depth 1 $($Node.url) `"$NodeInstallDir`""
+        if ($GitResult -eq 0) {
             Write-Log "[$($Node.name)] - Installed successfully"
             $InstalledCount++
 

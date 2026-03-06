@@ -22,6 +22,9 @@ if (Test-Path $GitExe) {
     $GitExe = "git"
 }
 
+# Fix "dubious ownership" errors (install runs as Admin, update runs as user)
+& $GitExe config --global --add safe.directory '*' 2>$null
+
 # ============================================================================
 # PRE-FLIGHT CHECK
 # ============================================================================

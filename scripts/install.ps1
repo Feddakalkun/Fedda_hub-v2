@@ -287,6 +287,10 @@ else {
     Write-Log "[ComfyUI 2/9] Portable Git found."
 }
 
+# Fix "dubious ownership" errors (install runs as Admin, user runs update/ComfyUI as regular user)
+$env:PATH = "$(Join-Path $GitDir 'cmd');$env:PATH"
+& $GitExe config --global --add safe.directory '*' 2>$null
+
 Pause-Step
 
 # --- 1.3 Portable Node.js ---

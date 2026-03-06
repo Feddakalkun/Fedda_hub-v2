@@ -261,7 +261,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -283,7 +283,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -303,7 +303,7 @@
   },
   "20": {
     "inputs": {
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "images": [
         "21",
         0
@@ -663,7 +663,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -685,7 +685,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -705,7 +705,7 @@
   },
   "49": {
     "inputs": {
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "images": [
         "50",
         0
@@ -992,7 +992,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1014,7 +1014,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1034,7 +1034,7 @@
   },
   "84": {
     "inputs": {
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "images": [
         "95",
         0
@@ -1398,7 +1398,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1420,7 +1420,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1440,7 +1440,7 @@
   },
   "113": {
     "inputs": {
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "images": [
         "122",
         0
@@ -1677,7 +1677,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22/0",
+      "filename_prefix": "FEDDA/Video/Img2Vid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,

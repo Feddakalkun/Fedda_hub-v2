@@ -119,7 +119,7 @@
     "inputs": {
       "frame_rate": 25,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/INFINITE 1s/0",
+      "filename_prefix": "FEDDA/Video/lipsync",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -329,7 +329,7 @@
   },
   "460": {
     "inputs": {
-      "filename_prefix": "VIDEO/INFINITE-TALK/0",
+      "filename_prefix": "FEDDA/Video/lipsync",
       "images": [
         "459",
         0

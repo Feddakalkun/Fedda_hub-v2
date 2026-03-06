@@ -28,7 +28,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -50,7 +50,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -72,7 +72,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -94,7 +94,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1328,7 +1328,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1350,7 +1350,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -1372,7 +1372,7 @@
     "inputs": {
       "frame_rate": 24,
       "loop_count": 0,
-      "filename_prefix": "VIDEO/WAN22FLF/0",
+      "filename_prefix": "FEDDA/Video/longvid",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,

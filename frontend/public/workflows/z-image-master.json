@@ -79,7 +79,7 @@
   },
   "9": {
     "inputs": {
-      "filename_prefix": "IMAGE/ZIMAGE/0",
+      "filename_prefix": "FEDDA/Image/z-image",
       "images": [
         "181",
         0

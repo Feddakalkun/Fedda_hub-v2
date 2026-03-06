@@ -102,18 +102,21 @@ foreach ($Node in $NodesConfig) {
         try {
             Set-Location $NodeDir_Install
             & $GitExe pull 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  [$($Node.name)] Git pull failed (non-fatal)" -ForegroundColor Yellow
+            }
             $UpdatedCount++
             Set-Location $RootPath
-
-            # Re-check requirements in case they changed
-            $ReqFile = Join-Path $NodeDir_Install "requirements.txt"
-            if (Test-Path $ReqFile) {
-                & $PyExe -m pip install -r "$ReqFile" --no-warn-script-location 2>&1 | Out-Null
-            }
         }
         catch {
             Write-Host "  [$($Node.name)] Update failed (non-fatal): $_" -ForegroundColor Yellow
             Set-Location $RootPath
+        }
+
+        # Re-check requirements in case they changed (outside try/catch so pip warnings don't look like failures)
+        $ReqFile = Join-Path $NodeDir_Install "requirements.txt"
+        if (Test-Path $ReqFile) {
+            & $PyExe -m pip install -r "$ReqFile" --no-warn-script-location 2>&1 | Out-Null
         }
     }
 }

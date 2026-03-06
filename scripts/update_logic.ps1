@@ -84,7 +84,9 @@ foreach ($Node in $NodesConfig) {
                 $ReqFile = Join-Path $NodeDir_Install "requirements.txt"
                 if (Test-Path $ReqFile) {
                     Write-Host "  [$($Node.name)] Installing dependencies..." -ForegroundColor Gray
+                    $ErrorActionPreference = "Continue"
                     & $PyExe -m pip install -r "$ReqFile" --no-warn-script-location 2>&1 | Out-Null
+                    $ErrorActionPreference = "Stop"
                 }
             } else {
                 Write-Host "  [$($Node.name)] Clone failed!" -ForegroundColor Red
@@ -113,10 +115,12 @@ foreach ($Node in $NodesConfig) {
             Set-Location $RootPath
         }
 
-        # Re-check requirements in case they changed (outside try/catch so pip warnings don't look like failures)
+        # Re-check requirements in case they changed
         $ReqFile = Join-Path $NodeDir_Install "requirements.txt"
         if (Test-Path $ReqFile) {
+            $ErrorActionPreference = "Continue"
             & $PyExe -m pip install -r "$ReqFile" --no-warn-script-location 2>&1 | Out-Null
+            $ErrorActionPreference = "Stop"
         }
     }
 }

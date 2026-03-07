@@ -104,7 +104,9 @@ if ($NeedNodeUpdate -or $HasMissing) {
             # Clone missing node — always runs
             Write-Host "  [$($Node.name)] Installing..." -ForegroundColor White
             try {
+                $ErrorActionPreference = "Continue"
                 $cloneOutput = & $GitExe clone --depth 1 $Node.url "$NodeDir_Install" 2>&1 | Out-String
+                $ErrorActionPreference = "Stop"
                 if ($LASTEXITCODE -eq 0) {
                     $InstalledCount++
                     Write-Host "  [$($Node.name)] Installed OK" -ForegroundColor Green

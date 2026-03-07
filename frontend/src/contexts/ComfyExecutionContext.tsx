@@ -22,6 +22,7 @@ interface ComfyExecutionContextType {
     totalNodes: number;
     completedNodes: number;
     lastCompletedPromptId: string | null;
+    outputReadyCount: number; // increments on each 'executed' event (per output node)
     // Queue a workflow: builds node map, sends to ComfyUI, returns prompt_id
     queueWorkflow: (workflow: Record<string, any>) => Promise<string>;
 }
@@ -70,6 +71,7 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
     const [completedNodes, setCompletedNodes] = useState(0);
 
     const [lastCompletedPromptId, setLastCompletedPromptId] = useState<string | null>(null);
+    const [outputReadyCount, setOutputReadyCount] = useState(0);
 
     const nodeMapRef = useRef<Record<string, { name: string; classType: string }>>({});
     const executedNodesRef = useRef<Set<string>>(new Set());
@@ -141,6 +143,7 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
             onCompleted: (promptId) => {
                 activePromptIdRef.current = promptId;
                 setLastCompletedPromptId(promptId);
+                setOutputReadyCount(prev => prev + 1);
             },
 
             onStatus: (data) => {
@@ -162,6 +165,7 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
         setTotalNodes(Object.keys(nodeMap).length);
         executedNodesRef.current.clear();
         setCompletedNodes(0);
+        setOutputReadyCount(0);
 
         // Reset state
         setState('executing');
@@ -212,6 +216,7 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
             totalNodes,
             completedNodes,
             lastCompletedPromptId,
+            outputReadyCount,
             queueWorkflow,
         }}>
             {children}

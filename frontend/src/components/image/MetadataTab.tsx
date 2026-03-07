@@ -249,47 +249,71 @@ export const MetadataTab = ({ isGenerating, setIsGenerating, initialImageUrl, on
         lastLoadedUrl.current = null;
     };
 
-    // Apply LoRA overrides to workflow
-    const applyLoraOverrides = (workflow: Record<string, any>) => {
-        if (loraOverrides.length === 0) return;
-        let loraIdx = 0;
-        for (const [, node] of Object.entries(workflow)) {
-            const cls = (node as any).class_type as string;
-            if (cls?.includes('LoraLoader') && (node as any).inputs.lora_name) {
-                if (loraIdx < loraOverrides.length) {
-                    (node as any).inputs.lora_name = loraOverrides[loraIdx].name;
-                    (node as any).inputs.strength_model = loraOverrides[loraIdx].strength;
-                    if ((node as any).inputs.strength_clip !== undefined) {
-                        (node as any).inputs.strength_clip = loraOverrides[loraIdx].strength;
-                    }
-                    loraIdx++;
-                }
-            }
-            // Power Lora Loader
-            if (cls?.includes('Power Lora')) {
-                for (let i = 1; i <= 5; i++) {
-                    const l = (node as any).inputs[`lora_${i}`];
-                    if (l && typeof l === 'object' && l.on && l.lora && loraIdx < loraOverrides.length) {
-                        l.lora = loraOverrides[loraIdx].name;
-                        l.strength = loraOverrides[loraIdx].strength;
-                        loraIdx++;
-                    }
+    // Build a workflow from our own z-image-master template, injecting extracted metadata
+    const buildWorkflow = async (overrideSeed?: number): Promise<Record<string, any>> => {
+        const resp = await fetch('/workflows/z-image-master.json');
+        if (!resp.ok) throw new Error('Failed to load z-image workflow template');
+        const workflow = await resp.json();
+
+        if (!metadata) throw new Error('No metadata');
+
+        // KSampler (node 3)
+        if (workflow['3']) {
+            const ks = workflow['3'].inputs;
+            ks.seed = overrideSeed ?? metadata.seed ?? ks.seed;
+            ks.steps = metadata.steps ?? ks.steps;
+            ks.cfg = metadata.cfg ?? ks.cfg;
+            ks.denoise = metadata.denoise ?? ks.denoise;
+            if (metadata.sampler) ks.sampler_name = metadata.sampler;
+            if (metadata.scheduler) ks.scheduler = metadata.scheduler;
+        }
+
+        // Positive prompt (node 6)
+        if (workflow['6'] && metadata.prompt) {
+            workflow['6'].inputs.text = metadata.prompt;
+        }
+
+        // Negative prompt (node 7)
+        if (workflow['7'] && metadata.negativePrompt) {
+            workflow['7'].inputs.text = metadata.negativePrompt;
+        }
+
+        // Dimensions — find EmptyLatentImage node
+        if (metadata.width && metadata.height) {
+            for (const [, node] of Object.entries(workflow)) {
+                if ((node as any).class_type === 'EmptyLatentImage') {
+                    (node as any).inputs.width = metadata.width;
+                    (node as any).inputs.height = metadata.height;
                 }
             }
         }
+
+        // LoRAs — inject into Power Lora Loader (node 126)
+        if (workflow['126'] && loraOverrides.length > 0) {
+            const powerLora = workflow['126'].inputs;
+            loraOverrides.forEach((l, i) => {
+                powerLora[`lora_${i + 1}`] = {
+                    on: true,
+                    lora: l.name,
+                    strength: l.strength,
+                    strengthTwo: l.strength,
+                };
+            });
+        }
+
+        return workflow;
     };
 
     const handleReproduce = async () => {
-        if (!metadata?.rawWorkflow) {
-            toast('No workflow data available to reproduce', 'error');
+        if (!metadata) {
+            toast('No metadata available to reproduce', 'error');
             return;
         }
         setIsGenerating(true);
         try {
-            const workflow = JSON.parse(JSON.stringify(metadata.rawWorkflow));
-            applyLoraOverrides(workflow);
+            const workflow = await buildWorkflow();
             await queueWorkflow(workflow);
-            toast('Reproducing image with exact same settings!', 'success');
+            toast('Reproducing with extracted settings!', 'success');
         } catch (err: any) {
             console.error('Reproduce failed:', err);
             toast(err.message || 'Failed to reproduce image', 'error');
@@ -298,20 +322,14 @@ export const MetadataTab = ({ isGenerating, setIsGenerating, initialImageUrl, on
     };
 
     const handleReproduceNewSeed = async () => {
-        if (!metadata?.rawWorkflow) {
-            toast('No workflow data available', 'error');
+        if (!metadata) {
+            toast('No metadata available', 'error');
             return;
         }
         setIsGenerating(true);
         try {
-            const workflow = JSON.parse(JSON.stringify(metadata.rawWorkflow));
-            applyLoraOverrides(workflow);
-            for (const [, node] of Object.entries(workflow)) {
-                const cls = (node as any).class_type as string;
-                if (cls?.includes('KSampler') || cls === 'SamplerCustom') {
-                    (node as any).inputs.seed = Math.floor(Math.random() * 1000000000000000);
-                }
-            }
+            const newSeed = Math.floor(Math.random() * 1000000000000000);
+            const workflow = await buildWorkflow(newSeed);
             await queueWorkflow(workflow);
             toast('Generating with same settings but new seed!', 'success');
         } catch (err: any) {
@@ -322,21 +340,15 @@ export const MetadataTab = ({ isGenerating, setIsGenerating, initialImageUrl, on
     };
 
     const handleBatchVariations = async () => {
-        if (!metadata?.rawWorkflow) {
-            toast('No workflow data available', 'error');
+        if (!metadata) {
+            toast('No metadata available', 'error');
             return;
         }
         setIsGenerating(true);
         try {
             for (let i = 0; i < 4; i++) {
-                const workflow = JSON.parse(JSON.stringify(metadata.rawWorkflow));
-                applyLoraOverrides(workflow);
-                for (const [, node] of Object.entries(workflow)) {
-                    const cls = (node as any).class_type as string;
-                    if (cls?.includes('KSampler') || cls === 'SamplerCustom') {
-                        (node as any).inputs.seed = Math.floor(Math.random() * 1000000000000000);
-                    }
-                }
+                const newSeed = Math.floor(Math.random() * 1000000000000000);
+                const workflow = await buildWorkflow(newSeed);
                 await queueWorkflow(workflow);
             }
             toast('Queued 4 variations!', 'success');

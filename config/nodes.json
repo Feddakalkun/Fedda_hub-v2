@@ -118,6 +118,13 @@
   },
 
   {
+    "name": "audio-separation-nodes-comfyui",
+    "url": "https://github.com/christian-byrne/audio-separation-nodes-comfyui.git",
+    "folder": "audio-separation-nodes-comfyui",
+    "note": "AudioCrop — audio cropping used in wan-infinite-talk lipsync workflow"
+  },
+
+  {
     "name": "ComfyUI-WanVideoWrapper",
     "url": "https://github.com/kijai/ComfyUI-WanVideoWrapper.git",
     "folder": "ComfyUI-WanVideoWrapper",

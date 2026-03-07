@@ -104,7 +104,7 @@ if ($NeedNodeUpdate -or $HasMissing) {
             # Clone missing node — always runs
             Write-Host "  [$($Node.name)] Installing..." -ForegroundColor White
             try {
-                & $GitExe clone --depth 1 $Node.url "$NodeDir_Install" 2>&1
+                $cloneOutput = & $GitExe clone --depth 1 $Node.url "$NodeDir_Install" 2>&1 | Out-String
                 if ($LASTEXITCODE -eq 0) {
                     $InstalledCount++
                     Write-Host "  [$($Node.name)] Installed OK" -ForegroundColor Green
@@ -249,13 +249,10 @@ $LegacyFolders = @(
     "ComfyUI\custom_nodes\ComfyMath",
     "ComfyUI\custom_nodes\mikey_nodes",
     "ComfyUI\custom_nodes\joycaption_comfyui",
-    "ComfyUI\custom_nodes\ComfyUI-Image-Selector",
     "ComfyUI\custom_nodes\masquerade-nodes-comfyui",
-    "ComfyUI\custom_nodes\ComfyUI_Comfyroll_CustomNodes",
     "ComfyUI\custom_nodes\chibi",
     "ComfyUI\custom_nodes\comfy-image-saver",
     "ComfyUI\custom_nodes\ComfyUI-Timer-Nodes",
-    "ComfyUI\custom_nodes\comfyui-various",
     "ComfyUI\custom_nodes\ComfyUI-Image-Saver",
     "ComfyUI\custom_nodes\ComfyUI-VoxCPM",
     "ComfyUI\custom_nodes\ComfyUI_Fill-Nodes",

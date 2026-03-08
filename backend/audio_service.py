@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 # ComfyUI server URL
-COMFYUI_URL = "http://127.0.0.1:8188"
+COMFYUI_URL = "http://127.0.0.1:8199"
 
 # Paths
 WORKFLOW_PATH = Path(__file__).parent / "workflows" / "audio" / "audio_caption_api.json"

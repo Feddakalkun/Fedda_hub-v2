@@ -1,7 +1,7 @@
 // ComfyUI API Configuration
 
 export const COMFY_API = {
-    BASE_URL: 'http://127.0.0.1:8188',
+    BASE_URL: 'http://127.0.0.1:8199',
 
     ENDPOINTS: {
         PROMPT: '/prompt',
@@ -13,7 +13,7 @@ export const COMFY_API = {
         OBJECT_INFO: '/object_info',
     },
 
-    WS_URL: 'ws://127.0.0.1:8188/ws',
+    WS_URL: 'ws://127.0.0.1:8199/ws',
 };
 
 // Backend API Configuration (FastAPI server)

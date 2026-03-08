@@ -201,7 +201,7 @@ def get_installed_premium_loras():
 def refresh_comfy_models():
     """Tells ComfyUI to refresh its internal list of LoRAs and models."""
     try:
-        res = requests.post("http://127.0.0.1:8188/refresh", timeout=5)
+        res = requests.post("http://127.0.0.1:8199/refresh", timeout=5)
         if res.ok:
             print("🔄 ComfyUI models refreshed.")
             return True

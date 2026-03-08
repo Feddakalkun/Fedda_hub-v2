@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 # ComfyUI Configuration
-COMFYUI_URL = "http://127.0.0.1:8188"
+COMFYUI_URL = "http://127.0.0.1:8199"
 COMFYUI_INPUT_DIR = Path(__file__).parent.parent / "ComfyUI" / "input"
 COMFYUI_OUTPUT_DIR = Path(__file__).parent.parent / "ComfyUI" / "output"
 

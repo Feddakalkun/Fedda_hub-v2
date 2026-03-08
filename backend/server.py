@@ -478,7 +478,7 @@ async def download_runpod_output(req: RunPodDownloadRequest):
         return {
             "success": True,
             "local_path": str(local_path),
-            "url": f"http://127.0.0.1:8188/view?filename={req.filename}&subfolder=runpod&type=output"
+            "url": f"http://127.0.0.1:8199/view?filename={req.filename}&subfolder=runpod&type=output"
         }
 
     except Exception as e:
@@ -521,7 +521,7 @@ async def list_output_files():
                     "dateFolder": date_folder,
                     "size": stat.st_size,
                     "modified": stat.st_mtime,
-                    "url": f"http://127.0.0.1:8188/view?filename={file_path.name}&subfolder={subfolder}&type=output"
+                    "url": f"http://127.0.0.1:8199/view?filename={file_path.name}&subfolder={subfolder}&type=output"
                 })
         
         # Sort by modified time (newest first)
@@ -596,7 +596,7 @@ async def cleanup_orphaned_files():
         import requests
         
         # Get ComfyUI history
-        history_response = requests.get("http://127.0.0.1:8188/history")
+        history_response = requests.get("http://127.0.0.1:8199/history")
         history = history_response.json()
         
         # Extract all valid filenames from history

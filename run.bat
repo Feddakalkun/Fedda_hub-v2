@@ -38,7 +38,7 @@ if exist "%OLLAMA%" (
 )
 
 :: 3. Start ComfyUI
-echo [2/4] Starting ComfyUI Backend (Port 8188)...
+echo [2/4] Starting ComfyUI Backend (Port 8199)...
 start "ComfyUI Backend" /MIN cmd /k "call "%~f0" :launch_comfy"
 timeout /t 3 /nobreak >nul
 
@@ -103,12 +103,12 @@ set PYTHONUNBUFFERED=1
 set PYTHONIOENCODING=utf-8
 set PYTHONPATH=%COMFYUI_DIR%;%PYTHONPATH%
 
-echo Clearing port 8188...
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8188"') do taskkill /F /PID %%a 2>nul
+echo Clearing port 8199...
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8199"') do taskkill /F /PID %%a 2>nul
 timeout /t 1 >nul
 
 cd /d "%COMFYUI_DIR%"
-"%PYTHON%" -W ignore::FutureWarning -s -u main.py --windows-standalone-build --port 8188 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method none --disable-auto-launch
+"%PYTHON%" -W ignore::FutureWarning -s -u main.py --windows-standalone-build --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method none --disable-auto-launch
 
 if %errorlevel% neq 0 (
     echo.

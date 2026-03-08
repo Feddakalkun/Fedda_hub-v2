@@ -18,53 +18,25 @@ echo.
 :: SYSTEM SCAN
 :: ============================================================================
 
-:: GPU Check — try --query-gpu first, fall back to parsing nvidia-smi output
+:: GPU Check — nvidia-smi -L gives clean output on all driver versions
 set "GPU_OK=0"
 set "GPU_NAME=Not detected"
-for /f "tokens=*" %%a in ('nvidia-smi --query-gpu=name --format=csv,noheader 2^>nul') do (
+for /f "tokens=1,* delims=:" %%a in ('nvidia-smi -L 2^>nul') do (
     if "!GPU_OK!"=="0" (
-        echo %%a | findstr /i "ERROR Option" >nul 2>nul
-        if !errorlevel! neq 0 (
-            set "GPU_NAME=%%a"
-            set "GPU_OK=1"
-        )
-    )
-)
-:: Fallback: parse plain nvidia-smi output for GPU name
-if "!GPU_OK!"=="0" (
-    for /f "tokens=*" %%a in ('nvidia-smi 2^>nul ^| findstr /i "NVIDIA GeForce RTX GTX"') do (
-        if "!GPU_OK!"=="0" (
-            set "GPU_OK=1"
-            :: Extract GPU name from the line (e.g. "| NVIDIA GeForce RTX 4070 ... |")
-            set "_line=%%a"
-            for /f "tokens=2 delims=|" %%b in ("%%a") do (
-                for /f "tokens=*" %%c in ("%%b") do set "GPU_NAME=%%c"
-            )
+        set "GPU_OK=1"
+        :: %%b = " NVIDIA GeForce RTX 3090 (UUID: ...)"
+        :: Extract name before the UUID parenthesis
+        set "_gpu=%%b"
+        for /f "tokens=1 delims=(" %%n in ("%%b") do (
+            :: Trim leading space
+            for /f "tokens=*" %%t in ("%%n") do set "GPU_NAME=%%t"
         )
     )
 )
 if "!GPU_OK!"=="1" (
     echo   GPU:      !GPU_NAME!
 ) else (
-    nvidia-smi >nul 2>nul
-    if !errorlevel! equ 0 (
-        set "GPU_OK=1"
-        set "GPU_NAME=NVIDIA GPU detected"
-        echo   GPU:      !GPU_NAME!
-    ) else (
-        echo   GPU:      No NVIDIA GPU found
-    )
-)
-
-:: VRAM via nvidia-smi
-set "VRAM_SHOWN=0"
-for /f %%v in ('nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2^>nul') do (
-    echo %%v | findstr /i "ERROR Option" >nul 2>nul
-    if !errorlevel! neq 0 if "!VRAM_SHOWN!"=="0" (
-        set /a VRAM_GB=%%v / 1024
-        echo   VRAM:     !VRAM_GB! GB
-        set "VRAM_SHOWN=1"
-    )
+    echo   GPU:      No NVIDIA GPU found
 )
 
 :: Check for system Python

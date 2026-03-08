@@ -18,23 +18,22 @@ echo.
 :: SYSTEM SCAN
 :: ============================================================================
 
-:: GPU Check
+:: GPU Check (nvidia-smi is most reliable across all Windows versions)
 set "GPU_OK=0"
 set "GPU_NAME=Not detected"
-for /f "tokens=*" %%a in ('wmic path Win32_VideoController where "Name like '%%NVIDIA%%'" get Name /value 2^>nul ^| findstr "Name"') do (
-    set "%%a"
+for /f "tokens=*" %%a in ('nvidia-smi --query-gpu=name --format=csv,noheader 2^>nul') do (
+    set "GPU_NAME=%%a"
     set "GPU_OK=1"
 )
 if "%GPU_OK%"=="1" (
-    echo   GPU:      %Name%
+    echo   GPU:      !GPU_NAME!
 ) else (
     echo   GPU:      No NVIDIA GPU found
 )
 
 :: VRAM via nvidia-smi
-set "VRAM_STR="
 nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits >nul 2>nul
-if %errorlevel% equ 0 (
+if !errorlevel! equ 0 (
     for /f %%v in ('nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2^>nul') do (
         set /a VRAM_GB=%%v / 1024
         echo   VRAM:     !VRAM_GB! GB

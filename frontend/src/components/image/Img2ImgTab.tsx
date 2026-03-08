@@ -11,9 +11,11 @@ import { ImageUpload } from './ImageUpload';
 interface Img2ImgTabProps {
     isGenerating: boolean;
     setIsGenerating: (v: boolean) => void;
+    initialImageUrl?: string | null;
+    onConsumeImage?: () => void;
 }
 
-export const Img2ImgTab = ({ isGenerating, setIsGenerating }: Img2ImgTabProps) => {
+export const Img2ImgTab = ({ isGenerating, setIsGenerating, initialImageUrl, onConsumeImage }: Img2ImgTabProps) => {
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
@@ -38,6 +40,13 @@ export const Img2ImgTab = ({ isGenerating, setIsGenerating }: Img2ImgTabProps) =
         };
         load();
     }, []);
+
+    // Consume gallery image when sent from another tab
+    useEffect(() => {
+        if (initialImageUrl) {
+            onConsumeImage?.();
+        }
+    }, [initialImageUrl, onConsumeImage]);
 
     const handleImageSelected = (file: File) => {
         setInputImage(file);
@@ -115,6 +124,7 @@ export const Img2ImgTab = ({ isGenerating, setIsGenerating }: Img2ImgTabProps) =
                     previewUrl={previewUrl}
                     onClear={handleClearImage}
                     label="Input Image"
+                    initialUrl={initialImageUrl}
                 />
             </div>
 

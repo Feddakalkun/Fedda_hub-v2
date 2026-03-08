@@ -12,9 +12,11 @@ import { DimensionSelector } from './DimensionSelector';
 interface InpaintTabProps {
     isGenerating: boolean;
     setIsGenerating: (v: boolean) => void;
+    initialImageUrl?: string | null;
+    onConsumeImage?: () => void;
 }
 
-export const InpaintTab = ({ isGenerating, setIsGenerating }: InpaintTabProps) => {
+export const InpaintTab = ({ isGenerating, setIsGenerating, initialImageUrl, onConsumeImage }: InpaintTabProps) => {
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
@@ -48,6 +50,13 @@ export const InpaintTab = ({ isGenerating, setIsGenerating }: InpaintTabProps) =
         };
         load();
     }, []);
+
+    // Consume gallery image when sent from another tab
+    useEffect(() => {
+        if (initialImageUrl) {
+            onConsumeImage?.();
+        }
+    }, [initialImageUrl, onConsumeImage]);
 
     const handleImageSelected = (file: File) => {
         setInputImage(file);
@@ -147,6 +156,7 @@ export const InpaintTab = ({ isGenerating, setIsGenerating }: InpaintTabProps) =
                     previewUrl={previewUrl}
                     onClear={handleClearImage}
                     label="Input Image"
+                    initialUrl={initialImageUrl}
                 />
             </div>
 

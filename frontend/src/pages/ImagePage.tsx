@@ -65,18 +65,36 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
             <div className="p-8 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-8 h-full overflow-y-auto custom-scrollbar">
                 {/* Left: Tab Controls */}
                 <div className="lg:col-span-1">
-                    {activeMode === 'generate' && <GenerateTab isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-                    {activeMode === 'hq' && <HQPortraitTab isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-                    {activeMode === 'img2img' && <Img2ImgTab isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-                    {activeMode === 'inpaint' && <InpaintTab isGenerating={isGenerating} setIsGenerating={setIsGenerating} />}
-                    {activeMode === 'metadata' && (
+                    <div style={{ display: activeMode === 'generate' ? undefined : 'none' }}>
+                        <GenerateTab isGenerating={isGenerating} setIsGenerating={setIsGenerating} />
+                    </div>
+                    <div style={{ display: activeMode === 'hq' ? undefined : 'none' }}>
+                        <HQPortraitTab isGenerating={isGenerating} setIsGenerating={setIsGenerating} />
+                    </div>
+                    <div style={{ display: activeMode === 'img2img' ? undefined : 'none' }}>
+                        <Img2ImgTab
+                            isGenerating={isGenerating}
+                            setIsGenerating={setIsGenerating}
+                            initialImageUrl={activeMode === 'img2img' ? pendingImageUrl : null}
+                            onConsumeImage={() => setPendingImageUrl(null)}
+                        />
+                    </div>
+                    <div style={{ display: activeMode === 'inpaint' ? undefined : 'none' }}>
+                        <InpaintTab
+                            isGenerating={isGenerating}
+                            setIsGenerating={setIsGenerating}
+                            initialImageUrl={activeMode === 'inpaint' ? pendingImageUrl : null}
+                            onConsumeImage={() => setPendingImageUrl(null)}
+                        />
+                    </div>
+                    <div style={{ display: activeMode === 'metadata' ? undefined : 'none' }}>
                         <MetadataTab
                             isGenerating={isGenerating}
                             setIsGenerating={setIsGenerating}
-                            initialImageUrl={pendingImageUrl}
+                            initialImageUrl={activeMode === 'metadata' ? pendingImageUrl : null}
                             onConsumeImage={() => setPendingImageUrl(null)}
                         />
-                    )}
+                    </div>
                 </div>
 
                 {/* Right: Shared Gallery */}

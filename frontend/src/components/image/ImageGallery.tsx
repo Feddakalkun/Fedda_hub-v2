@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Maximize2, X, Trash2, Video, FileText } from 'lucide-react';
+import { Sparkles, Maximize2, X, Trash2, Video, FileText, Image, Paintbrush } from 'lucide-react';
 import { comfyService } from '../../services/comfyService';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { useToast } from '../ui/Toast';
@@ -155,9 +155,17 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
                                             <Maximize2 className="w-3.5 h-3.5 text-white" />
                                         </button>
                                         {onSendToTab && (
-                                            <button onClick={(e) => { e.stopPropagation(); onSendToTab('metadata', img); }} className="p-2 bg-amber-500/20 hover:bg-amber-500/30 rounded-full backdrop-blur-sm transition-all" title="Read metadata">
-                                                <FileText className="w-3.5 h-3.5 text-amber-400" />
-                                            </button>
+                                            <>
+                                                <button onClick={(e) => { e.stopPropagation(); onSendToTab('img2img', img); }} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-full backdrop-blur-sm transition-all" title="Send to Img2Img">
+                                                    <Image className="w-3.5 h-3.5 text-emerald-400" />
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); onSendToTab('inpaint', img); }} className="p-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-full backdrop-blur-sm transition-all" title="Send to Inpaint">
+                                                    <Paintbrush className="w-3.5 h-3.5 text-purple-400" />
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); onSendToTab('metadata', img); }} className="p-2 bg-amber-500/20 hover:bg-amber-500/30 rounded-full backdrop-blur-sm transition-all" title="Read metadata">
+                                                    <FileText className="w-3.5 h-3.5 text-amber-400" />
+                                                </button>
+                                            </>
                                         )}
                                         <button onClick={(e) => { e.stopPropagation(); localStorage.setItem('active_input_image', img); toast('Image selected for Video generation! Go to Video tab.', 'success'); }} className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-full backdrop-blur-sm transition-all" title="Use as input for Video">
                                             <Video className="w-3.5 h-3.5 text-blue-400" />

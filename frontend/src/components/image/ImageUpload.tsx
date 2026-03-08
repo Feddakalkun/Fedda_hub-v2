@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, X } from 'lucide-react';
 
 interface ImageUploadProps {
@@ -6,11 +6,31 @@ interface ImageUploadProps {
     previewUrl: string | null;
     onClear: () => void;
     label?: string;
+    initialUrl?: string | null;
 }
 
-export const ImageUpload = ({ onImageSelected, previewUrl, onClear, label = 'Upload Image' }: ImageUploadProps) => {
+export const ImageUpload = ({ onImageSelected, previewUrl, onClear, label = 'Upload Image', initialUrl }: ImageUploadProps) => {
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const lastLoadedUrl = useRef<string | null>(null);
+
+    // Auto-load image from URL (e.g., gallery "Send to Img2Img")
+    useEffect(() => {
+        if (!initialUrl || initialUrl === lastLoadedUrl.current) return;
+        lastLoadedUrl.current = initialUrl;
+
+        (async () => {
+            try {
+                const resp = await fetch(initialUrl);
+                const blob = await resp.blob();
+                const ext = blob.type.split('/')[1] || 'png';
+                const file = new File([blob], `gallery_image.${ext}`, { type: blob.type });
+                onImageSelected(file);
+            } catch (err) {
+                console.error('Failed to load image from URL:', err);
+            }
+        })();
+    }, [initialUrl, onImageSelected]);
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();

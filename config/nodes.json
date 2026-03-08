@@ -159,5 +159,11 @@
     "url": "https://github.com/WASasquatch/was-node-suite-comfyui.git",
     "folder": "was-node-suite-comfyui",
     "note": "Text Concatenate, Text Multiline, image utilities — widely used in workflows"
+  },
+  {
+    "name": "ComfyUI-qwenmultiangle",
+    "url": "https://github.com/jtydhr88/ComfyUI-qwenmultiangle.git",
+    "folder": "comfyui-qwenmultiangle",
+    "note": "QwenMultiangleCameraNode — multi-angle camera control for qwen-multiangle workflow"
   }
 ]

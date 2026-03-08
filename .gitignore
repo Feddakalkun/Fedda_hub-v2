@@ -89,6 +89,7 @@ assets/landingpage/
 Feddafront_Distribution/
 
 # Dev-only launcher scripts
+push-to-github.bat
 01.runLTX2.bat
 fix_gpu.bat
 HANDOVER_TO_LTX.md

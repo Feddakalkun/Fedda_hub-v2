@@ -17,13 +17,16 @@ import uvicorn
 from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech
 from lipsync_service import generate_lipsync
 from lora_service import start_lora_download, get_download_status, refresh_comfy_models, sync_premium_folder, get_installed_premium_loras
-import tiktok_service
-from pathlib import Path
+try:
+    import tiktok_service
+except ImportError as e:
+    print(f"[WARNING] TikTok service not available: {e}")
+    tiktok_service = None
+from typing import Optional
 from pydantic import BaseModel
 import json
 import urllib.request
 import urllib.error
-import requests
 import subprocess
 import shutil
 
@@ -1019,7 +1022,7 @@ async def purge_models(group: str = "z-image"):
 class TikTokDownloadRequest(BaseModel):
     url: str
     cookie_source: str = "none"
-    limit: int = None
+    limit: Optional[int] = None
 
 class TikTokCaptionRequest(BaseModel):
     frame_paths: list
@@ -1030,30 +1033,40 @@ class TikTokExtractRequest(BaseModel):
     video_path: str
     count: int = 6
 
+def _check_tiktok():
+    if tiktok_service is None:
+        raise HTTPException(status_code=503, detail="TikTok service not available")
+
 @app.post("/api/tiktok/download-profile")
 async def tiktok_download_profile(req: TikTokDownloadRequest):
+    _check_tiktok()
     job_id = tiktok_service.download_profile(req.url, req.cookie_source, req.limit)
     return {"job_id": job_id, "status": "started"}
 
 @app.post("/api/tiktok/download-video")
 async def tiktok_download_video(req: TikTokDownloadRequest):
+    _check_tiktok()
     job_id = tiktok_service.download_single_video(req.url, req.cookie_source)
     return {"job_id": job_id, "status": "started"}
 
 @app.get("/api/tiktok/download-status/{job_id}")
 async def tiktok_download_status(job_id: str):
+    _check_tiktok()
     return tiktok_service.get_download_progress(job_id)
 
 @app.get("/api/tiktok/profiles")
 async def tiktok_list_profiles():
-    return tiktok_service.list_profiles()
+    _check_tiktok()
+    return {"profiles": tiktok_service.list_profiles()}
 
 @app.get("/api/tiktok/videos/{profile}")
 async def tiktok_list_videos(profile: str):
-    return tiktok_service.list_videos(profile)
+    _check_tiktok()
+    return {"videos": tiktok_service.list_videos(profile)}
 
 @app.post("/api/tiktok/extract-frames")
 async def tiktok_extract_frames(req: TikTokExtractRequest):
+    _check_tiktok()
     try:
         frames = tiktok_service.extract_frames(req.video_path, req.count)
         return {"frames": frames}
@@ -1062,19 +1075,23 @@ async def tiktok_extract_frames(req: TikTokExtractRequest):
 
 @app.get("/api/tiktok/frames/{video_id}")
 async def tiktok_get_frames(video_id: str):
+    _check_tiktok()
     return {"frames": tiktok_service.get_frames(video_id)}
 
 @app.post("/api/tiktok/caption-frames")
 async def tiktok_caption_frames(req: TikTokCaptionRequest):
+    _check_tiktok()
     job_id = tiktok_service.caption_frames(req.frame_paths, req.method, req.model)
     return {"job_id": job_id, "status": "started"}
 
 @app.get("/api/tiktok/caption-status/{job_id}")
 async def tiktok_caption_status(job_id: str):
+    _check_tiktok()
     return tiktok_service.get_caption_status(job_id)
 
 @app.get("/api/tiktok/serve/{path:path}")
 async def tiktok_serve_file(path: str):
+    _check_tiktok()
     file_path = tiktok_service.get_file_path(path)
     if file_path is None:
         raise HTTPException(status_code=404, detail="File not found")

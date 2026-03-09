@@ -1,4 +1,4 @@
-// ComfyUI API Configuration
+﻿// ComfyUI API Configuration
 // Desktop mode: uses .env.development with localhost URLs
 // Docker mode: falls back to relative URLs through Nginx reverse proxy
 
@@ -42,6 +42,7 @@ export const BACKEND_API = {
         COMFY_REFRESH_MODELS: '/api/comfy/refresh-models',
         AUDIO_TRANSCRIBE: '/api/audio/transcribe',
         AUDIO_TTS: '/api/audio/tts',
+        AUDIO_REFERENCE_INFO: '/api/audio/reference-info',
         VIDEO_LIPSYNC: '/api/video/lipsync',
         HARDWARE_STATS: '/api/hardware/stats',
     },
@@ -63,6 +64,8 @@ export const MODELS = {
         { id: 'scene-builder', label: 'Scene Builder', icon: 'Film' },
     ],
     AUDIO: [
-        { id: 'generic', label: 'Coming Soon', icon: 'Music' },
+        { id: 'ace-step', label: 'ACE-Step 1.5', icon: 'Music' },
     ],
 };
+
+

@@ -8,6 +8,7 @@ import { LoraStack } from './LoraStack';
 import type { SelectedLora } from './LoraStack';
 import { ImageUpload } from './ImageUpload';
 import { BACKEND_API } from '../../config/api';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface Img2ImgTabProps {
     isGenerating: boolean;
@@ -20,13 +21,13 @@ export const Img2ImgTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
-    const [prompt, setPrompt] = useState('');
-    const [negativePrompt, setNegativePrompt] = useState('blurry, low quality, distorted, bad anatomy, flat lighting');
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [steps, setSteps] = useState(9);
-    const [cfg, setCfg] = useState(1);
-    const [denoise, setDenoise] = useState(0.5);
-    const [selectedLoras, setSelectedLoras] = useState<SelectedLora[]>([]);
+    const [prompt, setPrompt] = usePersistentState('image_img2img_prompt', '');
+    const [negativePrompt, setNegativePrompt] = usePersistentState('image_img2img_negative', 'blurry, low quality, distorted, bad anatomy, flat lighting');
+    const [showAdvanced, setShowAdvanced] = usePersistentState('image_img2img_show_advanced', false);
+    const [steps, setSteps] = usePersistentState('image_img2img_steps', 9);
+    const [cfg, setCfg] = usePersistentState('image_img2img_cfg', 1);
+    const [denoise, setDenoise] = usePersistentState('image_img2img_denoise', 0.5);
+    const [selectedLoras, setSelectedLoras] = usePersistentState<SelectedLora[]>('image_img2img_selected_loras', []);
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
     const [inputImage, setInputImage] = useState<File | null>(null);
@@ -181,3 +182,4 @@ export const Img2ImgTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
         </div>
     );
 };
+

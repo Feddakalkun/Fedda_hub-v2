@@ -6,6 +6,7 @@ import { useToast } from '../ui/Toast';
 import { PromptInput } from './PromptInput';
 import { DimensionSelector } from './DimensionSelector';
 import { BACKEND_API } from '../../config/api';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface PersonConfig {
     lora: string;
@@ -23,16 +24,16 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
-    const [prompt, setPrompt] = useState('');
-    const [negativePrompt, setNegativePrompt] = useState('cartoon, anime, 3d render, bad anatomy, blurry, watermark, face hidden, flat lighting');
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [steps, setSteps] = useState(9);
-    const [cfg, setCfg] = useState(1.1);
-    const [dimensions, setDimensions] = useState('768x1152');
-    const [dualPersonMode, setDualPersonMode] = useState(false);
+    const [prompt, setPrompt] = usePersistentState('image_hq_prompt', '');
+    const [negativePrompt, setNegativePrompt] = usePersistentState('image_hq_negative', 'cartoon, anime, 3d render, bad anatomy, blurry, watermark, face hidden, flat lighting');
+    const [showAdvanced, setShowAdvanced] = usePersistentState('image_hq_show_advanced', false);
+    const [steps, setSteps] = usePersistentState('image_hq_steps', 9);
+    const [cfg, setCfg] = usePersistentState('image_hq_cfg', 1.1);
+    const [dimensions, setDimensions] = usePersistentState('image_hq_dimensions', '768x1152');
+    const [dualPersonMode, setDualPersonMode] = usePersistentState('image_hq_dual_person_mode', false);
 
-    const [personA, setPersonA] = useState<PersonConfig>({ lora: '', strength: 0.95, description: '', label: 'man' });
-    const [personB, setPersonB] = useState<PersonConfig>({ lora: '', strength: 0.95, description: '', label: 'woman' });
+    const [personA, setPersonA] = usePersistentState<PersonConfig>('image_hq_person_a', { lora: '', strength: 0.95, description: '', label: 'man' });
+    const [personB, setPersonB] = usePersistentState<PersonConfig>('image_hq_person_b', { lora: '', strength: 0.95, description: '', label: 'woman' });
     const [showPersonALoraList, setShowPersonALoraList] = useState(false);
     const [showPersonBLoraList, setShowPersonBLoraList] = useState(false);
     const [personALoraSearch, setPersonALoraSearch] = useState('');
@@ -273,3 +274,4 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
         </div>
     );
 };
+

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Download, Trash2, BrainCircuit, Search, RotateCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Download, Trash2, BrainCircuit, Search, RotateCw, CheckCircle2, AlertCircle, ExternalLink, FolderOpen } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { ollamaService } from '../services/ollamaService';
 import type { OllamaModel, OllamaProgress } from '../services/ollamaService';
+import { CatalogShell, CatalogCard } from '../components/layout/CatalogShell';
 
 // Text / Chat Models
 const TEXT_MODELS = [
@@ -39,18 +40,37 @@ export const SettingsPage = () => {
     // RunPod state
     const [runpodUrl, setRunpodUrl] = useState('');
     const [runpodToken, setRunpodToken] = useState('');
+    const [runpodExplorerUrl, setRunpodExplorerUrl] = useState('');
 
     useEffect(() => {
         refreshModels();
         // Load RunPod settings
         setRunpodUrl(localStorage.getItem('runpodUrl') || '');
         setRunpodToken(localStorage.getItem('runpodToken') || '');
+        setRunpodExplorerUrl(localStorage.getItem('runpodExplorerUrl') || '');
     }, []);
 
     const saveRunpodSettings = () => {
         localStorage.setItem('runpodUrl', runpodUrl);
         localStorage.setItem('runpodToken', runpodToken);
+        localStorage.setItem('runpodExplorerUrl', runpodExplorerUrl);
         toast('RunPod settings saved!', 'success');
+    };
+    const deriveRunpodBase = (url: string) => {
+        const trimmed = url.trim();
+        if (!trimmed) return '';
+        return trimmed.replace(/\/prompt\/?$/i, '');
+    };
+
+    const runpodBaseUrl = deriveRunpodBase(runpodUrl);
+    const resolvedExplorerUrl = runpodExplorerUrl.trim() || (runpodBaseUrl ? `${runpodBaseUrl}/` : '');
+
+    const openExternal = (url: string, label: string) => {
+        if (!url) {
+            toast(`No ${label} URL configured yet.`, 'error');
+            return;
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
     };
 
     // Update selected model when category changes
@@ -112,18 +132,15 @@ export const SettingsPage = () => {
     };
 
     return (
-        <div className="p-8 max-w-6xl mx-auto space-y-8">
-            <div className="flex items-center gap-3 mb-8">
-                <BrainCircuit className="w-8 h-8 text-white" />
-                <div>
-                    <h1 className="text-3xl font-bold text-white">AI Model Manager</h1>
-                    <p className="text-slate-400">Manage your Ollama models for Text generation and Image captioning.</p>
-                </div>
-            </div>
-
+        <CatalogShell
+            title="AI Model Manager"
+            subtitle="Manage your Ollama models for Text generation and Image captioning."
+            icon={BrainCircuit}
+            maxWidthClassName="max-w-6xl"
+        >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* LEFT: Download / Manager */}
-                <div className="bg-[#121218] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
+                <CatalogCard className="p-6 shadow-xl space-y-6">
                     <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                         <Download className="w-5 h-5 text-white" /> Download New Models
                     </h2>
@@ -247,10 +264,10 @@ export const SettingsPage = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </CatalogCard>
 
                 {/* RIGHT: Installed Models */}
-                <div className="bg-[#121218] border border-white/5 rounded-2xl p-6 shadow-xl flex flex-col h-full">
+                <CatalogCard className="p-6 shadow-xl flex flex-col h-full">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                             <BrainCircuit className="w-5 h-5 text-blue-400" /> Installed Models
@@ -286,11 +303,11 @@ export const SettingsPage = () => {
                             ))
                         )}
                     </div>
-                </div>
+                </CatalogCard>
             </div>
 
             {/* RunPod Settings Section */}
-            <div className="bg-[#121218] border border-white/5 rounded-2xl p-6 shadow-xl space-y-6">
+            <CatalogCard className="p-6 shadow-xl space-y-6">
                 <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                     ☁️ Cloud Engines / RunPod Integration
                 </h2>
@@ -323,12 +340,36 @@ export const SettingsPage = () => {
                             className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
                         />
                     </div>
-                    <Button variant="primary" onClick={saveRunpodSettings}>
-                        Save Cloud Settings
-                    </Button>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
+                            RunPod File Explorer URL (Optional override)
+                        </label>
+                        <input
+                            type="text"
+                            value={runpodExplorerUrl}
+                            onChange={(e) => setRunpodExplorerUrl(e.target.value)}
+                            placeholder="https://[YOUR_POD_ID]-8888.proxy.runpod.net/lab/tree"
+                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">
+                            If empty, explorer defaults to your endpoint base URL. For Jupyter/Lab file browser, paste the full /lab/tree URL.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <Button variant="secondary" onClick={() => openExternal(runpodBaseUrl ? `${runpodBaseUrl}/` : '', 'RunPod Comfy UI')}>
+                            <ExternalLink className="w-4 h-4" /> Open RunPod UI
+                        </Button>
+                        <Button variant="secondary" onClick={() => openExternal(resolvedExplorerUrl, 'RunPod File Explorer')}>
+                            <FolderOpen className="w-4 h-4" /> Open File Explorer
+                        </Button>
+                        <Button variant="primary" onClick={saveRunpodSettings}>
+                            Save Cloud Settings
+                        </Button>
+                    </div>
                 </div>
-            </div>
+            </CatalogCard>
 
-        </div>
+        </CatalogShell>
     );
 };
+

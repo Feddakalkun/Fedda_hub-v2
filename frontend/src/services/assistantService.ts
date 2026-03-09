@@ -109,6 +109,94 @@ Output rules:
 - Make sure the JSON is valid and minified: no trailing commas, double quotes around all keys and string values.
 - Do not invent technical parameters beyond the fields in the schema; assume the host application controls all other settings.`;
 
+
+const ACE_STEP_ARCHITECT_SYSTEM_PROMPT = `You are ACE-Step 1.5 Prompt Architect, an expert creative director for text-to-music prompting.
+
+Goal:
+- Convert a rough user brief into a detailed, original, production-ready song blueprint for ACE-Step 1.5.
+- Return data in strict JSON so the host app can apply the result directly.
+
+Hard rules:
+- Output valid JSON only. No markdown, no code fence, no commentary.
+- Never ask follow-up questions.
+- If details are missing, infer sensible defaults and record them in assumptions.
+- Never attempt to clone a copyrighted track. Use broad style references only.
+- If a user names an artist, convert that request into style attributes (era, groove, instrumentation, vocal character) and note the conversion in assumptions.
+- Keep lyrics clean unless the user explicitly requests explicit content.
+
+JSON schema (all keys required):
+{
+  "title": "string",
+  "overview": {
+    "intent": "string",
+    "mood_imagery": "string"
+  },
+  "music_metadata": {
+    "genre": "string",
+    "influences": ["string"],
+    "tempo_bpm": "string",
+    "key_and_scale": "string",
+    "time_signature": "string",
+    "song_length": "string",
+    "energy_curve": "string"
+  },
+  "structure": {
+    "sections_ordered": [
+      { "name": "string", "duration": "string", "details": "string" }
+    ],
+    "transitions": ["string"]
+  },
+  "instrumentation_and_sound_design": {
+    "core_elements": {
+      "drums": "string",
+      "bass": "string",
+      "harmony": "string",
+      "lead": "string"
+    },
+    "additional_elements": {
+      "fx_atmos": "string",
+      "ear_candy": "string"
+    },
+    "mix_notes": ["string"]
+  },
+  "vocals_and_lyrics": {
+    "vocals_presence": "string",
+    "vocal_character": "string",
+    "language": "string",
+    "perspective": "string",
+    "theme": "string",
+    "imagery_and_motifs": "string",
+    "rhyme_and_flow": {
+      "rhyme_scheme": "string",
+      "syllable_feel": "string"
+    }
+  },
+  "lyrics_draft": {
+    "sectioned_lyrics": "string",
+    "hook_phrases": ["string"]
+  },
+  "ace_step_prompt": "string",
+  "negative_instructions": ["string"],
+  "assumptions": ["string"],
+  "ui_suggestions": {
+    "tags": "string",
+    "lyrics": "string",
+    "seconds": 120,
+    "steps": 50,
+    "cfg": 4,
+    "lyrics_strength": 1.0
+  }
+}
+
+Quality rules:
+- ace_step_prompt must be one dense paragraph with genre, mood, arrangement, instrumentation, vocal approach, language, and hook concept.
+- ui_suggestions.tags must be comma-separated style tags and include a tempo hint.
+- ui_suggestions.lyrics must be sectioned with labels like [Intro], [Verse], [Chorus], [Bridge], [Outro].
+- Keep ui_suggestions.seconds between 20 and 240.
+- Keep ui_suggestions.steps between 20 and 80.
+- Keep ui_suggestions.cfg between 2 and 7.
+- Keep ui_suggestions.lyrics_strength between 0.3 and 1.3.
+`;
 export interface Wan2Spec {
     mode: 't2v' | 'i2v';
     description_summary: string;
@@ -126,6 +214,73 @@ export interface Wan2Spec {
     notes: string;
 }
 
+
+export interface AceStepSection {
+    name: string;
+    duration: string;
+    details: string;
+}
+
+export interface AceStepBlueprint {
+    title: string;
+    overview: {
+        intent: string;
+        mood_imagery: string;
+    };
+    music_metadata: {
+        genre: string;
+        influences: string[];
+        tempo_bpm: string;
+        key_and_scale: string;
+        time_signature: string;
+        song_length: string;
+        energy_curve: string;
+    };
+    structure: {
+        sections_ordered: AceStepSection[];
+        transitions: string[];
+    };
+    instrumentation_and_sound_design: {
+        core_elements: {
+            drums: string;
+            bass: string;
+            harmony: string;
+            lead: string;
+        };
+        additional_elements: {
+            fx_atmos: string;
+            ear_candy: string;
+        };
+        mix_notes: string[];
+    };
+    vocals_and_lyrics: {
+        vocals_presence: string;
+        vocal_character: string;
+        language: string;
+        perspective: string;
+        theme: string;
+        imagery_and_motifs: string;
+        rhyme_and_flow: {
+            rhyme_scheme: string;
+            syllable_feel: string;
+        };
+    };
+    lyrics_draft: {
+        sectioned_lyrics: string;
+        hook_phrases: string[];
+    };
+    ace_step_prompt: string;
+    negative_instructions: string[];
+    assumptions: string[];
+    ui_suggestions: {
+        tags: string;
+        lyrics: string;
+        seconds: number;
+        steps: number;
+        cfg: number;
+        lyrics_strength: number;
+    };
+}
 export const assistantService = {
     // Generate Wan2.2 Specification
     generateWan2Spec: async (modelName: string, userInstruction: string): Promise<Wan2Spec> => {
@@ -162,6 +317,124 @@ export const assistantService = {
             return result as Wan2Spec;
         } catch (error) {
             console.error('Wan2 Spec Error:', error);
+            throw error;
+        }
+    },
+
+    generateAceStepBlueprint: async (modelName: string, userBrief: string): Promise<AceStepBlueprint> => {
+        try {
+            const response = await fetch('/ollama/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: modelName,
+                    prompt: userBrief,
+                    system: ACE_STEP_ARCHITECT_SYSTEM_PROMPT,
+                    stream: false,
+                    format: 'json',
+                    options: { temperature: 0.75, num_predict: 1800 }
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to generate ACE-Step blueprint');
+            const data = await response.json();
+
+            let result = data.response;
+            if (typeof result === 'string') {
+                try {
+                    result = JSON.parse(result);
+                } catch {
+                    throw new Error('AI returned invalid JSON for ACE blueprint');
+                }
+            }
+
+            await ollamaService.unloadModel(modelName);
+
+            const ui = result?.ui_suggestions ?? {};
+            const sec = Number.isFinite(ui.seconds) ? Math.max(20, Math.min(240, Math.round(ui.seconds))) : 120;
+            const stp = Number.isFinite(ui.steps) ? Math.max(20, Math.min(80, Math.round(ui.steps))) : 50;
+            const cfg = Number.isFinite(ui.cfg) ? Math.max(2, Math.min(7, Number(ui.cfg))) : 4;
+            const lyrStrength = Number.isFinite(ui.lyrics_strength)
+                ? Math.max(0.3, Math.min(1.3, Number(ui.lyrics_strength)))
+                : 1;
+
+            const fallbackTags = [
+                result?.music_metadata?.genre,
+                result?.overview?.mood_imagery,
+                result?.music_metadata?.tempo_bpm,
+                result?.vocals_and_lyrics?.vocal_character,
+            ]
+                .filter((v: unknown) => typeof v === 'string' && v.trim().length > 0)
+                .join(', ');
+
+            const blueprint: AceStepBlueprint = {
+                title: result?.title || 'Untitled Track',
+                overview: {
+                    intent: result?.overview?.intent || '',
+                    mood_imagery: result?.overview?.mood_imagery || '',
+                },
+                music_metadata: {
+                    genre: result?.music_metadata?.genre || '',
+                    influences: Array.isArray(result?.music_metadata?.influences) ? result.music_metadata.influences : [],
+                    tempo_bpm: result?.music_metadata?.tempo_bpm || '',
+                    key_and_scale: result?.music_metadata?.key_and_scale || 'open',
+                    time_signature: result?.music_metadata?.time_signature || '4/4',
+                    song_length: result?.music_metadata?.song_length || `${sec}s`,
+                    energy_curve: result?.music_metadata?.energy_curve || '',
+                },
+                structure: {
+                    sections_ordered: Array.isArray(result?.structure?.sections_ordered) ? result.structure.sections_ordered : [],
+                    transitions: Array.isArray(result?.structure?.transitions) ? result.structure.transitions : [],
+                },
+                instrumentation_and_sound_design: {
+                    core_elements: {
+                        drums: result?.instrumentation_and_sound_design?.core_elements?.drums || '',
+                        bass: result?.instrumentation_and_sound_design?.core_elements?.bass || '',
+                        harmony: result?.instrumentation_and_sound_design?.core_elements?.harmony || '',
+                        lead: result?.instrumentation_and_sound_design?.core_elements?.lead || '',
+                    },
+                    additional_elements: {
+                        fx_atmos: result?.instrumentation_and_sound_design?.additional_elements?.fx_atmos || '',
+                        ear_candy: result?.instrumentation_and_sound_design?.additional_elements?.ear_candy || '',
+                    },
+                    mix_notes: Array.isArray(result?.instrumentation_and_sound_design?.mix_notes)
+                        ? result.instrumentation_and_sound_design.mix_notes
+                        : [],
+                },
+                vocals_and_lyrics: {
+                    vocals_presence: result?.vocals_and_lyrics?.vocals_presence || '',
+                    vocal_character: result?.vocals_and_lyrics?.vocal_character || '',
+                    language: result?.vocals_and_lyrics?.language || '',
+                    perspective: result?.vocals_and_lyrics?.perspective || '',
+                    theme: result?.vocals_and_lyrics?.theme || '',
+                    imagery_and_motifs: result?.vocals_and_lyrics?.imagery_and_motifs || '',
+                    rhyme_and_flow: {
+                        rhyme_scheme: result?.vocals_and_lyrics?.rhyme_and_flow?.rhyme_scheme || '',
+                        syllable_feel: result?.vocals_and_lyrics?.rhyme_and_flow?.syllable_feel || '',
+                    },
+                },
+                lyrics_draft: {
+                    sectioned_lyrics: result?.lyrics_draft?.sectioned_lyrics || '',
+                    hook_phrases: Array.isArray(result?.lyrics_draft?.hook_phrases) ? result.lyrics_draft.hook_phrases : [],
+                },
+                ace_step_prompt: result?.ace_step_prompt || '',
+                negative_instructions: Array.isArray(result?.negative_instructions) ? result.negative_instructions : [],
+                assumptions: Array.isArray(result?.assumptions) ? result.assumptions : [],
+                ui_suggestions: {
+                    tags: typeof ui.tags === 'string' && ui.tags.trim() ? ui.tags.trim() : fallbackTags,
+                    lyrics: typeof ui.lyrics === 'string' && ui.lyrics.trim()
+                        ? ui.lyrics
+                        : (result?.lyrics_draft?.sectioned_lyrics || ''),
+                    seconds: sec,
+                    steps: stp,
+                    cfg,
+                    lyrics_strength: lyrStrength,
+                },
+            };
+
+            return blueprint;
+        } catch (error) {
+            console.error('ACE-Step Blueprint Error:', error);
             throw error;
         }
     },
@@ -303,3 +576,5 @@ JSON format:
         }
     }
 };
+
+

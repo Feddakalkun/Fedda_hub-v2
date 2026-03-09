@@ -8,6 +8,7 @@ import { LoraStack } from './LoraStack';
 import type { SelectedLora } from './LoraStack';
 import { DimensionSelector } from './DimensionSelector';
 import { BACKEND_API } from '../../config/api';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface GenerateTabProps {
     isGenerating: boolean;
@@ -18,15 +19,15 @@ export const GenerateTab = ({ isGenerating, setIsGenerating }: GenerateTabProps)
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
-    const [prompt, setPrompt] = useState('');
-    const [negativePrompt, setNegativePrompt] = useState('blurry, low quality, distorted, bad anatomy, flat lighting');
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [steps, setSteps] = useState(9);
-    const [cfg, setCfg] = useState(1);
-    const [dimensions, setDimensions] = useState('1024x1536');
-    const [seed, setSeed] = useState(-1);
-    const [batchCount, setBatchCount] = useState(1);
-    const [selectedLoras, setSelectedLoras] = useState<SelectedLora[]>([]);
+    const [prompt, setPrompt] = usePersistentState('image_generate_prompt', '');
+    const [negativePrompt, setNegativePrompt] = usePersistentState('image_generate_negative', 'blurry, low quality, distorted, bad anatomy, flat lighting');
+    const [showAdvanced, setShowAdvanced] = usePersistentState('image_generate_show_advanced', false);
+    const [steps, setSteps] = usePersistentState('image_generate_steps', 9);
+    const [cfg, setCfg] = usePersistentState('image_generate_cfg', 1);
+    const [dimensions, setDimensions] = usePersistentState('image_generate_dimensions', '1024x1536');
+    const [seed, setSeed] = usePersistentState('image_generate_seed', -1);
+    const [batchCount, setBatchCount] = usePersistentState('image_generate_batch_count', 1);
+    const [selectedLoras, setSelectedLoras] = usePersistentState<SelectedLora[]>('image_generate_selected_loras', []);
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
     useEffect(() => {
@@ -171,3 +172,4 @@ export const GenerateTab = ({ isGenerating, setIsGenerating }: GenerateTabProps)
         </div>
     );
 };
+

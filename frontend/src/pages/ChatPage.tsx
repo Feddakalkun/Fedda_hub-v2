@@ -3,8 +3,10 @@ import { Send, Bot, User, Sparkles, Image as ImageIcon, Loader2, Mic, Square, Vo
 import { assistantService } from '../services/assistantService';
 import { comfyService } from '../services/comfyService';
 import { ollamaService } from '../services/ollamaService';
-import { OllamaQuickPull } from '../components/OllamaQuickPull';
 import ReactMarkdown from 'react-markdown';
+import { CatalogCard } from '../components/layout/CatalogShell';
+import { useToast } from '../components/ui/Toast';
+import { directDownload } from '../utils/directDownload';
 
 interface Message {
     id: string;
@@ -43,6 +45,7 @@ Your goal is to help the user create AWARD-WINNING visuals via ComfyUI.
 <</GENERATE>>`;
 
 export const ChatPage = () => {
+    const { toast } = useToast();
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
@@ -617,6 +620,22 @@ export const ChatPage = () => {
     };
 
     // Auto-play TTS for new assistant messages when enabled
+
+    const handleDownloadGeneratedImage = async (msg: Message) => {
+        const imageUrl = msg.metadata?.imageUrl as string | undefined;
+        if (!imageUrl) {
+            toast('No image URL found for download', 'error');
+            return;
+        }
+
+        const fallbackName = `chat-image-${msg.id}.png`;
+        try {
+            const savedAs = await directDownload(imageUrl, fallbackName);
+            toast(`Downloaded ${savedAs}`, 'success');
+        } catch {
+            toast('Failed to download image', 'error');
+        }
+    };
     useEffect(() => {
         if (!ttsEnabled || messages.length === 0) return;
 
@@ -646,23 +665,11 @@ export const ChatPage = () => {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="absolute top-0 left-0 right-0 p-6 z-10 bg-gradient-to-b from-[#050508] to-transparent">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3 opacity-70">
-                            <Bot className="w-5 h-5 text-white" />
-                            <span className="text-sm font-bold tracking-wider uppercase text-white">AI-Assistent</span>
-                        </div>
-
-                        {/* Integrated Quick Model Puller */}
-                        <OllamaQuickPull />
-                    </div>
-
-                    <div className="flex items-center gap-2 pointer-events-auto">
-                        {/* Brain Status & Info */}
-                        <div className="flex items-center gap-2 bg-[#121218] border border-white/10 rounded-lg px-2 py-1 z-20 pointer-events-auto shadow-lg mr-2">
-                            <span className="text-[10px] text-slate-500 uppercase tracking-tighter">Brain:</span>
+            <div className="px-6 pt-4 pb-2">
+                <CatalogCard className="p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 bg-[#0a0a0f] border border-white/10 rounded-lg px-2 py-1">
+                            <span className="text-[10px] text-slate-500 uppercase tracking-tighter">Brain</span>
                             <select
                                 value={selectedModel}
                                 onChange={(e) => setSelectedModel(e.target.value)}
@@ -679,13 +686,12 @@ export const ChatPage = () => {
                             </select>
                         </div>
 
-                        {/* LoRA Selector */}
-                        <div className="flex items-center gap-2 bg-[#121218] border border-white/10 rounded-lg px-2 py-1 mr-2">
-                            <span className="text-xs text-slate-500">LoRA:</span>
+                        <div className="flex items-center gap-2 bg-[#0a0a0f] border border-white/10 rounded-lg px-2 py-1">
+                            <span className="text-xs text-slate-500">LoRA</span>
                             <select
                                 value={selectedLora}
                                 onChange={(e) => setSelectedLora(e.target.value)}
-                                className="bg-transparent text-xs text-white border-none focus:ring-0 cursor-pointer outline-none max-w-[120px]"
+                                className="bg-transparent text-xs text-white border-none focus:ring-0 cursor-pointer outline-none max-w-[140px]"
                                 disabled={availableLoras.length === 0}
                             >
                                 <option value="">{availableLoras.length === 0 ? 'None' : 'None'}</option>
@@ -695,21 +701,16 @@ export const ChatPage = () => {
                             </select>
                         </div>
 
-                        {/* TTS Controls */}
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setTtsEnabled(!ttsEnabled)}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${ttsEnabled
-                                    ? 'bg-white/10 text-white'
-                                    : 'bg-white/5 text-slate-400 hover:text-white'
-                                    }`}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${ttsEnabled ? 'bg-white/10 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}
                                 title="Toggle AI voice responses"
                             >
                                 {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                                 <span className="text-xs font-medium">Voice</span>
                             </button>
 
-                            {/* Voice Style Selector */}
                             {ttsEnabled && (
                                 <select
                                     value={voiceStyle}
@@ -724,11 +725,10 @@ export const ChatPage = () => {
                             )}
                         </div>
                     </div>
-                </div>
+                </CatalogCard>
             </div>
-
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-12 py-20 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 custom-scrollbar">
                 {messages.map((msg) => (
                     <div
                         key={msg.id}
@@ -855,7 +855,7 @@ export const ChatPage = () => {
                                     />
                                     <div className="p-3 flex items-center justify-between">
                                         <span className="text-xs text-slate-500 font-mono">Z-Image v1</span>
-                                        <button className="text-xs text-white hover:underline">Download</button>
+                                        <button onClick={() => handleDownloadGeneratedImage(msg)} className="text-xs text-white hover:underline">Download</button>
                                     </div>
                                 </div>
                             )}
@@ -888,7 +888,7 @@ export const ChatPage = () => {
             </div>
 
             {/* Input Area */}
-            <div className="p-6 mb-4 relative z-20">
+            <div className="px-8 pb-6 pt-4 relative z-20">
                 <div className="relative w-full">
 
                     {/* Pending Image Preview */}
@@ -932,10 +932,7 @@ export const ChatPage = () => {
                         onMouseLeave={handleMicMouseUp}
                         onClick={handleMicClick}
                         disabled={isTranscribing}
-                        className={`absolute right-16 bottom-3 p-2 rounded-xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${isRecording
-                            ? 'bg-red-500 text-white animate-pulse'
-                            : 'bg-slate-700 text-white hover:bg-slate-600'
-                            }`}
+                        className={`absolute right-16 bottom-3 p-2 rounded-xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
                         title={recordingMode === 'hold' ? 'Hold to record' : 'Click to start/stop'}
                     >
                         {isTranscribing ? (
@@ -970,3 +967,5 @@ export const ChatPage = () => {
         </div>
     );
 };
+
+

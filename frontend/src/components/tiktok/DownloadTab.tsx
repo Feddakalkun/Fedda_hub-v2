@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Download, User, Video, Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { BACKEND_API } from '../../config/api';
 import { useToast } from '../ui/Toast';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 const COOKIE_OPTIONS = [
     { value: 'none', label: 'No Cookies' },
@@ -24,10 +25,10 @@ interface DownloadJob {
 
 export const DownloadTab = ({ onDownloadComplete }: { onDownloadComplete?: () => void }) => {
     const { toast } = useToast();
-    const [profileUrl, setProfileUrl] = useState('');
-    const [videoUrl, setVideoUrl] = useState('');
-    const [cookieSource, setCookieSource] = useState('none');
-    const [limit, setLimit] = useState('');
+    const [profileUrl, setProfileUrl] = usePersistentState('tiktok_download_profile_url', '');
+    const [videoUrl, setVideoUrl] = usePersistentState('tiktok_download_video_url', '');
+    const [cookieSource, setCookieSource] = usePersistentState('tiktok_download_cookie_source', 'none');
+    const [limit, setLimit] = usePersistentState('tiktok_download_limit', '');
     const [jobs, setJobs] = useState<DownloadJob[]>([]);
     const pollRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
@@ -274,3 +275,4 @@ export const DownloadTab = ({ onDownloadComplete }: { onDownloadComplete?: () =>
         </div>
     );
 };
+

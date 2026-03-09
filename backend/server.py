@@ -1,4 +1,4 @@
-"""
+﻿"""
 Simple FastAPI server for audio transcription
 Runs on port 8000
 """
@@ -32,7 +32,7 @@ import shutil
 
 app = FastAPI()
 
-# CORS for frontend — configurable via env var for Docker/RunPod
+# CORS for frontend â€” configurable via env var for Docker/RunPod
 import os
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174").split(",")
 # Base URL prefix for ComfyUI view URLs returned to frontend
@@ -69,7 +69,7 @@ async def transcribe(audio: UploadFile = File(...)):
         return {"text": text, "success": True}
         
     except Exception as e:
-        print(f"❌ Transcription error: {e}")
+        print(f"âŒ Transcription error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:
@@ -108,10 +108,72 @@ async def generate_speech(request: TTSRequest):
         )
         
     except Exception as e:
-        print(f"❌ TTS error: {e}")
+        print(f"âŒ TTS error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+class AudioReferenceRequest(BaseModel):
+    url: str
+
+
+@app.post("/api/audio/reference-info")
+async def get_audio_reference_info(req: AudioReferenceRequest):
+    """
+    Analyze a YouTube track reference URL and return metadata that can guide ACE prompts.
+    """
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Reference URL is required")
+
+    if not ("youtube.com" in url or "youtu.be" in url):
+        raise HTTPException(status_code=400, detail="Only YouTube URLs are supported right now")
+
+    try:
+        cmd = [
+            "yt-dlp",
+            "--dump-single-json",
+            "--no-playlist",
+            "--skip-download",
+            url,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            raise HTTPException(status_code=500, detail=stderr or "yt-dlp failed to analyze URL")
+
+        data = json.loads(result.stdout)
+        title = data.get("title") or ""
+        uploader = data.get("uploader") or data.get("channel") or ""
+        duration = data.get("duration") or 0
+        description = data.get("description") or ""
+        tags = data.get("tags") or []
+        categories = data.get("categories") or []
+
+        # Keep payload compact for the frontend and LLM context.
+        description_preview = description[:1000]
+        tag_preview = tags[:20] if isinstance(tags, list) else []
+        category_preview = categories[:8] if isinstance(categories, list) else []
+
+        return {
+            "success": True,
+            "title": title,
+            "uploader": uploader,
+            "duration_seconds": duration,
+            "description": description_preview,
+            "tags": tag_preview,
+            "categories": category_preview,
+            "webpage_url": data.get("webpage_url") or url,
+        }
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="yt-dlp is not installed on backend")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to parse yt-dlp metadata response")
+    except Exception as e:
+        print(f"Audio reference analyze error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/video/lipsync")
 async def generate_lipsync_video(
@@ -156,7 +218,7 @@ async def generate_lipsync_video(
         )
         
     except Exception as e:
-        print(f"❌ LipSync error: {e}")
+        print(f"âŒ LipSync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -193,7 +255,7 @@ async def get_hardware_stats():
         }
     except Exception as e:
         # Fallback if no NVIDIA GPU or command fails
-        print(f"⚠️ GPU Stats Error: {e}")
+        print(f"âš ï¸ GPU Stats Error: {e}")
         return {"status": "error", "message": "NVIDIA GPU not detected or driver error"}
 
 @app.get("/health")
@@ -221,7 +283,7 @@ async def install_lora(req: LoraInstallRequest):
         result = start_lora_download(req.url, req.filename)
         return result
     except Exception as e:
-        print(f"❌ LoRA Install trigger error: {e}")
+        print(f"âŒ LoRA Install trigger error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/lora/download-status/{filename}")
@@ -242,7 +304,7 @@ async def sync_premium_loras():
         result = sync_premium_folder()
         return result
     except Exception as e:
-        print(f"❌ Sync premium error: {e}")
+        print(f"âŒ Sync premium error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -314,7 +376,7 @@ async def trigger_runpod_animation(req: RunPodAnimateRequest):
         if req.runpod_token:
             headers["Authorization"] = f"Bearer {req.runpod_token}"
             
-        print(f"☁️ Uploading {len(local_files)} images to RunPod...")
+        print(f"â˜ï¸ Uploading {len(local_files)} images to RunPod...")
         for fpath in local_files:
             with open(fpath, 'rb') as f:
                 res = requests.post(upload_url, headers=headers, files={'image': (fpath.name, f, 'image/png')})
@@ -346,7 +408,7 @@ async def trigger_runpod_animation(req: RunPodAnimateRequest):
         # (Optional) Inject default RunPod limits or tokens here. Let's send it!
         payload = {"prompt": wf}
         
-        print(f"☁️ Sending job to {req.runpod_url}")
+        print(f"â˜ï¸ Sending job to {req.runpod_url}")
         req_kwargs = {
             "json": payload,
             "headers": {
@@ -366,7 +428,7 @@ async def trigger_runpod_animation(req: RunPodAnimateRequest):
         print(f"RunPod HTTP Error: {he.response.text}")
         raise HTTPException(status_code=he.response.status_code, detail=f"RunPod Endpoint Error: {he.response.text}")
     except Exception as e:
-        print(f"❌ RunPod Integration Error: {e}")
+        print(f"âŒ RunPod Integration Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -448,7 +510,7 @@ async def check_runpod_status(req: RunPodStatusRequest):
     except requests.exceptions.Timeout:
         return {"status": "pod_loading", "completed": False, "outputs": [], "prompt_id": req.prompt_id}
     except Exception as e:
-        print(f"❌ RunPod Status Error: {e}")
+        print(f"âŒ RunPod Status Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -483,7 +545,7 @@ async def download_runpod_output(req: RunPodDownloadRequest):
             for chunk in download_res.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        print(f"✅ Downloaded from RunPod: {req.filename} -> {local_path}")
+        print(f"âœ… Downloaded from RunPod: {req.filename} -> {local_path}")
         return {
             "success": True,
             "local_path": str(local_path),
@@ -491,7 +553,7 @@ async def download_runpod_output(req: RunPodDownloadRequest):
         }
 
     except Exception as e:
-        print(f"❌ RunPod Download Error: {e}")
+        print(f"âŒ RunPod Download Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -509,7 +571,7 @@ async def list_output_files():
         
         # Scan all files recursively
         for file_path in comfy_output.rglob("*"):
-            if file_path.is_file() and file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm']:
+            if file_path.is_file() and file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.mp4', '.webm', '.flac', '.wav', '.mp3', '.ogg', '.m4a', '.aac']:
                 # Get relative path from output directory
                 rel_path = file_path.relative_to(comfy_output)
                 
@@ -543,7 +605,7 @@ async def list_output_files():
         }
         
     except Exception as e:
-        print(f"❌ List files error: {e}")
+        print(f"âŒ List files error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -583,7 +645,7 @@ async def delete_file(request: DeleteFileRequest):
         # Delete file
         if file_path.exists():
             file_path.unlink()
-            print(f"✅ Deleted: {file_path}")
+            print(f"âœ… Deleted: {file_path}")
             return {"success": True, "message": f"Deleted {request.filename}"}
         else:
             raise HTTPException(status_code=404, detail="File not found")
@@ -591,7 +653,7 @@ async def delete_file(request: DeleteFileRequest):
     except HTTPException:
         raise  # Re-raise HTTPExceptions as-is
     except Exception as e:
-        print(f"❌ Delete error: {e}")
+        print(f"âŒ Delete error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -632,7 +694,7 @@ async def cleanup_orphaned_files():
                 if file_path.name not in valid_files:
                     file_path.unlink()
                     deleted_files.append(str(file_path.relative_to(comfy_output)))
-                    print(f"🗑️ Cleaned up: {file_path.name}")
+                    print(f"ðŸ—‘ï¸ Cleaned up: {file_path.name}")
         
         return {
             "success": True,
@@ -641,7 +703,7 @@ async def cleanup_orphaned_files():
         }
         
     except Exception as e:
-        print(f"❌ Cleanup error: {e}")
+        print(f"âŒ Cleanup error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -840,6 +902,28 @@ REQUIRED_MODELS = {
             "url": "https://huggingface.co/scenario-labs/sam_vit/resolve/main/sam_vit_b_01ec64.pth",
             "path": "sams/sam_vit_b_01ec64.pth",
             "size_gb": 0.375
+        }
+        ],
+    "ace-step": [
+        {
+            "id": "ace-unet",
+            "name": "acestep_v1.5_turbo.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/diffusion_models/acestep_v1.5_turbo.safetensors",
+            "path": "diffusion_models/acestep_v1.5_turbo.safetensors",
+            "size_gb": 4.8
+        },
+        {
+            "id": "ace-clip-small",
+            "name": "qwen_0.6b_ace15.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_0.6b_ace15.safetensors",
+            "path": "text_encoders/qwen_0.6b_ace15.safetensors",
+            "size_gb": 1.3
+        },{
+            "id": "ace-vae",
+            "name": "ace_1.5_vae.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/vae/ace_1.5_vae.safetensors",
+            "path": "vae/ace_1.5_vae.safetensors",
+            "size_gb": 0.314
         }
     ],
     "qwen-angle": [
@@ -1135,3 +1219,10 @@ async def tiktok_serve_file(path: str):
 if __name__ == "__main__":
     print("FEDDA Backend starting on port 8000...")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
+
+
+

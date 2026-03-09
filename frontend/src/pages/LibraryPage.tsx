@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Download, CheckCircle2, Package, Search, Loader2, Trash2, RotateCw, CloudDownload, Crown } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { BACKEND_API } from '../config/api';
+import { CatalogShell, CatalogCard } from '../components/layout/CatalogShell';
 import { LORA_CATALOG, LORA_CATEGORIES, type LoraEntry } from '../config/loras';
 
 const api = (endpoint: string) => `${BACKEND_API.BASE_URL}${endpoint}`;
@@ -193,19 +194,12 @@ export const LibraryPage = () => {
     };
 
     return (
-        <div className="p-8 max-w-[1920px] mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Package className="w-8 h-8 text-white" />
-                    <div>
-                        <h1 className="text-3xl font-bold text-white">LoRA Library</h1>
-                        <p className="text-slate-400">
-                            {filteredLoras.length} available &bull; {installedCount} installed &bull; {premiumCount} premium
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
+        <CatalogShell
+            title="LoRA Library"
+            subtitle={`${filteredLoras.length} available • ${installedCount} installed • ${premiumCount} premium`}
+            icon={Package}
+            actions={
+                <>
                     <button
                         onClick={handleSyncAll}
                         disabled={isSyncing}
@@ -226,11 +220,11 @@ export const LibraryPage = () => {
                         <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         Refresh ComfyUI
                     </button>
-                </div>
-            </div>
-
+                </>
+            }
+        >
             {/* Filters */}
-            <div className="bg-[#121218] border border-white/5 rounded-2xl p-6 space-y-4">
+            <CatalogCard className="p-6 space-y-4">
                 <div className="flex flex-col md:flex-row gap-4">
                     {/* Search */}
                     <div className="relative flex-1">
@@ -261,8 +255,7 @@ export const LibraryPage = () => {
                         ))}
                     </div>
                 </div>
-            </div>
-
+            </CatalogCard>
             {/* LoRA Grid */}
             {filteredLoras.length === 0 ? (
                 <div className="text-center text-slate-500 py-20">No LoRAs match your search</div>
@@ -385,6 +378,7 @@ export const LibraryPage = () => {
                     })}
                 </div>
             )}
-        </div>
+        </CatalogShell>
     );
 };
+

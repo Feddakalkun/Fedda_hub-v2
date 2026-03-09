@@ -6,6 +6,7 @@ import { comfyService } from '../../services/comfyService';
 import { GalleryModal } from '../GalleryModal';
 import { useToast } from '../ui/Toast';
 import { BACKEND_API } from '../../config/api';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 export const LipsyncTab = () => {
     const { queueWorkflow } = useComfyExecution();
@@ -17,20 +18,20 @@ export const LipsyncTab = () => {
     const [showGalleryModal, setShowGalleryModal] = useState(false);
 
     // Audio input
-    const [audioMode, setAudioMode] = useState<'upload' | 'tts'>('upload');
+    const [audioMode, setAudioMode] = usePersistentState<'upload' | 'tts'>('video_lipsync_audio_mode', 'upload');
     const [audioFile, setAudioFile] = useState<File | null>(null);
-    const [ttsText, setTtsText] = useState('');
-    const [voiceStyle, setVoiceStyle] = useState('female, clear voice');
+    const [ttsText, setTtsText] = usePersistentState('video_lipsync_tts_text', '');
+    const [voiceStyle, setVoiceStyle] = usePersistentState('video_lipsync_voice_style', 'female, clear voice');
     const [isGeneratingTts, setIsGeneratingTts] = useState(false);
 
     // Parameters
-    const [prompt, setPrompt] = useState('a woman lipsyncing');
-    const [negativePrompt, setNegativePrompt] = useState('bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards');
-    const [audioDuration, setAudioDuration] = useState(5);
-    const [steps, setSteps] = useState(4);
-    const [seed, setSeed] = useState(-1);
-    const [resolution, setResolution] = useState(512);
-    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [prompt, setPrompt] = usePersistentState('video_lipsync_prompt', 'a woman lipsyncing');
+    const [negativePrompt, setNegativePrompt] = usePersistentState('video_lipsync_negative_prompt', 'bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards');
+    const [audioDuration, setAudioDuration] = usePersistentState('video_lipsync_audio_duration', 5);
+    const [steps, setSteps] = usePersistentState('video_lipsync_steps', 4);
+    const [seed, setSeed] = usePersistentState('video_lipsync_seed', -1);
+    const [resolution, setResolution] = usePersistentState('video_lipsync_resolution', 512);
+    const [showAdvanced, setShowAdvanced] = usePersistentState('video_lipsync_show_advanced', false);
     const [isGenerating, setIsGenerating] = useState(false);
 
     const handleFaceImageDrop = (e: React.DragEvent) => {
@@ -362,3 +363,4 @@ export const LipsyncTab = () => {
         </>
     );
 };
+

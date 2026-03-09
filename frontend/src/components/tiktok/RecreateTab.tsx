@@ -5,6 +5,7 @@ import type { SelectedLora } from '../image/LoraStack';
 import { comfyService } from '../../services/comfyService';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { useToast } from '../ui/Toast';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface FrameData {
     path: string;
@@ -20,9 +21,9 @@ export const RecreateTab = ({ frames }: RecreateTabProps) => {
     const { toast } = useToast();
     const { queueWorkflow, lastCompletedPromptId, lastOutputImages, outputReadyCount } = useComfyExecution();
 
-    const [selectedLoras, setSelectedLoras] = useState<SelectedLora[]>([]);
+    const [selectedLoras, setSelectedLoras] = usePersistentState<SelectedLora[]>('tiktok_recreate_selected_loras', []);
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
-    const [denoise, setDenoise] = useState(0.55);
+    const [denoise, setDenoise] = usePersistentState('tiktok_recreate_denoise', 0.55);
     const [generating, setGenerating] = useState(false);
     const [results, setResults] = useState<Record<number, string>>({});
 
@@ -217,3 +218,4 @@ export const RecreateTab = ({ frames }: RecreateTabProps) => {
         </div>
     );
 };
+

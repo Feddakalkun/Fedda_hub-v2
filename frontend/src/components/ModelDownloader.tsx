@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Download, Loader2, AlertTriangle } from 'lucide-react';
 import { BACKEND_API } from '../config/api';
 
@@ -18,21 +18,28 @@ interface ModelInfo {
 
 interface ModelDownloaderProps {
     modelGroup?: string;
+    onModelsReady?: () => void;
 }
 
-export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps) => {
+const MODEL_GROUP_LABELS: Record<string, string> = {
+    'z-image': 'Z-Image Turbo',
+    'ace-step': 'ACE-Step 1.5',
+    'qwen-angle': 'Qwen Angle',
+};
+
+export const ModelDownloader = ({ modelGroup = 'z-image', onModelsReady }: ModelDownloaderProps) => {
     const [modelStatus, setModelStatus] = useState<ModelInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDownloading, setIsDownloading] = useState(false);
+    const didNotifyReadyRef = useRef(false);
 
     const checkStatus = useCallback(async () => {
         try {
             const resp = await fetch(`${BACKEND_API.BASE_URL}/api/models/status?group=${modelGroup}`);
             const data = await resp.json();
-            if (data.success) {
+            if (data.success && Array.isArray(data.models)) {
                 setModelStatus(data.models);
-                const results = data.models;
-                const downloading = results.some((m: any) => m.progress.status === 'downloading');
+                const downloading = data.models.some((m: ModelInfo) => m.progress?.status === 'downloading');
                 setIsDownloading(downloading);
             }
         } catch (e) {
@@ -44,15 +51,30 @@ export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps
 
     useEffect(() => {
         checkStatus();
-        // Dynamic interval: 2s when downloading, 5s when idle
         const timer = isDownloading ? 2000 : 5000;
         const interval = setInterval(checkStatus, timer);
         return () => clearInterval(interval);
     }, [checkStatus, isDownloading]);
 
+    const allInstalled = modelStatus.length > 0 && modelStatus.every((m) => m.exists);
+
+    useEffect(() => {
+        if (!onModelsReady) return;
+
+        if (allInstalled && !didNotifyReadyRef.current) {
+            didNotifyReadyRef.current = true;
+            onModelsReady();
+            return;
+        }
+
+        if (!allInstalled) {
+            didNotifyReadyRef.current = false;
+        }
+    }, [allInstalled, onModelsReady]);
+
     const handleDownloadAll = async () => {
         setIsDownloading(true);
-        const missing = modelStatus.filter(m => !m.exists || m.progress.status === 'error');
+        const missing = modelStatus.filter((m) => !m.exists || m.progress.status === 'error');
         for (const m of missing) {
             try {
                 await fetch(`${BACKEND_API.BASE_URL}/api/models/download?model_id=${m.id}&group=${modelGroup}`, { method: 'POST' });
@@ -63,7 +85,7 @@ export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps
     };
 
     const handlePurge = async () => {
-        if (!confirm("Are you sure? This will delete existing model files to allow a fresh download.")) return;
+        if (!confirm('Are you sure? This will delete existing model files to allow a fresh download.')) return;
         try {
             await fetch(`${BACKEND_API.BASE_URL}/api/models/purge?group=${modelGroup}`, { method: 'POST' });
             await checkStatus();
@@ -73,30 +95,35 @@ export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps
     };
 
     if (isLoading) return null;
+    if (modelStatus.length === 0 && !isDownloading) return null;
 
-    const corruptModels = modelStatus.filter(m => m.is_corrupt);
+    const groupLabel = MODEL_GROUP_LABELS[modelGroup] || modelGroup;
+    const corruptModels = modelStatus.filter((m) => m.is_corrupt);
     const hasCorrupt = corruptModels.length > 0;
-    const hasError = modelStatus.some(m => m.progress.status === 'error');
-    const allInstalled = modelStatus.every(m => m.exists);
+    const hasError = modelStatus.some((m) => m.progress.status === 'error');
+
+    const totalRequiredGb = modelStatus.reduce((acc, m) => acc + (m.size_gb || 0), 0);
+    const requiredSizeLabel = totalRequiredGb >= 10 ? totalRequiredGb.toFixed(0) : totalRequiredGb.toFixed(1);
 
     const mainMessage = hasCorrupt ? 'Corrupted File Detected' : hasError ? 'Download Corrupted' : 'Required Models Missing';
     const subMessage = hasCorrupt
-        ? `One or more base models are incomplete (UNET/CLIP/VAE). LoRAs are safe.`
+        ? `One or more ${groupLabel} model files are incomplete. LoRAs are safe.`
         : hasError
-            ? 'The connection was lost. Purge and restart for a clean copy.'
-            : 'Z-Image Turbo base models are required for generation (~26GB total)';
+            ? `The ${groupLabel} download was interrupted. Purge and restart for a clean copy.`
+            : `${groupLabel} base models are required for generation (~${requiredSizeLabel}GB total)`;
 
-    // If everything is fine, show a very discreet repair option or nothing
-    if (allInstalled && !isDownloading && !hasError && !hasCorrupt) return (
-        <div className="mx-8 mt-4 flex justify-end">
-            <button
-                onClick={handlePurge}
-                className="text-[9px] text-slate-700 hover:text-slate-400 font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
-            >
-                [ Verify & Repair Cache ]
-            </button>
-        </div>
-    );
+    if (allInstalled && !isDownloading && !hasError && !hasCorrupt) {
+        return (
+            <div className="mx-8 mt-4 flex justify-end">
+                <button
+                    onClick={handlePurge}
+                    className="text-[9px] text-slate-700 hover:text-slate-400 font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
+                >
+                    [ Verify & Repair Cache ]
+                </button>
+            </div>
+        );
+    }
 
     const totalDownloaded = modelStatus.reduce((acc, m) => acc + (m.progress.downloaded || 0), 0);
     const totalSize = modelStatus.reduce((acc, m) => acc + (m.progress.total || 0), 0);
@@ -130,7 +157,7 @@ export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps
                         {isDownloading ? (
                             <div className="flex flex-col items-end gap-1.5 min-w-[200px]">
                                 <div className="flex justify-between w-full text-[10px] font-mono text-slate-400">
-                                    <span>{totalSize > 0 ? 'Downloading Assets...' : 'Connecting...'}</span>
+                                    <span>{totalSize > 0 ? `Downloading ${groupLabel}...` : 'Connecting...'}</span>
                                     {totalSize > 0 && <span>{Math.round(percent)}%</span>}
                                 </div>
                                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
@@ -151,10 +178,9 @@ export const ModelDownloader = ({ modelGroup = "z-image" }: ModelDownloaderProps
                     </div>
                 </div>
 
-                {/* Corruption Details */}
                 {hasCorrupt && !isDownloading && (
                     <div className="px-6 pb-4 pt-2 border-t border-white/5 flex flex-wrap gap-4">
-                        {corruptModels.map(m => (
+                        {corruptModels.map((m) => (
                             <div key={m.id} className="flex flex-col">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{m.id}</span>
                                 <span className="text-[11px] text-red-400 font-mono">

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader2, Sparkles, Image, Paintbrush, AlertCircle } from 'lucide-react';
 import { BACKEND_API } from '../../config/api';
 import { useToast } from '../ui/Toast';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface FrameData {
     path: string;
@@ -20,12 +21,12 @@ interface FramesTabProps {
 export const FramesTab = ({ videoPath, videoName, onSendToImg2Img, onSendToInpaint, onSendToRecreate }: FramesTabProps) => {
     const { toast } = useToast();
     const [frames, setFrames] = useState<FrameData[]>([]);
-    const [frameCount, setFrameCount] = useState(6);
+    const [frameCount, setFrameCount] = usePersistentState('tiktok_frames_count', 6);
     const [extracting, setExtracting] = useState(false);
     const [captioning, setCaptioning] = useState(false);
     const [captionProgress, setCaptionProgress] = useState<{ done: number; total: number } | null>(null);
-    const [captionMethod, setCaptionMethod] = useState<'ollama' | 'comfy'>('ollama');
-    const [captionModel, setCaptionModel] = useState('llava');
+    const [captionMethod, setCaptionMethod] = usePersistentState<'ollama' | 'comfy'>('tiktok_frames_caption_method', 'ollama');
+    const [captionModel, setCaptionModel] = usePersistentState('tiktok_frames_caption_model', 'llava');
     const [extractError, setExtractError] = useState<string | null>(null);
 
     const extractFrames = async () => {
@@ -296,3 +297,4 @@ export const FramesTab = ({ videoPath, videoName, onSendToImg2Img, onSendToInpai
         </div>
     );
 };
+

@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Film, Play, Download, Trash2, Search, Maximize2 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { BACKEND_API } from '../config/api';
+import { CatalogShell, CatalogCard } from '../components/layout/CatalogShell';
+import { directDownload } from '../utils/directDownload';
 
 const api = (endpoint: string) => `${BACKEND_API.BASE_URL}${endpoint}`;
 
@@ -79,6 +81,14 @@ export const VideosPage = () => {
         v.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
         v.model.toLowerCase().includes(searchTerm.toLowerCase())
     );
+    const handleDownload = async (video: VideoFile) => {
+        try {
+            const savedAs = await directDownload(video.url, video.filename);
+            toast(`Downloaded ${savedAs}`, 'success');
+        } catch {
+            toast('Failed to download video', 'error');
+        }
+    };
 
     // Group videos by date
     const groupedByDate = filteredVideos.reduce<Record<string, VideoFile[]>>((acc, v) => {
@@ -91,29 +101,25 @@ export const VideosPage = () => {
     const sortedDates = Object.keys(groupedByDate).sort().reverse();
 
     return (
-        <div className="p-8 max-w-[1920px] mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Film className="w-8 h-8 text-white" />
-                    <div>
-                        <h1 className="text-3xl font-bold text-white">Videos</h1>
-                        <p className="text-slate-400">{filteredVideos.length} videos</p>
+        <CatalogShell
+            title="Videos"
+            subtitle={`${filteredVideos.length} videos`}
+            icon={Film}
+            actions={
+                <CatalogCard className="p-2">
+                    <div className="relative w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <input
+                            type="text"
+                            placeholder="Search videos..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-[#0a0a0f] border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                        />
                     </div>
-                </div>
-
-                <div className="relative w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                        type="text"
-                        placeholder="Search videos..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-[#0a0a0f] border border-white/10 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
-                    />
-                </div>
-            </div>
-
+                </CatalogCard>
+            }
+        >
             {/* Expanded Video Player */}
             {expandedVideo && (
                 <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
@@ -134,13 +140,12 @@ export const VideosPage = () => {
                             </p>
                         </div>
                         <div className="flex gap-2">
-                            <a
-                                href={expandedVideo.url}
-                                download={expandedVideo.filename}
+                            <button
+                                onClick={() => handleDownload(expandedVideo)}
                                 className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-slate-300 flex items-center gap-2 transition-colors"
                             >
                                 <Download className="w-4 h-4" /> Save
-                            </a>
+                            </button>
                             <button
                                 onClick={() => handleDelete(expandedVideo)}
                                 className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-sm text-red-400 flex items-center gap-2 transition-colors"
@@ -220,6 +225,8 @@ export const VideosPage = () => {
                     </div>
                 ))
             )}
-        </div>
+        </CatalogShell>
     );
 };
+
+

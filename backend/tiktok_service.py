@@ -328,11 +328,32 @@ def caption_frames(frame_paths: list, method: str = "ollama", model: str = "llav
 def _caption_thread(job_id: str, frame_paths: list, method: str, model: str):
     """Background thread for captioning frames."""
     try:
+        # Validate model exists in Ollama before starting
+        if method == "ollama":
+            try:
+                r = requests.get("http://127.0.0.1:11434/api/tags", timeout=5)
+                if r.ok:
+                    installed = [m["name"] for m in r.json().get("models", [])]
+                    # Allow prefix match (e.g. "llava" matches "llava:latest")
+                    if not any(m == model or m.startswith(model.split(":")[0]) for m in installed):
+                        available = ", ".join(installed) if installed else "none"
+                        err = f"[Model '{model}' not found in Ollama. Installed: {available}]"
+                        for fp in frame_paths:
+                            norm = fp.replace("\\", "/")
+                            caption_jobs[job_id]["captions"][norm] = err
+                            caption_jobs[job_id]["done"] += 1
+                        caption_jobs[job_id]["status"] = "completed"
+                        return
+            except Exception:
+                pass  # If we can't check, proceed and let the actual call fail
+
         for frame_rel_path in frame_paths:
+            # Normalize to forward slashes for consistent key lookup from frontend
+            norm_path = frame_rel_path.replace("\\", "/")
             frame_full_path = DOWNLOADS_DIR / frame_rel_path
 
             if not frame_full_path.exists():
-                caption_jobs[job_id]["captions"][frame_rel_path] = "[Frame not found]"
+                caption_jobs[job_id]["captions"][norm_path] = "[Frame not found]"
                 caption_jobs[job_id]["done"] += 1
                 continue
 
@@ -341,7 +362,7 @@ def _caption_thread(job_id: str, frame_paths: list, method: str, model: str):
             else:
                 caption = _caption_ollama(frame_full_path, model)  # Fallback to ollama for now
 
-            caption_jobs[job_id]["captions"][frame_rel_path] = caption
+            caption_jobs[job_id]["captions"][norm_path] = caption
             caption_jobs[job_id]["done"] += 1
 
         caption_jobs[job_id]["status"] = "completed"
@@ -352,24 +373,32 @@ def _caption_thread(job_id: str, frame_paths: list, method: str, model: str):
 
 
 def _caption_ollama(image_path: Path, model: str = "llava") -> str:
-    """Caption a single image using Ollama vision model."""
+    """Caption a single image using Ollama vision model via /api/chat."""
     try:
         with open(image_path, "rb") as f:
             image_b64 = base64.b64encode(f.read()).decode("utf-8")
 
         response = requests.post(
-            "http://127.0.0.1:11434/api/generate",
+            "http://127.0.0.1:11434/api/chat",
             json={
                 "model": model,
-                "prompt": "Describe this scene in detail for image generation. Focus on the person's pose, expression, clothing, hairstyle, background, lighting, and composition. Be specific and concise.",
-                "images": [image_b64],
                 "stream": False,
+                "messages": [{
+                    "role": "user",
+                    "content": "Describe this scene in detail for image generation. Focus on the person's appearance, pose, expression, clothing, hairstyle, background, lighting, and composition. Be specific and concise.",
+                    "images": [image_b64],
+                }],
             },
             timeout=120,
         )
         response.raise_for_status()
-        return response.json().get("response", "").strip()
+        result = response.json()
+        return result.get("message", {}).get("content", "").strip()
 
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return f"[Model '{model}' not found — use the Caption Model button in the header to install a vision model]"
+        return f"[Caption failed: {e}]"
     except Exception as e:
         return f"[Caption failed: {e}]"
 

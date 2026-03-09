@@ -9,6 +9,7 @@ import type { SelectedLora } from './LoraStack';
 import { ImageUpload } from './ImageUpload';
 import { DimensionSelector } from './DimensionSelector';
 import { BACKEND_API } from '../../config/api';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface InpaintTabProps {
     isGenerating: boolean;
@@ -21,23 +22,23 @@ export const InpaintTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
-    const [prompt, setPrompt] = useState('');
-    const [negativePrompt, setNegativePrompt] = useState('blurry, low quality, distorted');
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [steps, setSteps] = useState(6);
-    const [cfg, setCfg] = useState(1);
-    const [denoise, setDenoise] = useState(0.77);
-    const [dimensions, setDimensions] = useState('1024x1024');
-    const [selectedLoras, setSelectedLoras] = useState<SelectedLora[]>([]);
+    const [prompt, setPrompt] = usePersistentState('image_inpaint_prompt', '');
+    const [negativePrompt, setNegativePrompt] = usePersistentState('image_inpaint_negative', 'blurry, low quality, distorted');
+    const [showAdvanced, setShowAdvanced] = usePersistentState('image_inpaint_show_advanced', false);
+    const [steps, setSteps] = usePersistentState('image_inpaint_steps', 6);
+    const [cfg, setCfg] = usePersistentState('image_inpaint_cfg', 1);
+    const [denoise, setDenoise] = usePersistentState('image_inpaint_denoise', 0.77);
+    const [dimensions, setDimensions] = usePersistentState('image_inpaint_dimensions', '1024x1024');
+    const [selectedLoras, setSelectedLoras] = usePersistentState<SelectedLora[]>('image_inpaint_selected_loras', []);
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
     // Mask regions (from PersonMaskUltra node 173)
-    const [maskFace, setMaskFace] = useState(true);
-    const [maskHair, setMaskHair] = useState(true);
-    const [maskBody, setMaskBody] = useState(false);
-    const [maskClothes, setMaskClothes] = useState(false);
-    const [maskAccessories, setMaskAccessories] = useState(false);
-    const [maskBackground, setMaskBackground] = useState(false);
+    const [maskFace, setMaskFace] = usePersistentState('image_inpaint_mask_face', true);
+    const [maskHair, setMaskHair] = usePersistentState('image_inpaint_mask_hair', true);
+    const [maskBody, setMaskBody] = usePersistentState('image_inpaint_mask_body', false);
+    const [maskClothes, setMaskClothes] = usePersistentState('image_inpaint_mask_clothes', false);
+    const [maskAccessories, setMaskAccessories] = usePersistentState('image_inpaint_mask_accessories', false);
+    const [maskBackground, setMaskBackground] = usePersistentState('image_inpaint_mask_background', false);
 
     const [inputImage, setInputImage] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -232,3 +233,4 @@ export const InpaintTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
         </div>
     );
 };
+

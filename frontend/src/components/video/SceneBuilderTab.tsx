@@ -7,6 +7,7 @@ import { assistantService } from '../../services/assistantService';
 import { ollamaService } from '../../services/ollamaService';
 import { GalleryModal } from '../GalleryModal';
 import { useToast } from '../ui/Toast';
+import { usePersistentState } from '../../hooks/usePersistentState';
 
 interface KeyframeImage {
     url: string | null;
@@ -101,25 +102,25 @@ export const SceneBuilderTab = () => {
     const [showGalleryModal, setShowGalleryModal] = useState(false);
 
     // Preset system
-    const [usePresetMode, setUsePresetMode] = useState(false);
-    const [presetDescription, setPresetDescription] = useState('');
-    const [presetLora, setPresetLora] = useState('');
+    const [usePresetMode, setUsePresetMode] = usePersistentState('video_scene_use_preset_mode', false);
+    const [presetDescription, setPresetDescription] = usePersistentState('video_scene_preset_description', '');
+    const [presetLora, setPresetLora] = usePersistentState('video_scene_preset_lora', '');
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
     const [ollamaModels, setOllamaModels] = useState<any[]>([]);
-    const [selectedOllamaModel, setSelectedOllamaModel] = useState('');
+    const [selectedOllamaModel, setSelectedOllamaModel] = usePersistentState('video_scene_selected_ollama_model', '');
     const [isGeneratingPreset, setIsGeneratingPreset] = useState(false);
 
     // Video parameters
-    const [prompt, setPrompt] = useState('cinematic motion');
-    const [seed, setSeed] = useState(-1);
-    const [resolution, setResolution] = useState(720);
-    const [frameLength, setFrameLength] = useState(81);
-    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [prompt, setPrompt] = usePersistentState('video_scene_prompt', 'cinematic motion');
+    const [seed, setSeed] = usePersistentState('video_scene_seed', -1);
+    const [resolution, setResolution] = usePersistentState('video_scene_resolution', 720);
+    const [frameLength, setFrameLength] = usePersistentState('video_scene_frame_length', 81);
+    const [showAdvanced, setShowAdvanced] = usePersistentState('video_scene_show_advanced', false);
     const [isGenerating, setIsGenerating] = useState(false);
 
     // LoRA toggles (14 slots, all off by default)
-    const [loraEnabled, setLoraEnabled] = useState<boolean[]>(WORKFLOW_LORAS.map(() => false));
-    const [loraStrengths, setLoraStrengths] = useState<number[]>(WORKFLOW_LORAS.map(l => {
+    const [loraEnabled, setLoraEnabled] = usePersistentState<boolean[]>('video_scene_lora_enabled', WORKFLOW_LORAS.map(() => false));
+    const [loraStrengths, setLoraStrengths] = usePersistentState<number[]>('video_scene_lora_strengths', WORKFLOW_LORAS.map(l => {
         // Use default strengths from workflow
         if (l.label === 'Twerk') return 0.6;
         if (l.label === 'Rev Cowgirl') return 0.7;
@@ -572,3 +573,4 @@ export const SceneBuilderTab = () => {
         </>
     );
 };
+

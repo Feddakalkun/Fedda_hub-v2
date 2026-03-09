@@ -1,4 +1,4 @@
-// ComfyUI API Service
+﻿// ComfyUI API Service
 import { COMFY_API, BACKEND_API } from '../config/api';
 import type { ComfyPrompt, ComfyQueueItem, ComfyHistoryItem } from '../types/comfy';
 
@@ -241,6 +241,36 @@ class ComfyUIService {
         }
     }
 
+    private async getObjectInfoNode(nodeName: string): Promise<any | null> {
+        try {
+            const response = await fetch(`${COMFY_API.BASE_URL}/object_info/${encodeURIComponent(nodeName)}`);
+            if (!response.ok) return null;
+            return await response.json();
+        } catch {
+            return null;
+        }
+    }
+
+    private extractComboValues(nodeData: any, inputName: string): string[] {
+        const values = nodeData?.input?.required?.[inputName]?.[0];
+        return Array.isArray(values) ? values : [];
+    }
+
+    async getUNetModels(): Promise<string[]> {
+        const data = await this.getObjectInfoNode('UNETLoader');
+        return this.extractComboValues(data?.UNETLoader, 'unet_name');
+    }
+
+    async getDualClipModels(inputName: 'clip_name1' | 'clip_name2' = 'clip_name1'): Promise<string[]> {
+        const data = await this.getObjectInfoNode('DualCLIPLoader');
+        return this.extractComboValues(data?.DualCLIPLoader, inputName);
+    }
+
+    async getVaeModels(): Promise<string[]> {
+        const data = await this.getObjectInfoNode('VAELoader');
+        return this.extractComboValues(data?.VAELoader, 'vae_name');
+    }
+
     /**
      * Connect to WebSocket for real-time updates and return a listener cleanup function
      */
@@ -252,7 +282,7 @@ class ComfyUIService {
     }): () => void {
         this.ws = new WebSocket(`${COMFY_API.WS_URL}?clientId=${this.clientId}`);
 
-        this.ws.onopen = () => console.log('✅ WebSocket connected to ComfyUI');
+        this.ws.onopen = () => console.log('âœ… WebSocket connected to ComfyUI');
 
         this.ws.onmessage = (event) => {
             try {
@@ -343,7 +373,7 @@ class ComfyUIService {
                     free_memory: freeCache
                 })
             });
-            console.log('✅ ComfyUI Memory Freed');
+            console.log('âœ… ComfyUI Memory Freed');
         } catch (error) {
             console.error('Failed to free ComfyUI memory:', error);
         }
@@ -351,3 +381,4 @@ class ComfyUIService {
 }
 
 export const comfyService = new ComfyUIService();
+

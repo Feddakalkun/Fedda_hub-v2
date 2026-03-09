@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Maximize2, X, Trash2, Video, FileText, Image, Paintbrush } from 'lucide-react';
+import { Sparkles, Maximize2, X, Trash2, Video, FileText, Image, Paintbrush, Download } from 'lucide-react';
 import { comfyService } from '../../services/comfyService';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { useToast } from '../ui/Toast';
+import { directDownload } from '../../utils/directDownload';
 
 interface ImageGalleryProps {
     generatedImages: string[];
@@ -41,6 +42,7 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
     useEffect(() => {
         if (generatedImages.length > 0) {
             localStorage.setItem(`gallery_${galleryKey}`, JSON.stringify(generatedImages));
+            window.dispatchEvent(new Event('fedda:gallery-updated'));
         }
     }, [generatedImages, galleryKey]);
 
@@ -87,6 +89,15 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
             return () => clearTimeout(timer);
         }
     }, [execState, isGenerating]);
+
+    const handleDownloadImage = async (imageUrl: string, index: number) => {
+        try {
+            const savedAs = await directDownload(imageUrl, `image-${index + 1}.png`);
+            toast(`Downloaded ${savedAs}`, 'success');
+        } catch {
+            toast('Failed to download image', 'error');
+        }
+    };
 
     const handleDeleteImage = async (imageUrl: string, index: number) => {
         try {
@@ -170,6 +181,9 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
                                         <button onClick={(e) => { e.stopPropagation(); localStorage.setItem('active_input_image', img); toast('Image selected for Video generation! Go to Video tab.', 'success'); }} className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-full backdrop-blur-sm transition-all" title="Use as input for Video">
                                             <Video className="w-3.5 h-3.5 text-blue-400" />
                                         </button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDownloadImage(img, idx); }} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-full backdrop-blur-sm transition-all" title="Download">
+                                            <Download className="w-3.5 h-3.5 text-emerald-300" />
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this image permanently?')) handleDeleteImage(img, idx); }} className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-full backdrop-blur-sm transition-all" title="Delete">
                                             <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                         </button>
@@ -193,3 +207,6 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
         </>
     );
 };
+
+
+

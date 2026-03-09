@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, Building2 } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { ModelDownloader } from '../components/ModelDownloader';
 import { ImageGallery } from '../components/image/ImageGallery';
 import { ImageUpload } from '../components/image/ImageUpload';
@@ -29,22 +29,6 @@ const PIPELINES = [
 ];
 
 const PRESETS: Record<string, AngleConfig[]> = {
-    'Street Hero 6-Pack': [
-        { horizontal: 0, vertical: 8, zoom: 5, label: 'Front Hero' },
-        { horizontal: 35, vertical: 8, zoom: 5, label: 'Front 3/4 Right' },
-        { horizontal: 325, vertical: 8, zoom: 5, label: 'Front 3/4 Left' },
-        { horizontal: 90, vertical: 8, zoom: 5, label: 'Right Side' },
-        { horizontal: 270, vertical: 8, zoom: 5, label: 'Left Side' },
-        { horizontal: 180, vertical: 8, zoom: 5, label: 'Back Yard' },
-    ],
-    'Twilight Listing Set': [
-        { horizontal: 0, vertical: 8, zoom: 5, label: 'Front Twilight' },
-        { horizontal: 30, vertical: 8, zoom: 5, label: 'Front 3/4 Warm' },
-        { horizontal: 330, vertical: 8, zoom: 5, label: 'Front 3/4 Cool' },
-        { horizontal: 90, vertical: 10, zoom: 5, label: 'Side Lit' },
-        { horizontal: 270, vertical: 10, zoom: 5, label: 'Side Lit 2' },
-        { horizontal: 180, vertical: 10, zoom: 5, label: 'Back Twilight' },
-    ],
     'Character Sheet': [
         { horizontal: 0, vertical: 0, zoom: 5, label: 'Front' },
         { horizontal: 90, vertical: 0, zoom: 5, label: 'Right' },
@@ -69,7 +53,34 @@ const PRESETS: Record<string, AngleConfig[]> = {
         { horizontal: 225, vertical: 0, zoom: 8, label: 'Wide Back Left' },
         { horizontal: 0, vertical: 30, zoom: 1, label: 'Close High' },
     ],
+    'MLS Photoreal Clean': [
+        { horizontal: 0, vertical: 2, zoom: 7, label: 'Front Hero' },
+        { horizontal: 35, vertical: 4, zoom: 7, label: '3/4 Right' },
+        { horizontal: 325, vertical: 4, zoom: 7, label: '3/4 Left' },
+        { horizontal: 90, vertical: 2, zoom: 8, label: 'Right Side' },
+        { horizontal: 270, vertical: 2, zoom: 8, label: 'Left Side' },
+        { horizontal: 180, vertical: 3, zoom: 8, label: 'Rear' },
+    ],
+    'MLS Ultra Clean': [
+        { horizontal: 0, vertical: 2, zoom: 8, label: 'Front Hero Wide' },
+        { horizontal: 30, vertical: 3, zoom: 8, label: '3/4 Right Wide' },
+        { horizontal: 330, vertical: 3, zoom: 8, label: '3/4 Left Wide' },
+        { horizontal: 90, vertical: 2, zoom: 9, label: 'Right Side Wide' },
+        { horizontal: 270, vertical: 2, zoom: 9, label: 'Left Side Wide' },
+        { horizontal: 180, vertical: 3, zoom: 9, label: 'Rear Wide' },
+    ],
 };
+
+const MLS_NEGATIVE_PROMPT = 'low quality, blurry, noisy, grainy, oversharpened, cgi, 3d render, cartoon, plastic texture, waxy walls, warped windows, distorted roof lines';
+const MLS_ULTRA_NEGATIVE_PROMPT = 'low quality, blurry, noisy, grainy, oversharpened, cgi, 3d render, cartoon, anime, game render, plastic texture, waxy walls, fake grass, fake sky, warped windows, distorted roof lines, texture flicker, banding, halos';
+
+const QUALITY_PRESETS = {
+    Fast: { steps: 4, cfg: 1.0, scheduler: 'simple' },
+    Balanced: { steps: 8, cfg: 1.2, scheduler: 'normal' },
+    Quality: { steps: 12, cfg: 1.3, scheduler: 'normal' },
+} as const;
+
+type QualityPresetKey = keyof typeof QUALITY_PRESETS;
 
 const QUICK_PICKS = [
     { label: 'Front', h: 0, v: 0 },
@@ -81,8 +92,6 @@ const QUICK_PICKS = [
     { label: 'Top', h: 0, v: 60 },
     { label: 'Low', h: 0, v: -30 },
 ];
-
-const IDENTITY_LOCK_PROMPT = 'same exact property identity, same architecture, same facade materials, same windows and doors, same roof shape and color, same landscaping footprint, only camera angle changes';
 
 function getAngleLabel(h: number, v: number, z: number): string {
     const dirs = ['Front', '3/4 R', 'Right', 'Back R', 'Back', 'Back L', 'Left', '3/4 L'];
@@ -111,23 +120,17 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
     const [selectedAngle, setSelectedAngle] = useState(0);
     const [inputImage, setInputImage] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [angles, setAngles] = useState<AngleConfig[]>(PRESETS['Street Hero 6-Pack']);
+    const [angles, setAngles] = useState<AngleConfig[]>(PRESETS['MLS Photoreal Clean']);
     const [incomingImageUrl, setIncomingImageUrl] = useState<string | null>(() => localStorage.getItem('qwen_input_image_url'));
     const [generatedImages, setGeneratedImages] = useState<string[]>(() => {
         const saved = localStorage.getItem(`gallery_${modelId}`);
         return saved ? JSON.parse(saved) : [];
     });
-
     const [lockSeedConsistency, setLockSeedConsistency] = usePersistentState('qwen_angle_lock_seed_consistency', true);
     const [baseSeed, setBaseSeed] = usePersistentState('qwen_angle_base_seed', Math.floor(Math.random() * 1000000000000000));
     const [seedStep, setSeedStep] = usePersistentState('qwen_angle_seed_step', 0);
-
-    const [brokerMode, setBrokerMode] = usePersistentState('qwen_angle_broker_mode', true);
-    const [preserveArchitectureIdentity, setPreserveArchitectureIdentity] = usePersistentState('qwen_angle_identity_lock', true);
-    const [styleBrief, setStyleBrief] = usePersistentState(
-        'qwen_angle_style_brief',
-        'premium real estate listing photo, clean lines, natural daylight, photoreal, MLS-ready composition'
-    );
+    const [qualityPreset, setQualityPreset] = usePersistentState<QualityPresetKey>('qwen_angle_quality_preset', 'Quality');
+    const [ultraCleanMode, setUltraCleanMode] = usePersistentState('qwen_angle_ultra_clean_mode', true);
 
     const handleImageSelected = (file: File) => {
         setInputImage(file);
@@ -177,21 +180,22 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
         setSelectedAngle(0);
     };
 
-    const applyBrokerDefaults = () => {
-        setBrokerMode(true);
+    const applyMlsPhotorealClean = () => {
+        applyPreset('MLS Photoreal Clean');
         setLockSeedConsistency(true);
         setSeedStep(0);
-        applyPreset('Street Hero 6-Pack');
-        toast('Broker defaults applied: strict consistency + street hero angles', 'success');
+        setQualityPreset('Quality');
+        setUltraCleanMode(false);
+        toast('Applied MLS Photoreal Clean preset', 'success');
     };
 
-    const buildGlobalInstruction = (): string => {
-        const base = brokerMode
-            ? 'real estate listing photography, photoreal, high-detail, straight verticals, professional composition'
-            : 'photoreal reference-preserving view generation';
-
-        const identity = preserveArchitectureIdentity ? IDENTITY_LOCK_PROMPT : '';
-        return [base, styleBrief.trim(), identity].filter(Boolean).join(', ');
+    const applyMlsUltraClean = () => {
+        applyPreset('MLS Ultra Clean');
+        setLockSeedConsistency(true);
+        setSeedStep(0);
+        setQualityPreset('Quality');
+        setUltraCleanMode(true);
+        toast('Applied MLS Ultra Clean preset', 'success');
     };
 
     const handleGenerate = async () => {
@@ -208,13 +212,10 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
             if (!response.ok) throw new Error('Failed to load qwen-multiangle workflow');
 
             const workflow = await response.json();
+            const quality = QUALITY_PRESETS[qualityPreset];
 
             // Node 41 is the input image for this workflow.
             workflow['41'].inputs.image = uploaded.name;
-
-            const effectiveLock = brokerMode ? true : lockSeedConsistency;
-            const effectiveSeedStep = brokerMode ? 0 : seedStep;
-            const globalInstruction = buildGlobalInstruction();
 
             // Set each pipeline's camera config and seed strategy.
             PIPELINES.forEach((pipe, i) => {
@@ -222,16 +223,18 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
                 workflow[pipe.camera].inputs.horizontal_angle = angle.horizontal;
                 workflow[pipe.camera].inputs.vertical_angle = angle.vertical;
                 workflow[pipe.camera].inputs.zoom = angle.zoom;
-                workflow[pipe.sampler].inputs.seed = effectiveLock
-                    ? (baseSeed + (i * effectiveSeedStep))
+                workflow[pipe.sampler].inputs.seed = lockSeedConsistency
+                    ? (baseSeed + (i * seedStep))
                     : Math.floor(Math.random() * 1000000000000000);
-            });
+                workflow[pipe.sampler].inputs.steps = quality.steps;
+                workflow[pipe.sampler].inputs.cfg = quality.cfg;
+                workflow[pipe.sampler].inputs.scheduler = quality.scheduler;
 
-            // Inject shared instruction on all editable text encoder nodes with string prompt.
-            Object.values(workflow).forEach((node: any) => {
-                if (node?.class_type !== 'TextEncodeQwenImageEditPlus') return;
-                if (!node.inputs || typeof node.inputs.prompt !== 'string') return;
-                node.inputs.prompt = globalInstruction;
+                const samplerPrefix = pipe.sampler.split(':')[0];
+                const negativePromptNode = workflow[`${samplerPrefix}:109`];
+                if (negativePromptNode?.inputs) {
+                    negativePromptNode.inputs.prompt = ultraCleanMode ? MLS_ULTRA_NEGATIVE_PROMPT : MLS_NEGATIVE_PROMPT;
+                }
             });
 
             await queueWorkflow(workflow);
@@ -247,7 +250,7 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
 
     return (
         <WorkbenchShell
-            leftWidthClassName="w-[520px]"
+            leftWidthClassName="w-[500px]"
             leftPaneClassName="p-4"
             leftPane={
                 <>
@@ -264,52 +267,19 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
                             />
                         </CatalogCard>
 
-                        <CatalogCard className="p-4 space-y-3 border border-emerald-500/20">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Building2 className="w-4 h-4 text-emerald-400" />
-                                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-300">Broker Mode</div>
-                                </div>
-                                <label className="flex items-center gap-2 text-xs text-slate-400">
-                                    <input
-                                        type="checkbox"
-                                        checked={brokerMode}
-                                        onChange={(e) => setBrokerMode(e.target.checked)}
-                                        className="rounded border-white/20 bg-black/40"
-                                    />
-                                    ON
-                                </label>
-                            </div>
-
-                            <label className="flex items-center gap-2 text-xs text-slate-400">
-                                <input
-                                    type="checkbox"
-                                    checked={preserveArchitectureIdentity}
-                                    onChange={(e) => setPreserveArchitectureIdentity(e.target.checked)}
-                                    className="rounded border-white/20 bg-black/40"
-                                />
-                                Preserve Architecture Identity
-                            </label>
-
-                            <div>
-                                <div className="text-[10px] text-slate-500 uppercase mb-1">Style Brief</div>
-                                <textarea
-                                    value={styleBrief}
-                                    onChange={(e) => setStyleBrief(e.target.value)}
-                                    rows={3}
-                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                                />
-                            </div>
-
-                            <button
-                                onClick={applyBrokerDefaults}
-                                className="w-full py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-xs font-semibold text-emerald-300"
-                            >
-                                Apply Broker Defaults
-                            </button>
-                        </CatalogCard>
-
                         <CatalogCard className="p-3">
+                            <button
+                                onClick={applyMlsPhotorealClean}
+                                className="w-full mb-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/30 transition-all"
+                            >
+                                Apply MLS Photoreal Clean (Locked)
+                            </button>
+                            <button
+                                onClick={applyMlsUltraClean}
+                                className="w-full mb-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 transition-all"
+                            >
+                                Apply MLS Ultra Clean (Strict)
+                            </button>
                             <div className="flex gap-2">
                                 {Object.keys(PRESETS).map((name) => (
                                     <button
@@ -367,6 +337,22 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
                             >
                                 Randomize Base Seed
                             </button>
+
+                            <div>
+                                <div className="text-[10px] text-slate-500 uppercase mb-1">Quality Mode</div>
+                                <select
+                                    value={qualityPreset}
+                                    onChange={(e) => setQualityPreset(e.target.value as QualityPresetKey)}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                >
+                                    {(Object.keys(QUALITY_PRESETS) as QualityPresetKey[]).map((name) => (
+                                        <option key={name} value={name}>{name}</option>
+                                    ))}
+                                </select>
+                                <div className="mt-1 text-[10px] text-slate-600">
+                                    {QUALITY_PRESETS[qualityPreset].steps} steps, cfg {QUALITY_PRESETS[qualityPreset].cfg}
+                                </div>
+                            </div>
                         </CatalogCard>
 
                         <CatalogCard className="p-3">
@@ -503,3 +489,8 @@ export const QwenAnglePage = ({ modelId }: QwenAnglePageProps) => {
         />
     );
 };
+
+
+
+
+

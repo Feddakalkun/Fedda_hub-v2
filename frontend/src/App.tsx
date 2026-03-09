@@ -18,6 +18,7 @@ import { ComfyExecutionProvider } from './contexts/ComfyExecutionContext';
 import { ExecutionStatusBar } from './components/ExecutionStatusBar';
 import { GlobalAlbumDock } from './components/layout/GlobalAlbumDock';
 import { MODELS } from './config/api';
+import { addUiLog, getUiLogs, UI_LOG_EVENT } from './services/uiLogger';
 
 const UI_STATE_KEY = 'fedda_ui_state_v1';
 const VALID_TABS = new Set([
@@ -114,6 +115,7 @@ function App() {
   const [showLanding, setShowLanding] = useState(initialState.showLanding);
   const [activeTab, setActiveTab] = useState(initialState.activeTab);
   const [activeSubTab, setActiveSubTab] = useState<string | null>(initialState.activeSubTab);
+  const [errorCount, setErrorCount] = useState(0);
 
   useEffect(() => {
     try {
@@ -139,6 +141,49 @@ function App() {
       window.history.replaceState(null, '', hash);
     }
   }, [showLanding, activeTab, activeSubTab]);
+
+  useEffect(() => {
+    addUiLog('info', 'app', 'FEDDA UI initialized');
+
+    const onError = (event: ErrorEvent) => {
+      addUiLog('error', 'window', event.message || 'Unhandled runtime error', {
+        file: event.filename,
+        line: event.lineno,
+        column: event.colno,
+      });
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      if (reason instanceof Error) {
+        addUiLog('error', 'promise', reason.message || 'Unhandled promise rejection', reason.stack || reason.message);
+      } else {
+        addUiLog('error', 'promise', 'Unhandled promise rejection', reason);
+      }
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, []);
+
+  // Global runtime error handlers
+
+  useEffect(() => {
+    const refreshErrorCount = () => {
+      const logs = getUiLogs();
+      const total = logs.filter((entry) => entry.level === 'error').length;
+      setErrorCount(total);
+    };
+
+    refreshErrorCount();
+    window.addEventListener(UI_LOG_EVENT, refreshErrorCount as EventListener);
+    return () => window.removeEventListener(UI_LOG_EVENT, refreshErrorCount as EventListener);
+  }, []);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -247,7 +292,23 @@ function App() {
                   )}
                 </h2>
               </div>
-              <OllamaQuickPull />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setShowLanding(false);
+                    setActiveTab('logs');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                    errorCount > 0
+                      ? 'border-red-500/50 bg-red-500/15 text-red-200 hover:bg-red-500/25'
+                      : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
+                  }`}
+                  title="Open Console Logs"
+                >
+                  {errorCount > 0 ? `Errors: ${errorCount}` : 'No Errors'}
+                </button>
+                <OllamaQuickPull />
+              </div>
             </header>
 
             <ExecutionStatusBar />

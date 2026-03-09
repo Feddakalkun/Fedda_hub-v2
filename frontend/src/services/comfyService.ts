@@ -1,6 +1,7 @@
 ﻿// ComfyUI API Service
 import { COMFY_API, BACKEND_API } from '../config/api';
 import type { ComfyPrompt, ComfyQueueItem, ComfyHistoryItem } from '../types/comfy';
+import { addUiLog } from './uiLogger';
 
 class ComfyUIService {
     private clientId: string;
@@ -25,6 +26,7 @@ class ComfyUIService {
             return response.ok;
         } catch (error) {
             console.error('ComfyUI connection failed:', error);
+            addUiLog('error', 'comfy', 'ComfyUI connection failed', error);
             return false;
         }
     }
@@ -35,6 +37,7 @@ class ComfyUIService {
     async getSystemStats(): Promise<any> {
         const response = await fetch(`${COMFY_API.BASE_URL}${COMFY_API.ENDPOINTS.SYSTEM_STATS}`);
         if (!response.ok) {
+            addUiLog('error', 'comfy', 'Failed to fetch system stats', { status: response.status, statusText: response.statusText });
             throw new Error('Failed to fetch system stats');
         }
         return await response.json();
@@ -47,6 +50,7 @@ class ComfyUIService {
             return await response.json();
         } catch (error) {
             console.error('Failed to fetch hardware stats:', error);
+            addUiLog('warn', 'comfy', 'Failed to fetch hardware stats', error);
             return null;
         }
     }
@@ -84,6 +88,7 @@ class ComfyUIService {
                     }
                 }
             } catch { }
+            addUiLog('error', 'comfy', 'Queue prompt failed', errorMsg);
             throw new Error(errorMsg);
         }
 
@@ -207,6 +212,7 @@ class ComfyUIService {
         }
 
         console.warn('Could not find LoRA list from ComfyUI');
+        addUiLog('warn', 'comfy', 'Could not find LoRA list from ComfyUI');
         return [];
     }
 
@@ -224,6 +230,7 @@ class ComfyUIService {
             return styleList;
         } catch (error) {
             console.error('Failed to load styles:', error);
+            addUiLog('warn', 'comfy', 'Failed to load styles', error);
             // Return defaults if failed
             return ['No Style', 'Photographic', 'Cinematic', 'Anime', 'Digital Art'];
         }
@@ -237,6 +244,7 @@ class ComfyUIService {
             return data.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
         } catch (error) {
             console.error('Failed to load checkpoints:', error);
+            addUiLog('warn', 'comfy', 'Failed to load checkpoints', error);
             return [];
         }
     }
@@ -282,7 +290,10 @@ class ComfyUIService {
     }): () => void {
         this.ws = new WebSocket(`${COMFY_API.WS_URL}?clientId=${this.clientId}`);
 
-        this.ws.onopen = () => console.log('âœ… WebSocket connected to ComfyUI');
+        this.ws.onopen = () => {
+            console.log('WebSocket connected to ComfyUI');
+            addUiLog('success', 'websocket', 'Connected to ComfyUI websocket');
+        };
 
         this.ws.onmessage = (event) => {
             try {
@@ -306,10 +317,14 @@ class ComfyUIService {
                 }
             } catch (error) {
                 console.error('Failed to parse WebSocket message:', error);
+                addUiLog('warn', 'websocket', 'Failed to parse websocket message', error);
             }
         };
 
-        this.ws.onerror = (error) => console.error('WebSocket error:', error);
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            addUiLog('error', 'websocket', 'WebSocket error', error);
+        };
 
         return () => {
             if (this.ws) {
@@ -376,6 +391,7 @@ class ComfyUIService {
             console.log('âœ… ComfyUI Memory Freed');
         } catch (error) {
             console.error('Failed to free ComfyUI memory:', error);
+            addUiLog('warn', 'comfy', 'Failed to free ComfyUI memory', error);
         }
     }
 }

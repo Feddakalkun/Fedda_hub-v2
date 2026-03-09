@@ -65,12 +65,79 @@ export const SettingsPage = () => {
     const runpodBaseUrl = deriveRunpodBase(runpodUrl);
     const resolvedExplorerUrl = runpodExplorerUrl.trim() || (runpodBaseUrl ? `${runpodBaseUrl}/` : '');
 
+    const deriveComfyUiUrl = () => {
+        const source = runpodBaseUrl || runpodUrl.trim();
+
+        if (!source) {
+            const host = window.location.host;
+            if (/\.proxy\.runpod\.net$/i.test(host)) {
+                const comfyHost = host.replace(/-\d+(\.proxy\.runpod\.net)$/i, '-8199$1');
+                return `${window.location.protocol}//${comfyHost}/`;
+            }
+            return '/comfy/';
+        }
+
+        try {
+            const parsed = new URL(source);
+            if (/\.proxy\.runpod\.net$/i.test(parsed.host)) {
+                parsed.host = parsed.host.replace(/-\d+(\.proxy\.runpod\.net)$/i, '-8199$1');
+            } else if (parsed.port) {
+                parsed.port = '8199';
+            }
+            parsed.pathname = '/';
+            parsed.search = '';
+            parsed.hash = '';
+            return parsed.toString();
+        } catch {
+            return `${source.replace(/\/+$/i, '').replace(/\/prompt\/?$/i, '')}/`;
+        }
+    };
+
     const openExternal = (url: string, label: string) => {
         if (!url) {
             toast(`No ${label} URL configured yet.`, 'error');
             return;
         }
         window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    const explorerCandidates = () => {
+        const override = runpodExplorerUrl.trim();
+        if (override) return [override];
+        if (!runpodBaseUrl) return [];
+        return [
+            `${runpodBaseUrl}/lab/tree`,
+            `${runpodBaseUrl}/tree`,
+            `${runpodBaseUrl}/files`,
+            `${runpodBaseUrl}/`
+        ];
+    };
+
+    const probeReachable = async (url: string) => {
+        try {
+            await fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const openRunpodExplorer = async () => {
+        const candidates = explorerCandidates();
+        if (candidates.length === 0) {
+            toast('No RunPod base URL configured yet.', 'error');
+            return;
+        }
+
+        for (const candidate of candidates) {
+            if (await probeReachable(candidate)) {
+                window.open(candidate, '_blank', 'noopener,noreferrer');
+                toast(`Opening explorer: ${candidate}`, 'info');
+                return;
+            }
+        }
+
+        toast('Could not reach RunPod file explorer. Set full Explorer URL (e.g. /lab/tree).', 'error');
     };
 
     // Update selected model when category changes
@@ -356,10 +423,10 @@ export const SettingsPage = () => {
                         </p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <Button variant="secondary" onClick={() => openExternal(runpodBaseUrl ? `${runpodBaseUrl}/` : '', 'RunPod Comfy UI')}>
-                            <ExternalLink className="w-4 h-4" /> Open RunPod UI
+                        <Button variant="secondary" onClick={() => openExternal(deriveComfyUiUrl(), 'ComfyUI')}>
+                            <ExternalLink className="w-4 h-4" /> Open ComfyUI
                         </Button>
-                        <Button variant="secondary" onClick={() => openExternal(resolvedExplorerUrl, 'RunPod File Explorer')}>
+                        <Button variant="secondary" onClick={openRunpodExplorer}>
                             <FolderOpen className="w-4 h-4" /> Open File Explorer
                         </Button>
                         <Button variant="primary" onClick={saveRunpodSettings}>
@@ -372,4 +439,6 @@ export const SettingsPage = () => {
         </CatalogShell>
     );
 };
+
+
 

@@ -17,6 +17,7 @@ import uvicorn
 from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech
 from lipsync_service import generate_lipsync
 from lora_service import start_lora_download, get_download_status, refresh_comfy_models, sync_premium_folder, get_installed_premium_loras
+from model_service import get_all_models_status, start_model_download, get_download_progress
 try:
     import tiktok_service
 except ImportError as e:
@@ -1247,6 +1248,48 @@ async def tiktok_serve_file(path: str):
     if file_path is None:
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path))
+# ============================================================================
+# Model Management Endpoints
+# ============================================================================
+
+@app.get("/api/models/status")
+async def models_status():
+    """Get status of all downloadable models"""
+    try:
+        status = get_all_models_status()
+        return {"models": status, "success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ModelDownloadRequest(BaseModel):
+    model_id: str
+
+
+@app.post("/api/models/download")
+async def download_model(request: ModelDownloadRequest):
+    """Start downloading a specific model"""
+    try:
+        success = start_model_download(request.model_id)
+        if success:
+            return {"success": True, "message": f"Download started for {request.model_id}"}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid model ID")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/models/progress/{model_id}")
+async def model_progress(model_id: str):
+    """Get download progress for a specific model"""
+    try:
+        progress = get_download_progress(model_id)
+        if progress:
+            return {"progress": progress, "success": True}
+        else:
+            return {"progress": None, "success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

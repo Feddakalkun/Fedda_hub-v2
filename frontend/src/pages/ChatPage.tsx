@@ -83,22 +83,10 @@ export const ChatPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Models
-                const models = await ollamaService.getModels();
-                if (models.length > 0) {
-                    setAvailableModels(models.map(m => m.name));
-                    const preferred = models.find(m => m.name.toLowerCase().includes('qwen') || m.name.toLowerCase().includes('llama'));
-                    setSelectedModel(preferred ? preferred.name : models[0].name);
-                } else {
-                    // No models found - Update welcome message
-                    setMessages([{
-                        id: 'no-models',
-                        role: 'assistant',
-                        content: "⚠️ **No AI models detected.**\n\nTo start chatting, please go to the **Settings** page and download a model (like Qwen 2.5 or Llama 3). Once downloaded, refresh this page.",
-                        timestamp: Date.now(),
-                        type: 'text'
-                    }]);
-                }
+                // IF_AI_tools models (hardcoded for now)
+                const models = ['qwen2.5-3b-instruct', 'llama-3.2-3b'];
+                setAvailableModels(models);
+                setSelectedModel(models[0]);
 
                 // LoRAs
                 const loras = await comfyService.getLoras();
@@ -237,11 +225,6 @@ export const ChatPage = () => {
         setGeneratingMsgId(msgId);
 
         try {
-            // Free VRAM from Ollama before ComfyUI generation
-            if (selectedModel) {
-                await ollamaService.unloadModel(selectedModel);
-            }
-
             // Load the same Z-Image workflow as ImagePage
             const response = await fetch('/workflows/z-image.json');
             if (!response.ok) throw new Error('Failed to load Z-Image workflow');

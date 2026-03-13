@@ -551,25 +551,27 @@ JSON format:
         }
     },
 
-    // General Chat
+    // General Chat (now using IF_AI_tools via backend)
     chat: async (modelName: string, messages: { role: string; content: string; images?: string[] }[]): Promise<string> => {
         try {
-            const response = await fetch('/ollama/chat', {
+            const { BACKEND_API } = await import('../config/api');
+            const response = await fetch(`${BACKEND_API.BASE_URL}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: modelName,
-                    messages: messages,
-                    stream: false,
+                    messages: messages
                 }),
             });
-            if (!response.ok) throw new Error('Failed to chat');
+
+            if (!response.ok) throw new Error('Chat request failed');
             const data = await response.json();
 
-            // 🧹 Free VRAM immediately
-            await ollamaService.unloadModel(modelName);
+            if (!data.success) {
+                throw new Error(data.error || 'Chat failed');
+            }
 
-            return data.message.content;
+            return data.response;
         } catch (error) {
             console.error('Chat Error:', error);
             throw error;

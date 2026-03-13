@@ -1292,6 +1292,54 @@ async def model_progress(model_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# Chat with IF_AI_tools (via ComfyUI)
+# ============================================================================
+
+class ChatRequest(BaseModel):
+    messages: list
+    model: str = "qwen2.5-3b-instruct"
+
+@app.post("/api/chat")
+async def chat_with_llm(request: ChatRequest):
+    """Chat using IF_AI_tools nodes in ComfyUI"""
+    try:
+        # Load workflow
+        workflow_path = Path(__file__).parent.parent / "public" / "workflows" / "if-ai-chat.json"
+        workflow = json.loads(workflow_path.read_text())
+
+        # Build prompt from messages
+        prompt = "\n".join([f"{m['role']}: {m['content']}" for m in request.messages])
+
+        # Update workflow with prompt
+        workflow["1"]["inputs"]["prompt"] = prompt
+
+        # Queue workflow
+        comfy_url = "http://127.0.0.1:8199"
+        response = requests.post(f"{comfy_url}/prompt", json={"prompt": workflow})
+        response.raise_for_status()
+        prompt_id = response.json()["prompt_id"]
+
+        # Poll for completion (max 60s)
+        import time
+        for _ in range(60):
+            time.sleep(1)
+            history_resp = requests.get(f"{comfy_url}/history/{prompt_id}")
+            history = history_resp.json()
+
+            if prompt_id in history and history[prompt_id].get("outputs"):
+                # Extract text output from node 2
+                outputs = history[prompt_id]["outputs"]
+                if "2" in outputs and "text" in outputs["2"]:
+                    return {"response": outputs["2"]["text"][0], "success": True}
+
+        raise HTTPException(status_code=504, detail="LLM response timeout")
+
+    except Exception as e:
+        print(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     print("FEDDA Backend starting on port 8000...")
     uvicorn.run(app, host="0.0.0.0", port=8000)

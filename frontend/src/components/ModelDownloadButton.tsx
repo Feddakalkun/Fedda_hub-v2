@@ -1,4 +1,4 @@
-import { Download, Check, Loader2 } from 'lucide-react';
+import { Download, Check } from 'lucide-react';
 import { useModelDownload } from '../hooks/useModelDownload';
 
 interface ModelDownloadButtonProps {

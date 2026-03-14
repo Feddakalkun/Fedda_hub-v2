@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, Image as ImageIcon, Loader2, Mic, Square, Volume2, VolumeX } from 'lucide-react';
-import { ModelDownloadButton } from '../components/ModelDownloadButton';
 import { assistantService } from '../services/assistantService';
 import { comfyService } from '../services/comfyService';
-import { ollamaService } from '../services/ollamaService';
 import ReactMarkdown from 'react-markdown';
 import { CatalogCard } from '../components/layout/CatalogShell';
 import { useToast } from '../components/ui/Toast';

@@ -88,7 +88,6 @@ class ComfyUIService {
                         if (firstError) {
                             // Build detailed error message
                             const nodeClass = nodeError.class_type || 'Unknown';
-                            const errorType = firstError.type || 'error';
                             const errorMessage = firstError.message || 'Unknown error';
                             errorMsg = `Node #${nodeId} (${nodeClass}): ${errorMessage}`;
                             errorDetails = JSON.stringify(firstError.details || {}, null, 2);

@@ -12,11 +12,7 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ollama/, '/api'), // Rewrite /ollama/tags -> /api/tags
       },
-      '/api/audio': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-      },
-      '/api/lora': {
+      '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },

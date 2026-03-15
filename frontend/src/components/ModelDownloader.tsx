@@ -15,6 +15,9 @@ interface ModelInfo {
         status: string;
         downloaded: number;
         total: number;
+        speed?: number;
+        eta?: number;
+        error?: string;
     };
 }
 
@@ -263,9 +266,17 @@ export const ModelDownloader = ({ modelGroup = 'z-image', onModelsReady }: Model
                                             ) : isModelDownloading ? (
                                                 <span className="text-blue-400">
                                                     {(m.progress.downloaded / (1024**3)).toFixed(2)}GB / {m.size_gb}GB ({Math.round(modelPercent)}%)
+                                                    {m.progress.speed && m.progress.speed > 0 && (
+                                                        <span className="text-slate-500 ml-2">
+                                                            @ {(m.progress.speed / (1024**2)).toFixed(1)}MB/s
+                                                            {m.progress.eta && m.progress.eta > 0 && (
+                                                                <> · {Math.floor(m.progress.eta / 60)}m{Math.floor(m.progress.eta % 60)}s</>
+                                                            )}
+                                                        </span>
+                                                    )}
                                                 </span>
                                             ) : m.progress?.status === 'error' ? (
-                                                <span className="text-red-400">Error</span>
+                                                <span className="text-red-400">Error{m.progress?.error ? `: ${m.progress.error.substring(0, 60)}` : ''}</span>
                                             ) : (
                                                 <span className="text-slate-600">{m.size_gb}GB required</span>
                                             )}

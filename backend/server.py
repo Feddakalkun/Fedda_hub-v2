@@ -17,7 +17,6 @@ import uvicorn
 from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech
 from lipsync_service import generate_lipsync
 from lora_service import start_lora_download, get_download_status, refresh_comfy_models, sync_premium_folder, get_installed_premium_loras
-from model_service import get_all_models_status, start_model_download, get_download_progress
 try:
     import tiktok_service
 except ImportError as e:
@@ -1001,9 +1000,16 @@ REQUIRED_MODELS = {
         {
             "id": "wan-infinite-unet",
             "name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
-            "url": "https://huggingface.co/Comfy-Org/WAN-22-repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
             "path": "diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
-            "size_gb": 27.5
+            "size_gb": 13.32
+        },
+        {
+            "id": "wan-high-unet",
+            "name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            "path": "diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+            "size_gb": 13.32
         },
         {
             "id": "ltx-lipsync",
@@ -1012,17 +1018,11 @@ REQUIRED_MODELS = {
             "path": "checkpoints/ltx-2-19b-dev-fp8.safetensors",
             "size_gb": 19.3
         }
-    ],
-    "scene-builder": [
-        {
-            "id": "wan-high-unet",
-            "name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-            "url": "https://huggingface.co/Comfy-Org/WAN-22-repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-            "path": "diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-            "size_gb": 27.5
-        }
     ]
 }
+
+# Scene Builder uses the same WAN models as Lipsync
+REQUIRED_MODELS["scene-builder"] = REQUIRED_MODELS["lipsync"]
 
 download_progress = {} # { model_id: { downloaded: 0, total: 0, status: 'idle' } }
 
@@ -1060,17 +1060,33 @@ def start_download(model_info, hf_token=None):
 
         # Poll file size for progress while curl runs
         last_log_time = 0
+        last_speed_size = 0
+        last_speed_time = time.time()
         while process.poll() is None:
             if target_path.exists():
                 current_size = target_path.stat().st_size
+                current_time = time.time()
                 download_progress[model_id]['downloaded'] = current_size
 
+                # Calculate speed and ETA
+                elapsed = current_time - last_speed_time
+                if elapsed >= 2:
+                    speed_bytes = (current_size - last_speed_size) / elapsed
+                    download_progress[model_id]['speed'] = speed_bytes
+                    if speed_bytes > 0 and total_bytes > 0:
+                        remaining = total_bytes - current_size
+                        download_progress[model_id]['eta'] = remaining / speed_bytes
+                    last_speed_size = current_size
+                    last_speed_time = current_time
+
                 # Log progress every 10 seconds
-                current_time = time.time()
                 if current_time - last_log_time >= 10:
                     progress_gb = current_size / (1024**3)
                     percent = (current_size / total_bytes * 100) if total_bytes > 0 else 0
-                    print(f"[DOWNLOAD] {model_id}: {progress_gb:.2f}GB / {model_info['size_gb']}GB ({percent:.1f}%)")
+                    speed_mb = download_progress[model_id].get('speed', 0) / (1024**2)
+                    eta_s = download_progress[model_id].get('eta', 0)
+                    eta_str = f"{int(eta_s//60)}m{int(eta_s%60)}s" if eta_s > 0 else "..."
+                    print(f"[DOWNLOAD] {model_id}: {progress_gb:.2f}GB / {model_info['size_gb']}GB ({percent:.1f}%) @ {speed_mb:.1f}MB/s ETA {eta_str}")
                     last_log_time = current_time
             time.sleep(1)
 
@@ -1132,7 +1148,7 @@ async def get_models_status(group: str = "z-image"):
 
         if exists and not is_downloading:
             fsize_gb = full_path.stat().st_size / (1024**3)
-            threshold = 0.5 if m['id'] == 'vae' else 0.8
+            threshold = 0.5 if m['size_gb'] < 1.0 else 0.95
             if fsize_gb < (m['size_gb'] * threshold):
                 is_corrupt = True
         
@@ -1156,12 +1172,13 @@ async def trigger_download(model_id: str, group: str = "z-image", hf_token: Opti
     if not model_to_download:
         return {"success": False, "error": "Model ID not found"}
 
-    # Auto-purge corrupt/incomplete files (< 1GB = clearly incomplete)
+    # Auto-purge corrupt/incomplete files (less than 50% of expected size)
     target_path = COMFY_MODELS_DIR / model_to_download['path']
     if target_path.exists():
         fsize_gb = target_path.stat().st_size / (1024**3)
-        if fsize_gb < 1.0:  # Less than 1GB = incomplete/corrupt
-            print(f"Auto-purging incomplete file: {target_path.name} ({fsize_gb:.2f}GB)")
+        expected_gb = model_to_download.get('size_gb', 0)
+        if expected_gb > 0 and fsize_gb < (expected_gb * 0.5):
+            print(f"Auto-purging incomplete file: {target_path.name} ({fsize_gb:.3f}GB vs expected {expected_gb}GB)")
             try:
                 target_path.unlink()
             except Exception as e:
@@ -1303,40 +1320,6 @@ async def tiktok_serve_file(path: str):
     if file_path is None:
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path))
-# ============================================================================
-# Model Management Endpoints
-# ============================================================================
-
-@app.get("/api/models/status")
-async def models_status():
-    """Get status of all downloadable models"""
-    try:
-        status = get_all_models_status()
-        return {"models": status, "success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class ModelDownloadRequest(BaseModel):
-    model_id: str
-
-
-# NOTE: Duplicate /api/models/download endpoint removed - using the one with HF_TOKEN support above
-# Old endpoint used model_service which doesn't support gated HuggingFace models
-
-
-@app.get("/api/models/progress/{model_id}")
-async def model_progress(model_id: str):
-    """Get download progress for a specific model"""
-    try:
-        progress = get_download_progress(model_id)
-        if progress:
-            return {"progress": progress, "success": True}
-        else:
-            return {"progress": None, "success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # ============================================================================
 # Chat with IF_AI_tools (via ComfyUI workflow)

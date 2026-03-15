@@ -1,7 +1,6 @@
 // TikTok Page - Download, Library, Frames, Recreate
 import { useState, useCallback, useEffect } from 'react';
 import { Download, FolderOpen, Grid3X3, Wand2 } from 'lucide-react';
-import { ModelDownloadButton } from '../components/ModelDownloadButton';
 import { DownloadTab } from '../components/tiktok/DownloadTab';
 import { LibraryTab } from '../components/tiktok/LibraryTab';
 import { FramesTab } from '../components/tiktok/FramesTab';
@@ -65,11 +64,6 @@ export const TikTokPage = ({ onSendToImg2Img, onSendToInpaint }: TikTokPageProps
             topBar={<PageTabs tabs={TABS} activeTab={activeMode} onChange={setActiveMode} />}
             leftPane={
                 <>
-                    {activeMode === 'recreate' && (
-                        <div className="px-4 pt-4 pb-2">
-                            <ModelDownloadButton modelId="ltx-video" label="LTX Video Model" />
-                        </div>
-                    )}
                     <div style={{ display: activeMode === 'download' ? undefined : 'none' }}>
                         <DownloadTab onDownloadComplete={handleDownloadComplete} />
                     </div>

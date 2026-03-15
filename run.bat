@@ -148,7 +148,7 @@ set PYTHONIOENCODING=utf-8
 set PYTHONPATH=%COMFYUI_DIR%;%PYTHONPATH%
 
 echo [%date% %time%] Clearing port 8199...
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8199"') do taskkill /F /PID %%a 2>nul
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8199"') do (taskkill /F /PID %%a >nul 2>&1)
 timeout /t 1 /nobreak >nul
 
 cd /d "%COMFYUI_DIR%"
@@ -178,7 +178,7 @@ if exist "%BASE_DIR%\python_embeded\python.exe" (
 set "PYTHONPATH=%BACKEND_DIR%;%PYTHONPATH%"
 
 echo [%date% %time%] Clearing port 8000...
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8000"') do taskkill /F /PID %%a 2>nul
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8000"') do (taskkill /F /PID %%a >nul 2>&1)
 timeout /t 1 /nobreak >nul
 
 cd /d "%BACKEND_DIR%"

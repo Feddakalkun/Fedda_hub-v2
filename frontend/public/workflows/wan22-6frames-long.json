@@ -1389,7 +1389,7 @@
   },
   "302:298": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-LOW.safetensors",
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1399,7 +1399,7 @@
   },
   "302:299": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-HIGH.safetensors",
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1429,7 +1429,7 @@
   },
   "287:283": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-LOW.safetensors",
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1439,7 +1439,7 @@
   },
   "287:284": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-HIGH.safetensors",
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1469,7 +1469,7 @@
   },
   "272:268": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-LOW.safetensors",
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1479,7 +1479,7 @@
   },
   "272:269": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-HIGH.safetensors",
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1509,7 +1509,7 @@
   },
   "257:253": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-LOW.safetensors",
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1519,7 +1519,7 @@
   },
   "257:254": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-HIGH.safetensors",
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1549,7 +1549,7 @@
   },
   "242:238": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-LOW.safetensors",
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1559,7 +1559,7 @@
   },
   "242:239": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-HIGH.safetensors",
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1578,7 +1578,7 @@
   },
   "227:221": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-LOW.safetensors",
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1588,7 +1588,7 @@
   },
   "227:222": {
     "inputs": {
-      "unet_name": "WAN22-NSFW-I2V-HIGH.safetensors",
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",

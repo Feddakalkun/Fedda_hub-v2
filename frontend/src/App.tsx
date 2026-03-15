@@ -16,7 +16,6 @@ import { ToastProvider } from './components/ui/Toast';
 import { OllamaQuickPull } from './components/OllamaQuickPull';
 import { ComfyExecutionProvider } from './contexts/ComfyExecutionContext';
 import { ExecutionStatusBar } from './components/ExecutionStatusBar';
-import { GlobalAlbumDock } from './components/layout/GlobalAlbumDock';
 import { MODELS } from './config/api';
 import { addUiLog, getUiLogs, UI_LOG_EVENT } from './services/uiLogger';
 
@@ -275,18 +274,6 @@ function App() {
     setActiveSubTab('z-image');
   };
 
-  const handleSendToQwen = (imageUrl: string) => {
-    try {
-      localStorage.setItem('qwen_input_image_url', imageUrl);
-      window.dispatchEvent(new CustomEvent('fedda:qwen-input', { detail: { url: imageUrl } }));
-    } catch {
-      // ignore storage/event errors
-    }
-
-    setShowLanding(false);
-    setActiveTab('image');
-    setActiveSubTab('qwen-angle');
-  };
 
   const getCurrentModel = () => {
     const allModels = [...MODELS.IMAGE, ...MODELS.VIDEO, ...MODELS.AUDIO];
@@ -405,8 +392,6 @@ function App() {
                   <ConsoleLogsPage />
                 </div>
               </div>
-
-              {!showLanding && <GlobalAlbumDock onSendToQwen={handleSendToQwen} />}
             </div>
           </main>
         </div>

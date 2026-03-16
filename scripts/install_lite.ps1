@@ -92,11 +92,26 @@ if (Test-Command "npm") {
 }
 
 # Ollama
+# Ollama - check if installed AND running
+$OllamaInstalled = $false
+$OllamaRunning = $false
 if (Test-Command "ollama") {
-    $OllamaVersion = & ollama --version 2>&1
-    Write-Step "Ollama:  $OllamaVersion" "Green"
+    $OllamaInstalled = $true
+    # Try to connect to Ollama service (port 11434)
+    try {
+        $null = Invoke-WebRequest -Uri "http://localhost:11434/api/tags" -TimeoutSec 1 -ErrorAction SilentlyContinue
+        if ($?) {
+            $OllamaVersion = & ollama --version 2>&1
+            Write-Step "Ollama:  $OllamaVersion (running)" "Green"
+            $OllamaRunning = $true
+        } else {
+            Write-Step "Ollama:  Installed but NOT RUNNING" "Yellow"
+        }
+    } catch {
+        Write-Step "Ollama:  Installed but NOT RUNNING" "Yellow"
+    }
 } else {
-    Write-Step "Ollama:  NOT FOUND (optional - AI chat disabled)" "Yellow"
+    Write-Step "Ollama:  NOT INSTALLED (optional - AI chat disabled)" "Yellow"
 }
 
 # NVIDIA GPU
@@ -144,25 +159,35 @@ if (-not $AllGood) {
     exit 1
 }
 
-# Ollama Check (Warning if missing)
-if (-not (Test-Command "ollama")) {
+# Ollama Check (Warning if not running)
+if (-not $OllamaRunning) {
     Write-Host ""
-    Write-Host "  ⚠ OLLAMA NOT DETECTED" -ForegroundColor Yellow
+    Write-Host "  ⚠ OLLAMA NOT RUNNING" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  Ollama is needed for the AI chat feature. Without it:" -ForegroundColor Yellow
     Write-Host "    - Agent Chat (text-to-speech, image caption) won't work" -ForegroundColor Gray
     Write-Host "    - Image generation, video, audio features WILL work normally" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  Options:" -ForegroundColor White
-    Write-Host "    1) Continue install (skip AI chat)" -ForegroundColor Gray
-    Write-Host "    2) Cancel and get Ollama first (recommended)" -ForegroundColor Gray
+    if ($OllamaInstalled) {
+        Write-Host "    1) Continue install (Ollama will be used when you start it)" -ForegroundColor Gray
+        Write-Host "    2) Cancel and start Ollama first (recommended)" -ForegroundColor Gray
+    } else {
+        Write-Host "    1) Continue install (skip AI chat)" -ForegroundColor Gray
+        Write-Host "    2) Cancel and download Ollama first (from https://ollama.ai)" -ForegroundColor Gray
+    }
     Write-Host ""
     $OllamaChoice = Read-Host "  Enter 1 or 2 (default: 1)"
     
     if ($OllamaChoice -eq "2") {
         Write-Host ""
-        Write-Host "  Getting Ollama from https://ollama.ai" -ForegroundColor Cyan
-        Write-Host "  Download and install, then run this installer again." -ForegroundColor White
+        if ($OllamaInstalled) {
+            Write-Host "  Start Ollama with: ollama serve" -ForegroundColor Cyan
+            Write-Host "  Then run this installer again." -ForegroundColor White
+        } else {
+            Write-Host "  Getting Ollama from https://ollama.ai" -ForegroundColor Cyan
+            Write-Host "  Download and install, then run this installer again." -ForegroundColor White
+        }
         Write-Host ""
         Read-Host "  Press Enter to exit"
         exit 0

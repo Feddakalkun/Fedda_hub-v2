@@ -1,4 +1,4 @@
-﻿"""
+"""
 Simple FastAPI server for audio transcription
 Runs on port 8000
 """
@@ -14,7 +14,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import uvicorn
-from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech
+from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech, get_available_voices, unload_audio_models
 from lipsync_service import generate_lipsync
 from lora_service import start_lora_download, get_download_status, refresh_comfy_models, sync_premium_folder, get_installed_premium_loras
 try:
@@ -32,7 +32,15 @@ import shutil
 
 app = FastAPI()
 
-# CORS for frontend â€” configurable via env var for Docker/RunPod
+# Register voice streaming WebSocket (/ws/voice)
+try:
+    from voice_streaming import register_voice_websocket
+    register_voice_websocket(app)
+    print("[OK] Voice streaming WebSocket registered at /ws/voice")
+except Exception as e:
+    print(f"[WARN] Voice streaming not available: {e}")
+
+# CORS for frontend  configurable via env var for Docker/RunPod
 import os
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174").split(",")
 # Base URL prefix for ComfyUI view URLs returned to frontend
@@ -69,7 +77,7 @@ async def transcribe(audio: UploadFile = File(...)):
         return {"text": text, "success": True}
         
     except Exception as e:
-        print(f"âŒ Transcription error: {e}")
+        print(f"[ERROR] Transcription error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:
@@ -100,17 +108,33 @@ async def generate_speech(request: TTSRequest):
         # Generate TTS
         audio_path = text_to_speech(request.text, request.voice_style)
         
-        # Return audio file
+        # Return audio file with correct media type
+        ext = audio_path.suffix.lower()
+        media_types = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".flac": "audio/flac"}
+        media_type = media_types.get(ext, "audio/wav")
         return FileResponse(
             path=str(audio_path),
-            media_type="audio/flac",
+            media_type=media_type,
             filename=f"tts_{audio_path.name}"
         )
         
     except Exception as e:
-        print(f"âŒ TTS error: {e}")
+        print(f"[ERROR] TTS error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@app.get("/api/audio/voices")
+async def list_voices():
+    """Return available TTS voices for the frontend dropdown."""
+    return {"voices": get_available_voices(), "success": True}
+
+
+@app.post("/api/audio/unload")
+async def unload_audio():
+    """Unload all audio/TTS/STT models from VRAM to free memory for image generation."""
+    unload_audio_models()
+    return {"success": True, "message": "Audio models unloaded from VRAM"}
 
 
 class AudioReferenceRequest(BaseModel):
@@ -218,7 +242,7 @@ async def generate_lipsync_video(
         )
         
     except Exception as e:
-        print(f"âŒ LipSync error: {e}")
+        print(f"[ERROR] LipSync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -255,7 +279,7 @@ async def get_hardware_stats():
         }
     except Exception as e:
         # Fallback if no NVIDIA GPU or command fails
-        print(f"âš ï¸ GPU Stats Error: {e}")
+        print(f"[ERROR] GPU Stats Error: {e}")
         return {"status": "error", "message": "NVIDIA GPU not detected or driver error"}
 
 @app.get("/api/system/node-install-status")
@@ -316,7 +340,7 @@ async def install_lora(req: LoraInstallRequest):
         result = start_lora_download(req.url, req.filename)
         return result
     except Exception as e:
-        print(f"âŒ LoRA Install trigger error: {e}")
+        print(f"[ERROR] LoRA Install trigger error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/lora/download-status/{filename}")
@@ -337,7 +361,7 @@ async def sync_premium_loras():
         result = sync_premium_folder()
         return result
     except Exception as e:
-        print(f"âŒ Sync premium error: {e}")
+        print(f"[ERROR] Sync premium error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -409,7 +433,7 @@ async def trigger_runpod_animation(req: RunPodAnimateRequest):
         if req.runpod_token:
             headers["Authorization"] = f"Bearer {req.runpod_token}"
             
-        print(f"â˜ï¸ Uploading {len(local_files)} images to RunPod...")
+        print(f"[INFO] Uploading {len(local_files)} images to RunPod...")
         for fpath in local_files:
             with open(fpath, 'rb') as f:
                 res = requests.post(upload_url, headers=headers, files={'image': (fpath.name, f, 'image/png')})
@@ -441,7 +465,7 @@ async def trigger_runpod_animation(req: RunPodAnimateRequest):
         # (Optional) Inject default RunPod limits or tokens here. Let's send it!
         payload = {"prompt": wf}
         
-        print(f"â˜ï¸ Sending job to {req.runpod_url}")
+        print(f"[INFO] Sending job to {req.runpod_url}")
         req_kwargs = {
             "json": payload,
             "headers": {
@@ -461,7 +485,7 @@ async def trigger_runpod_animation(req: RunPodAnimateRequest):
         print(f"RunPod HTTP Error: {he.response.text}")
         raise HTTPException(status_code=he.response.status_code, detail=f"RunPod Endpoint Error: {he.response.text}")
     except Exception as e:
-        print(f"âŒ RunPod Integration Error: {e}")
+        print(f"[ERROR] RunPod Integration Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -543,7 +567,7 @@ async def check_runpod_status(req: RunPodStatusRequest):
     except requests.exceptions.Timeout:
         return {"status": "pod_loading", "completed": False, "outputs": [], "prompt_id": req.prompt_id}
     except Exception as e:
-        print(f"âŒ RunPod Status Error: {e}")
+        print(f"[ERROR] RunPod Status Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -578,7 +602,7 @@ async def download_runpod_output(req: RunPodDownloadRequest):
             for chunk in download_res.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        print(f"âœ… Downloaded from RunPod: {req.filename} -> {local_path}")
+        print(f"[INFO] Downloaded from RunPod: {req.filename} -> {local_path}")
         return {
             "success": True,
             "local_path": str(local_path),
@@ -586,7 +610,7 @@ async def download_runpod_output(req: RunPodDownloadRequest):
         }
 
     except Exception as e:
-        print(f"âŒ RunPod Download Error: {e}")
+        print(f"[ERROR] RunPod Download Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -638,7 +662,7 @@ async def list_output_files():
         }
         
     except Exception as e:
-        print(f"âŒ List files error: {e}")
+        print(f"[ERROR] List files error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -678,7 +702,7 @@ async def delete_file(request: DeleteFileRequest):
         # Delete file
         if file_path.exists():
             file_path.unlink()
-            print(f"âœ… Deleted: {file_path}")
+            print(f"[OK] Deleted: {file_path}")
             return {"success": True, "message": f"Deleted {request.filename}"}
         else:
             raise HTTPException(status_code=404, detail="File not found")
@@ -686,7 +710,7 @@ async def delete_file(request: DeleteFileRequest):
     except HTTPException:
         raise  # Re-raise HTTPExceptions as-is
     except Exception as e:
-        print(f"âŒ Delete error: {e}")
+        print(f"[ERROR] Delete error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -727,7 +751,7 @@ async def cleanup_orphaned_files():
                 if file_path.name not in valid_files:
                     file_path.unlink()
                     deleted_files.append(str(file_path.relative_to(comfy_output)))
-                    print(f"ðŸ—‘ï¸ Cleaned up: {file_path.name}")
+                    print(f"[OK] Cleaned up: {file_path.name}")
         
         return {
             "success": True,
@@ -736,7 +760,7 @@ async def cleanup_orphaned_files():
         }
         
     except Exception as e:
-        print(f"âŒ Cleanup error: {e}")
+        print(f"[ERROR] Cleanup error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1343,39 +1367,55 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_with_llm(request: ChatRequest):
-    """Chat using IF_AI_tools nodes in ComfyUI"""
-    try:
-        # Load workflow
-        workflow_path = Path(__file__).parent.parent / "public" / "workflows" / "if-ai-chat.json"
-        workflow = json.loads(workflow_path.read_text())
+    """Chat using Ollama directly (local) or IF_AI_tools (RunPod)."""
+    is_runpod = os.environ.get("RUNPOD_POD_ID") is not None
 
-        # Build prompt from messages
-        prompt = "\n".join([f"{m['role']}: {m['content']}" for m in request.messages])
-        workflow["1"]["inputs"]["prompt"] = prompt
-
-        # Queue workflow
-        comfy_url = "http://127.0.0.1:8199"
-        response = requests.post(f"{comfy_url}/prompt", json={"prompt": workflow})
-        response.raise_for_status()
-        prompt_id = response.json()["prompt_id"]
-
-        # Poll for completion (max 60s)
-        import time
-        for _ in range(60):
-            time.sleep(1)
-            history_resp = requests.get(f"{comfy_url}/history/{prompt_id}")
-            history = history_resp.json()
-
-            if prompt_id in history and history[prompt_id].get("outputs"):
-                outputs = history[prompt_id]["outputs"]
-                if "2" in outputs and "text" in outputs["2"]:
-                    return {"response": outputs["2"]["text"][0], "success": True}
-
-        raise HTTPException(status_code=504, detail="LLM response timeout")
-
-    except Exception as e:
-        print(f"Chat error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    if is_runpod:
+        # RunPod: route through ComfyUI IF_AI_tools
+        try:
+            workflow_path = Path(__file__).parent.parent / "public" / "workflows" / "if-ai-chat.json"
+            workflow = json.loads(workflow_path.read_text())
+            prompt = "\n".join([f"{m['role']}: {m['content']}" for m in request.messages])
+            workflow["1"]["inputs"]["prompt"] = prompt
+            comfy_url = "http://127.0.0.1:8199"
+            response = requests.post(f"{comfy_url}/prompt", json={"prompt": workflow})
+            response.raise_for_status()
+            prompt_id = response.json()["prompt_id"]
+            import time
+            for _ in range(60):
+                time.sleep(1)
+                history_resp = requests.get(f"{comfy_url}/history/{prompt_id}")
+                history = history_resp.json()
+                if prompt_id in history and history[prompt_id].get("outputs"):
+                    outputs = history[prompt_id]["outputs"]
+                    if "2" in outputs and "text" in outputs["2"]:
+                        return {"response": outputs["2"]["text"][0], "success": True}
+            raise HTTPException(status_code=504, detail="LLM response timeout")
+        except Exception as e:
+            print(f"Chat error (RunPod): {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Local: call Ollama directly
+        try:
+            ollama_payload = json.dumps({
+                "model": request.model,
+                "messages": request.messages,
+                "stream": False,
+                "keep_alive": "30s",
+                "options": {"num_predict": 500, "num_ctx": 4096},
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "http://127.0.0.1:11434/api/chat",
+                data=ollama_payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                reply = result.get("message", {}).get("content", "")
+                return {"response": reply, "success": True}
+        except Exception as e:
+            print(f"Chat error (Ollama): {e}")
+            raise HTTPException(status_code=500, detail=f"Ollama error: {e}")
 
 
 if __name__ == "__main__":

@@ -305,7 +305,8 @@ class ComfyUIService {
     }
 
     /**
-     * Connect to WebSocket for real-time updates and return a listener cleanup function
+     * Connect to WebSocket for real-time updates and return a listener cleanup function.
+     * Safe to call multiple times (React Strict Mode) — reuses existing connection.
      */
     connectWebSocket(callbacks: {
         onStatus?: (data: any) => void;
@@ -313,12 +314,20 @@ class ComfyUIService {
         onExecuting?: (nodeId: string | null) => void;
         onCompleted?: (promptId: string, output?: any) => void;
     }): () => void {
+        // If we already have a working connection, just update callbacks
+        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+            this.updateCallbacks(callbacks);
+            return () => {
+                // Don't close on cleanup — keep the connection alive across re-mounts
+            };
+        }
+
         this.wsReady = false;
         this.ws = new WebSocket(`${COMFY_API.WS_URL}?clientId=${this.clientId}`);
+        this.updateCallbacks(callbacks);
 
         this.ws.onopen = () => {
             this.wsReady = true;
-            // Silently connect - status shown in UI indicator
         };
 
         this.ws.onmessage = (event) => {
@@ -327,17 +336,17 @@ class ComfyUIService {
 
                 switch (data.type) {
                     case 'status':
-                        callbacks.onStatus?.(data.data);
+                        this._callbacks?.onStatus?.(data.data);
                         break;
                     case 'progress':
-                        callbacks.onProgress?.(data.data.node, data.data.value, data.data.max);
+                        this._callbacks?.onProgress?.(data.data.node, data.data.value, data.data.max);
                         break;
                     case 'executing':
-                        callbacks.onExecuting?.(data.data.node);
+                        this._callbacks?.onExecuting?.(data.data.node);
                         break;
                     case 'executed':
                         if (data.data.prompt_id) {
-                            callbacks.onCompleted?.(data.data.prompt_id, data.data.output);
+                            this._callbacks?.onCompleted?.(data.data.prompt_id, data.data.output);
                         }
                         break;
                 }
@@ -348,20 +357,27 @@ class ComfyUIService {
 
         this.ws.onerror = () => {
             this.wsReady = false;
-            // Silently ignore WebSocket errors - connection status shown in UI
         };
 
         this.ws.onclose = () => {
             this.wsReady = false;
+            this.ws = null;
         };
 
         return () => {
-            if (this.ws) {
-                this.ws.close();
-                this.ws = null;
-                this.wsReady = false;
-            }
+            // Don't close on cleanup — singleton connection survives React re-mounts
         };
+    }
+
+    private _callbacks: {
+        onStatus?: (data: any) => void;
+        onProgress?: (node: string, value: number, max: number) => void;
+        onExecuting?: (nodeId: string | null) => void;
+        onCompleted?: (promptId: string, output?: any) => void;
+    } | null = null;
+
+    private updateCallbacks(callbacks: typeof this._callbacks) {
+        this._callbacks = callbacks;
     }
     /**
      * Upload an audio file to ComfyUI

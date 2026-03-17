@@ -84,9 +84,19 @@ RUN python3 -m pip install --no-cache-dir \
     webdriver-manager beautifulsoup4 lxml shapely \
     deepdiff fal_client matplotlib scipy scikit-image scikit-learn \
     timm colour-science blend-modes loguru \
-    fastapi "uvicorn[standard]" python-multipart \
+    fastapi "uvicorn[standard]" python-multipart httpx \
     jupyterlab \
     numpy pillow tqdm requests psutil
+
+# Voice pipeline: TTS + STT + VAD
+RUN python3 -m pip install --no-cache-dir \
+    "setuptools<75" \
+    faster-whisper \
+    edge-tts \
+    kokoro \
+    soundfile \
+    && python3 -m pip install --no-cache-dir chatterbox-tts \
+    && python3 -m pip install --no-cache-dir "numpy==1.26.4" --no-deps
 
 # --- Copy app code from the cloned main repo (stage 1) ---
 COPY --from=frontend-builder /app/backend /app/backend

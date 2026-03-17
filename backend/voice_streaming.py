@@ -10,6 +10,7 @@ Implements:
 
 All audio models are lazy-loaded on first voice use and auto-unload after 60s idle.
 """
+import os
 import re
 import json
 import time
@@ -166,12 +167,25 @@ def transcribe_bytes(audio_bytes: bytes, sample_rate: int = 16000) -> str:
 
 
 # ============================================================
-# LLM Streaming — stream tokens from Ollama
+# LLM Streaming — Ollama (local) or IF_AI_tools (RunPod)
 # ============================================================
 
-async def stream_ollama(prompt: str, model: str = "qwen2.5:7b-instruct",
-                        system_prompt: str = None) -> "AsyncGenerator[str, None]":
-    """Stream tokens from Ollama. Yields individual tokens as strings."""
+_IS_RUNPOD = os.environ.get("RUNPOD_POD_ID") is not None
+
+
+async def stream_llm(prompt: str, model: str = "qwen2.5:7b-instruct",
+                     system_prompt: str = None) -> "AsyncGenerator[str, None]":
+    """Stream tokens from LLM. Ollama on local, IF_AI_tools on RunPod."""
+    if _IS_RUNPOD:
+        async for token in _stream_if_ai_tools(prompt, system_prompt):
+            yield token
+    else:
+        async for token in _stream_ollama(prompt, model, system_prompt):
+            yield token
+
+
+async def _stream_ollama(prompt: str, model: str, system_prompt: str = None):
+    """Stream tokens from Ollama (local)."""
     import httpx
 
     payload = {
@@ -199,6 +213,47 @@ async def stream_ollama(prompt: str, model: str = "qwen2.5:7b-instruct",
                     yield token
                 if data.get("done"):
                     return
+
+
+async def _stream_if_ai_tools(prompt: str, system_prompt: str = None):
+    """Get LLM response via ComfyUI IF_AI_tools (RunPod). Non-streaming, yields full response."""
+    import httpx
+
+    # Build IF_AI_tools workflow
+    workflow_path = Path(__file__).parent.parent / "public" / "workflows" / "if-ai-chat.json"
+    if not workflow_path.exists():
+        # Fallback: yield error message
+        yield "Voice LLM not available on this server (missing IF_AI_tools workflow)."
+        return
+
+    workflow = json.loads(workflow_path.read_text())
+    full_prompt = prompt
+    if system_prompt:
+        full_prompt = f"System: {system_prompt}\n\nUser: {prompt}"
+    workflow["1"]["inputs"]["prompt"] = full_prompt
+
+    comfy_url = "http://127.0.0.1:8199"
+    async with httpx.AsyncClient() as client:
+        # Queue the workflow
+        resp = await client.post(f"{comfy_url}/prompt", json={"prompt": workflow}, timeout=10.0)
+        resp.raise_for_status()
+        prompt_id = resp.json()["prompt_id"]
+
+        # Poll for completion (max 60s)
+        for _ in range(120):
+            await asyncio.sleep(0.5)
+            history_resp = await client.get(f"{comfy_url}/history/{prompt_id}", timeout=10.0)
+            history = history_resp.json()
+            if prompt_id in history and history[prompt_id].get("outputs"):
+                outputs = history[prompt_id]["outputs"]
+                if "2" in outputs and "text" in outputs["2"]:
+                    response_text = outputs["2"]["text"][0]
+                    # Yield word by word to feed sentence buffer
+                    for word in response_text.split():
+                        yield word + " "
+                    return
+
+        yield "LLM response timed out."
 
 
 # ============================================================
@@ -319,7 +374,7 @@ async def streaming_voice_pipeline(send_json, send_bytes, audio_bytes: bytes,
     t_llm_start = time.time()
     first_audio_time = None
 
-    async for token in stream_ollama(transcript, model=model, system_prompt=system_prompt):
+    async for token in stream_llm(transcript, model=model, system_prompt=system_prompt):
         full_response.append(token)
         await send_json({"type": "llm_token", "token": token})
 
@@ -486,7 +541,7 @@ def register_voice_websocket(app):
                                 kokoro_voice = KOKORO_VOICES.get(voice_style, "af_heart")
                                 use_hybrid = audio_service._kokoro_available and audio_service._chatterbox_available
 
-                                async for token in stream_ollama(text, model=llm_model, system_prompt=system_prompt):
+                                async for token in stream_llm(text, model=llm_model, system_prompt=system_prompt):
                                     await send_json({"type": "llm_token", "token": token})
                                     sentences = sentence_buffer.add_token(token)
                                     for sentence in sentences:

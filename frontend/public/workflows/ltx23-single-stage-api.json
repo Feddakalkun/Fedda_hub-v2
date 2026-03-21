@@ -635,19 +635,16 @@
   },
   "4981": {
     "inputs": {
-      "input": [
+      "image": [
         "2004",
         0
       ],
-      "resize_type": {
-        "resize_type": "scale longer dimension",
-        "longer_size": 1536
-      },
-      "scale_method": "lanczos"
+      "size": 1536,
+      "interpolation_mode": "bicubic"
     },
-    "class_type": "ResizeImageMaskNode",
+    "class_type": "JWImageResizeByLongerSide",
     "_meta": {
-      "title": "ResizeImageMaskNode"
+      "title": "JWImageResizeByLongerSide"
     }
   },
   "4961": {

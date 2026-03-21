@@ -46,8 +46,9 @@ if (Test-Path $GitEmbedded) {
     $GitExe = "git"
 }
 
-# Fix dubious ownership errors
-& $GitExe config --global --add safe.directory '*' 2>$null
+# Fix dubious ownership errors (local config only — never modify user's global gitconfig)
+$env:GIT_CONFIG_GLOBAL = Join-Path $RootPath ".gitconfig"
+& $GitExe config --file "$env:GIT_CONFIG_GLOBAL" --add safe.directory '*' 2>$null
 
 if (-not (Test-Path $ComfyDir)) {
     Write-Host "`n  [ERROR] ComfyUI directory not found!" -ForegroundColor Red

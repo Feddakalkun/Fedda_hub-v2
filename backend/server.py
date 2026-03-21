@@ -951,14 +951,14 @@ REQUIRED_MODELS = {
             "name": "face_yolov8m.pt",
             "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt",
             "path": "ultralytics/bbox/face_yolov8m.pt",
-            "size_gb": 0.052
+            "size_gb": 0.048
         },
         {
             "id": "sam",
             "name": "sam_vit_b_01ec64.pth",
             "url": "https://huggingface.co/scenario-labs/sam_vit/resolve/main/sam_vit_b_01ec64.pth",
             "path": "sams/sam_vit_b_01ec64.pth",
-            "size_gb": 0.375
+            "size_gb": 0.349
         }
         ],
     "ace-step": [

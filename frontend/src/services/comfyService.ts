@@ -7,6 +7,8 @@ class ComfyUIService {
     private clientId: string;
     private ws: WebSocket | null = null;
     private wsReady: boolean = false;
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private reconnectAttempts: number = 0;
 
     constructor() {
         this.clientId = this.generateClientId();
@@ -378,7 +380,20 @@ class ComfyUIService {
         this.ws.onclose = () => {
             this.wsReady = false;
             this.ws = null;
+            // Auto-reconnect with exponential backoff (1s, 2s, 4s, 8s, max 10s)
+            const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
+            this.reconnectAttempts++;
+            this.reconnectTimer = setTimeout(() => {
+                if (this._callbacks) {
+                    this.connectWebSocket(this._callbacks);
+                }
+            }, delay);
         };
+
+        // Reset reconnect counter on successful connection
+        this.ws.addEventListener('open', () => {
+            this.reconnectAttempts = 0;
+        });
 
         return () => {
             // Don't close on cleanup — singleton connection survives React re-mounts

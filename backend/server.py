@@ -967,14 +967,14 @@ REQUIRED_MODELS = {
             "name": "acestep_v1.5_turbo.safetensors",
             "url": "https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/diffusion_models/acestep_v1.5_turbo.safetensors",
             "path": "diffusion_models/acestep_v1.5_turbo.safetensors",
-            "size_gb": 4.8
+            "size_gb": 4.46
         },
         {
             "id": "ace-clip-small",
             "name": "qwen_0.6b_ace15.safetensors",
             "url": "https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_0.6b_ace15.safetensors",
             "path": "text_encoders/qwen_0.6b_ace15.safetensors",
-            "size_gb": 1.3
+            "size_gb": 1.11
         },{
             "id": "ace-vae",
             "name": "ace_1.5_vae.safetensors",

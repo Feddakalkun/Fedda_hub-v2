@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Music4, Wand2, AlertCircle, Sparkles } from 'lucide-react';
+import { Loader2, Music4, Wand2, AlertCircle, Sparkles, ChevronDown } from 'lucide-react';
 import { useComfyExecution } from '../contexts/ComfyExecutionContext';
 import { comfyService } from '../services/comfyService';
 import { ollamaService } from '../services/ollamaService';
@@ -72,15 +72,15 @@ export const AudioPage = () => {
     const { queueWorkflow } = useComfyExecution();
     const { toast } = useToast();
 
-    const [tags, setTags] = usePersistentState('audio_ace_tags', 'cinematic pop, emotional, female vocal, modern synths, 120 BPM');
-    const [lyrics, setLyrics] = usePersistentState('audio_ace_lyrics', '[verse]\nWe rise again through the fire\n\n[chorus]\nWe are unbreakable tonight');
+    const [tags, setTags] = usePersistentState('audio_ace_tags', 'groove pop, funk bass, tight live drums, punchy brass stabs, soulful male vocal, dancefloor hook, retro modern polish, 118 BPM');
+    const [lyrics, setLyrics] = usePersistentState('audio_ace_lyrics', '[verse]\nCity lights burn like fire tonight\nFeet on the edge and the rhythm is right\n\n[pre-chorus]\nHeartbeat racing under neon skies\n\n[chorus]\nWe move like thunder, no looking back\nHands to the ceiling, we light the track');
     const [seconds, setSeconds] = usePersistentState('audio_ace_seconds', 120);
-    const [steps, setSteps] = usePersistentState('audio_ace_steps', 50);
-    const [cfg, setCfg] = usePersistentState('audio_ace_cfg', 4);
+    const [steps, setSteps] = usePersistentState('audio_ace_steps', 12);
+    const [cfg, setCfg] = usePersistentState('audio_ace_cfg', 1);
     const [seed, setSeed] = usePersistentState('audio_ace_seed', -1);
 
-    const [bpm, setBpm] = usePersistentState('audio_ace_bpm', 120);
-    const [cfgScale, setCfgScale] = usePersistentState('audio_ace_cfg_scale', 2);
+    const [bpm, setBpm] = usePersistentState('audio_ace_bpm', 118);
+    const [cfgScale, setCfgScale] = usePersistentState('audio_ace_cfg_scale', 1.2);
     const [useAudioCodes, setUseAudioCodes] = usePersistentState('audio_ace_use_audio_codes', false);
     const [selectedPresetId, setSelectedPresetId] = usePersistentState('audio_ace_selected_preset', ACE_PRESETS[0].id);
     const [generationSourceMode, setGenerationSourceMode] = usePersistentState<GenerationSourceMode>('audio_ace_source_mode', 'preset');
@@ -106,6 +106,8 @@ export const AudioPage = () => {
     const [plannerError, setPlannerError] = useState<string | null>(null);
     const [blueprint, setBlueprint] = useState<AceStepBlueprint | null>(null);
 
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showArchitect, setShowArchitect] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -693,216 +695,41 @@ export const AudioPage = () => {
                     <ModelDownloader modelGroup="ace-step" onModelsReady={() => refreshAceModels(true)} />
 
                     <div className="bg-[#121218] border border-white/5 rounded-2xl p-4 space-y-3 mt-4">
-                        <div className="text-xs font-bold uppercase tracking-widest text-slate-500">ACE Prompt Architect</div>
-
-                        <select
-                            value={plannerModel}
-                            onChange={(e) => setPlannerModel(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                            disabled={availableModels.length === 0}
-                        >
-                            {availableModels.length > 0 ? (
-                                availableModels.map((model) => (
-                                    <option key={model} value={model}>{model}</option>
-                                ))
-                            ) : (
-                                <option value="">No Ollama models found</option>
-                            )}
-                        </select>
-
-                        <textarea
-                            value={ideaBrief}
-                            onChange={(e) => setIdeaBrief(e.target.value)}
-                            rows={4}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                            placeholder="Describe the song idea, style, mood, language, and target length..."
-                        />
-
-                        <input
-                            value={favoriteArtist}
-                            onChange={(e) => setFavoriteArtist(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                            placeholder="Favorite artist (style inspiration only)"
-                        />
-
-                        <div className="flex gap-2">
-                            <input
-                                value={referenceUrl}
-                                onChange={(e) => setReferenceUrl(e.target.value)}
-                                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                                placeholder="YouTube reference link"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={handleAnalyzeAndApplyReference}
-                                disabled={isAnalyzingReference || !referenceUrl.trim()}
-                                className="py-2 rounded-xl font-bold text-xs uppercase bg-white text-black hover:bg-slate-200 disabled:opacity-40"
-                            >
-                                {isAnalyzingReference ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : null}
-                                Analyze + Use In ACE
-                            </button>
-                            <button
-                                onClick={handleAnalyzeReference}
-                                disabled={isAnalyzingReference || !referenceUrl.trim()}
-                                className="py-2 rounded-xl font-bold text-xs uppercase bg-white/10 text-white hover:bg-white/20 disabled:opacity-40"
-                            >
-                                Analyze Only
-                            </button>
-                        </div>
-
-                        {referenceInfo && (
-                            <div className="bg-black/30 border border-white/10 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
-                                <div className="text-slate-300 font-semibold">Reference: {referenceInfo.title}</div>
-                                <div>Channel: {referenceInfo.uploader || '-'}</div>
-                                <div>Duration: {referenceInfo.duration_seconds ? `${referenceInfo.duration_seconds}s` : '-'}</div>
-                                {referenceSuggestions && (
-                                    <>
-                                        <div>Suggested BPM: {referenceSuggestions.bpm}</div>
-                                        <div>Suggested Duration: {referenceSuggestions.seconds}s</div>
-                                        <div className="line-clamp-2">Arrangement: {referenceSuggestions.arrangementHint}</div>
-                                    </>
-                                )}
-                                <div className="line-clamp-3">{referenceInfo.description || 'No description available.'}</div>
-
-                                <button
-                                    onClick={() => {
-                                        const suggestions = applyReferenceSuggestionsToFields(referenceInfo);
-                                        toast(`Reference active: ${suggestions.bpm} BPM, ${suggestions.seconds}s.`, 'success');
-                                    }}
-                                    className="mt-2 w-full py-2 rounded-xl font-bold text-[11px] uppercase bg-white/10 text-white hover:bg-white/20"
-                                >
-                                    Use This Reference In ACE
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleDraftBlueprint}
-                                disabled={isPlanning || !plannerModel}
-                                className="flex-1 py-2 rounded-xl font-bold text-xs uppercase bg-white/10 text-white hover:bg-white/20 disabled:opacity-40"
-                            >
-                                {isPlanning ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <Sparkles className="w-4 h-4 inline mr-2" />}Draft Blueprint
-                            </button>
-                            {blueprint && (
-                                <button
-                                    onClick={() => applyBlueprint(blueprint)}
-                                    className="px-3 py-2 rounded-xl font-bold text-xs uppercase bg-black/40 border border-white/10 text-white hover:bg-black/60"
-                                >
-                                    Apply
-                                </button>
-                            )}
-                        </div>
-
-                        {plannerError && (
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2">
-                                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                                <div className="text-xs text-red-300">{plannerError}</div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="bg-[#121218] border border-white/5 rounded-2xl p-4 space-y-3 mt-4">
                         <div className="text-xs font-bold uppercase tracking-widest text-slate-500">ACE-Step 1.5</div>
-                        <div className="bg-black/30 border border-white/10 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
-                            <div className="flex items-center justify-between">
-                                <span className="uppercase tracking-widest text-slate-500">Current Source</span>
-                                <span className="font-semibold text-slate-200">{sourceModeLabel}</span>
-                            </div>
-                            <div>
-                                {generationSourceMode === 'reference'
-                                    ? (activeReferenceSummary || 'Reference applied from link metadata')
-                                    : generationSourceMode === 'preset'
-                                        ? `Preset: ${ACE_PRESETS.find((item) => item.id === selectedPresetId)?.label || selectedPresetId}`
-                                        : 'Manual field values'}
-                            </div>
-                            <div className="text-slate-500">Generate uses the ACE fields below. Preset/Reference updates those fields.</div>
-                        </div>
-                        <div className="bg-black/30 border border-white/10 rounded-xl p-3 space-y-3">
-                            <div>
-                                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Ready To Launch Presets</div>
-                                <div className="text-[11px] text-slate-500 mt-1">Pick a starter sound, then tweak tags/lyrics below.</div>
-                            </div>
 
-                            <div className="flex gap-2">
-                                <select
-                                    value={selectedPresetId}
-                                    onChange={(e) => setSelectedPresetId(e.target.value)}
-                                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                                >
-                                    {ACE_PRESETS.map((preset) => (
-                                        <option key={preset.id} value={preset.id}>
-                                            {preset.label} ({preset.artistHint})
-                                        </option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={() => applyPresetById(selectedPresetId)}
-                                    className="px-3 py-2 rounded-xl font-bold text-xs uppercase bg-white/10 text-white hover:bg-white/20"
-                                >
-                                    Apply
-                                </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                {ACE_FEATURED_PRESET_IDS.map((presetId) => {
-                                    const preset = ACE_PRESETS.find((item) => item.id === presetId);
-                                    if (!preset) return null;
-                                    const active = selectedPresetId === preset.id;
-                                    return (
-                                        <button
-                                            key={`featured_${preset.id}`}
-                                            onClick={() => applyPresetById(preset.id)}
-                                            className={`px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${active ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
-                                        >
-                                            {preset.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3">
-                            <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Model Routing</div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <div className="text-[11px] text-slate-500">UNET</div>
-                                    <select value={unetModel} onChange={(e) => setUnetModel(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
-                                        {unetModels.length > 0 ? unetModels.map((name) => <option key={name} value={name}>{name}</option>) : <option value="">No UNET models</option>}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-[11px] text-slate-500">VAE</div>
-                                    <select value={vaeModel} onChange={(e) => setVaeModel(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
-                                        {vaeModels.length > 0 ? vaeModels.map((name) => <option key={name} value={name}>{name}</option>) : <option value="">No VAE models</option>}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-[11px] text-slate-500">Text Encoder 1</div>
-                                    <select value={clipModel1} onChange={(e) => setClipModel1(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
-                                        {textEncoderModels.length > 0 ? textEncoderModels.map((name) => <option key={`a_${name}`} value={name}>{name}</option>) : <option value="">No text encoders</option>}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-[11px] text-slate-500">Text Encoder 2</div>
-                                    <select value={clipModel2} onChange={(e) => setClipModel2(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
-                                        {textEncoderModels.length > 0 ? textEncoderModels.map((name) => <option key={`b_${name}`} value={name}>{name}</option>) : <option value="">No text encoders</option>}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {!aceReady && (
-                            <button
-                                onClick={() => refreshAceModels()}
-                                className="w-full py-2 rounded-xl font-bold text-xs uppercase bg-white/10 text-white hover:bg-white/20"
+                        {/* Preset quick-pick */}
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedPresetId}
+                                onChange={(e) => { setSelectedPresetId(e.target.value); applyPresetById(e.target.value); }}
+                                className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                             >
-                                Refresh ACE Models
-                            </button>
-                        )}
+                                {ACE_PRESETS.map((preset) => (
+                                    <option key={preset.id} value={preset.id}>
+                                        {preset.label} ({preset.artistHint})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
 
+                        <div className="flex flex-wrap gap-1.5">
+                            {ACE_FEATURED_PRESET_IDS.map((presetId) => {
+                                const preset = ACE_PRESETS.find((item) => item.id === presetId);
+                                if (!preset) return null;
+                                const active = selectedPresetId === preset.id;
+                                return (
+                                    <button
+                                        key={`featured_${preset.id}`}
+                                        onClick={() => applyPresetById(preset.id)}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${active ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}
+                                    >
+                                        {preset.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Tags */}
                         <div className="space-y-1">
                             <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Tags</div>
                             <input
@@ -913,77 +740,53 @@ export const AudioPage = () => {
                             />
                         </div>
 
+                        {/* Lyrics */}
                         <div className="space-y-1">
-                            <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Lyrics & Structure</div>
+                            <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Lyrics</div>
                             <textarea
                                 value={lyrics}
                                 onChange={(e) => { setLyrics(e.target.value); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }}
-                                rows={8}
+                                rows={6}
                                 className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
                             />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
+                        {/* Core params: Duration + BPM */}
+                        <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
-                                <div className="text-[11px] text-slate-500">Seconds</div>
+                                <div className="text-[11px] text-slate-500">Duration (seconds)</div>
                                 <input type="number" value={seconds} onChange={(e) => { setSeconds(parseInt(e.target.value || '120')); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
                             </div>
                             <div className="space-y-1">
                                 <div className="text-[11px] text-slate-500">BPM</div>
                                 <input type="number" value={bpm} onChange={(e) => { setBpm(parseInt(e.target.value || '120')); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
                             </div>
-                            <div className="space-y-1">
-                                <div className="text-[11px] text-slate-500">Steps</div>
-                                <input type="number" value={steps} onChange={(e) => { setSteps(parseInt(e.target.value || '50')); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
-                            </div>
-                            <div className="space-y-1">
-                                <div className="text-[11px] text-slate-500">CFG</div>
-                                <input type="number" step={0.1} value={cfg} onChange={(e) => { setCfg(parseFloat(e.target.value || '4')); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
-                            </div>
-                            <div className="space-y-1">
-                                <div className="text-[11px] text-slate-500">CFG Scale</div>
-                                <input type="number" step={0.1} value={cfgScale} onChange={(e) => { setCfgScale(parseFloat(e.target.value || '2')); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
-                            </div>
-                            <div className="space-y-1">
-                                <div className="text-[11px] text-slate-500">Seed</div>
-                                <input type="number" value={seed} onChange={(e) => { setSeed(parseInt(e.target.value || '-1')); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" />
-                            </div>
                         </div>
 
-                        <label className="flex items-center gap-2 text-xs text-slate-400">
-                            <input
-                                type="checkbox"
-                                checked={useAudioCodes}
-                                onChange={(e) => { setUseAudioCodes(e.target.checked); setGenerationSourceMode('manual'); setActiveReferenceSummary(''); }}
-                                className="rounded border-white/20 bg-black/40"
-                            />
-                            Enable audio code generation (higher quality, can be unstable on some setups)
-                        </label>
-
+                        {/* Generate button */}
                         <button onClick={handleGenerate} disabled={isGenerating || !aceReady} className="w-full py-3 rounded-xl font-bold text-sm uppercase bg-white text-black hover:bg-slate-200 disabled:opacity-30">
                             {isGenerating ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <Wand2 className="w-4 h-4 inline mr-2" />}Generate Track
                         </button>
 
-                        {(lastPromptId || historyStatus || detectedOutputs.length > 0 || generationLogs.length > 0) && (
+                        {/* Status (only during/after generation) */}
+                        {(lastPromptId || historyStatus || detectedOutputs.length > 0) && (
                             <div className="bg-black/30 border border-white/10 rounded-xl p-3 space-y-2 text-[11px]">
                                 <div className="flex items-center justify-between">
                                     <span className="text-slate-400">Status</span>
                                     <span className="text-slate-200 font-semibold">{isGenerating ? 'running' : historyStatus || 'idle'}</span>
                                 </div>
-                                {lastPromptId && (
-                                    <div className="text-slate-400">
-                                        Prompt ID: <span className="font-mono text-slate-300">{lastPromptId}</span>
-                                    </div>
-                                )}
-                                <div className="text-slate-400">
-                                    Detected outputs: <span className="text-slate-300">{detectedOutputs.length > 0 ? detectedOutputs.join(', ') : 'none yet'}</span>
-                                </div>
                                 <details>
-                                    <summary className="cursor-pointer text-slate-300">Generation log</summary>
-                                    <div className="mt-2 max-h-28 overflow-y-auto custom-scrollbar space-y-1">
-                                        {generationLogs.length > 0 ? generationLogs.map((line, idx) => (
-                                            <div key={`${line}_${idx}`} className="text-slate-500 font-mono">{line}</div>
-                                        )) : <div className="text-slate-600">No log entries yet.</div>}
+                                    <summary className="cursor-pointer text-slate-500">Details</summary>
+                                    <div className="mt-2 space-y-1">
+                                        {lastPromptId && <div className="text-slate-500">ID: <span className="font-mono text-slate-400">{lastPromptId}</span></div>}
+                                        <div className="text-slate-500">Outputs: <span className="text-slate-400">{detectedOutputs.length > 0 ? detectedOutputs.join(', ') : 'none'}</span></div>
+                                        {generationLogs.length > 0 && (
+                                            <div className="max-h-20 overflow-y-auto custom-scrollbar space-y-0.5 mt-1">
+                                                {generationLogs.map((line, idx) => (
+                                                    <div key={`${line}_${idx}`} className="text-slate-600 font-mono text-[10px]">{line}</div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </details>
                             </div>
@@ -993,6 +796,155 @@ export const AudioPage = () => {
                             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2">
                                 <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                                 <div className="text-xs text-red-300">{error}</div>
+                            </div>
+                        )}
+
+                        {/* Advanced Settings (collapsed) */}
+                        <button
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="w-full flex items-center justify-between py-2 text-[11px] text-slate-500 hover:text-slate-300 uppercase tracking-widest"
+                        >
+                            Advanced Settings
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showAdvanced && (
+                            <div className="space-y-3 border-t border-white/5 pt-3">
+                                <div className="grid grid-cols-4 gap-2">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] text-slate-500">Steps</div>
+                                        <input type="number" value={steps} onChange={(e) => { setSteps(parseInt(e.target.value || '12')); setGenerationSourceMode('manual'); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] text-slate-500">CFG</div>
+                                        <input type="number" step={0.1} value={cfg} onChange={(e) => { setCfg(parseFloat(e.target.value || '1')); setGenerationSourceMode('manual'); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] text-slate-500">CFG Scale</div>
+                                        <input type="number" step={0.1} value={cfgScale} onChange={(e) => { setCfgScale(parseFloat(e.target.value || '1.2')); setGenerationSourceMode('manual'); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] text-slate-500">Seed</div>
+                                        <input type="number" value={seed} onChange={(e) => { setSeed(parseInt(e.target.value || '-1')); setGenerationSourceMode('manual'); }} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-xs text-white" />
+                                    </div>
+                                </div>
+
+                                {/* Model Routing */}
+                                <div className="space-y-2">
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Model Routing</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                            <div className="text-[10px] text-slate-600">UNET</div>
+                                            <select value={unetModel} onChange={(e) => setUnetModel(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-[11px] text-white">
+                                                {unetModels.length > 0 ? unetModels.map((name) => <option key={name} value={name}>{name}</option>) : <option value="">No UNET</option>}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="text-[10px] text-slate-600">VAE</div>
+                                            <select value={vaeModel} onChange={(e) => setVaeModel(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-[11px] text-white">
+                                                {vaeModels.length > 0 ? vaeModels.map((name) => <option key={name} value={name}>{name}</option>) : <option value="">No VAE</option>}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="text-[10px] text-slate-600">Encoder 1</div>
+                                            <select value={clipModel1} onChange={(e) => setClipModel1(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-[11px] text-white">
+                                                {textEncoderModels.length > 0 ? textEncoderModels.map((name) => <option key={`a_${name}`} value={name}>{name}</option>) : <option value="">None</option>}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="text-[10px] text-slate-600">Encoder 2</div>
+                                            <select value={clipModel2} onChange={(e) => setClipModel2(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-2 py-1.5 text-[11px] text-white">
+                                                {textEncoderModels.length > 0 ? textEncoderModels.map((name) => <option key={`b_${name}`} value={name}>{name}</option>) : <option value="">None</option>}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {!aceReady && (
+                                    <button onClick={() => refreshAceModels()} className="w-full py-2 rounded-xl font-bold text-xs uppercase bg-white/10 text-white hover:bg-white/20">
+                                        Refresh ACE Models
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* AI Prompt Architect (collapsed) */}
+                        <button
+                            onClick={() => setShowArchitect(!showArchitect)}
+                            className="w-full flex items-center justify-between py-2 text-[11px] text-slate-500 hover:text-slate-300 uppercase tracking-widest"
+                        >
+                            <span className="flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> AI Prompt Architect</span>
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showArchitect ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showArchitect && (
+                            <div className="space-y-3 border-t border-white/5 pt-3">
+                                <select
+                                    value={plannerModel}
+                                    onChange={(e) => setPlannerModel(e.target.value)}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                    disabled={availableModels.length === 0}
+                                >
+                                    {availableModels.length > 0 ? (
+                                        availableModels.map((model) => (
+                                            <option key={model} value={model}>{model}</option>
+                                        ))
+                                    ) : (
+                                        <option value="">No Ollama models found</option>
+                                    )}
+                                </select>
+
+                                <textarea
+                                    value={ideaBrief}
+                                    onChange={(e) => setIdeaBrief(e.target.value)}
+                                    rows={3}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                    placeholder="Describe the song idea, style, mood..."
+                                />
+
+                                <input
+                                    value={favoriteArtist}
+                                    onChange={(e) => setFavoriteArtist(e.target.value)}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                    placeholder="Favorite artist (style inspiration)"
+                                />
+
+                                <input
+                                    value={referenceUrl}
+                                    onChange={(e) => setReferenceUrl(e.target.value)}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                                    placeholder="YouTube reference link"
+                                />
+
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={handleAnalyzeAndApplyReference}
+                                        disabled={isAnalyzingReference || !referenceUrl.trim()}
+                                        className="py-2 rounded-xl font-bold text-[11px] uppercase bg-white text-black hover:bg-slate-200 disabled:opacity-40"
+                                    >
+                                        {isAnalyzingReference ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : null}
+                                        Analyze + Apply
+                                    </button>
+                                    <button
+                                        onClick={handleDraftBlueprint}
+                                        disabled={isPlanning || !plannerModel}
+                                        className="py-2 rounded-xl font-bold text-[11px] uppercase bg-white/10 text-white hover:bg-white/20 disabled:opacity-40"
+                                    >
+                                        {isPlanning ? <Loader2 className="w-3 h-3 inline animate-spin mr-1" /> : <Sparkles className="w-3 h-3 inline mr-1" />}
+                                        Draft Blueprint
+                                    </button>
+                                </div>
+
+                                {referenceInfo && (
+                                    <div className="bg-black/30 border border-white/10 rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
+                                        <div className="text-slate-300 font-semibold">{referenceInfo.title}</div>
+                                        {referenceSuggestions && <div>BPM: {referenceSuggestions.bpm} / Duration: {referenceSuggestions.seconds}s</div>}
+                                    </div>
+                                )}
+
+                                {plannerError && (
+                                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-2 text-[11px] text-red-300">{plannerError}</div>
+                                )}
                             </div>
                         )}
                     </div>

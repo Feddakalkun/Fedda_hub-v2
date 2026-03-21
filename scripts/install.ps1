@@ -288,8 +288,10 @@ else {
 }
 
 # Fix "dubious ownership" errors (install runs as Admin, user runs update/ComfyUI as regular user)
+# Use local git config to avoid modifying user's global ~/.gitconfig
 $env:PATH = "$(Join-Path $GitDir 'cmd');$env:PATH"
-& $GitExe config --global --add safe.directory '*' 2>$null
+$env:GIT_CONFIG_GLOBAL = Join-Path $RootPath ".gitconfig"
+& $GitExe config --file "$env:GIT_CONFIG_GLOBAL" --add safe.directory '*' 2>$null
 
 Pause-Step
 

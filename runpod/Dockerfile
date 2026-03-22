@@ -49,7 +49,7 @@ RUN python3 -m pip install --no-cache-dir \
 # Clone ComfyUI at pinned stable commit
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /app/ComfyUI \
     && cd /app/ComfyUI \
-    && git checkout 0467f69 \
+    && git checkout 25b6d1d6 \
     && pip install --no-cache-dir -r requirements.txt
 
 # Pre-install critical custom nodes in Docker image

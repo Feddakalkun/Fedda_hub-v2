@@ -105,20 +105,23 @@ export const LtxT2vTab = () => {
             // Node 4966: LTXVScheduler (steps)
             if (workflow['4966']) workflow['4966'].inputs.steps = steps;
 
+            const runTag = Date.now().toString(36);
+
             // Fast preset: skip expensive refinement branch by saving distilled pass output.
             if (preset === 'fast') {
                 if (workflow['4852']) {
                     workflow['4852'].inputs.video = ['4819', 0];
-                    workflow['4852'].inputs.filename_prefix = 'VIDEO/LTX23/T2V_FAST';
+                    workflow['4852'].inputs.filename_prefix = `VIDEO/LTX23/T2V_FAST_${runTag}`;
                 }
-                if (workflow['4823']) workflow['4823'].inputs.filename_prefix = 'VIDEO/LTX23/T2V_FAST_ALT';
             } else {
                 if (workflow['4852']) {
                     workflow['4852'].inputs.video = ['4849', 0];
-                    workflow['4852'].inputs.filename_prefix = 'VIDEO/LTX23/T2V';
+                    workflow['4852'].inputs.filename_prefix = `VIDEO/LTX23/T2V_${runTag}`;
                 }
-                if (workflow['4823']) workflow['4823'].inputs.filename_prefix = 'VIDEO/LTX23/T2V_ALT';
             }
+
+            // Remove duplicate SaveVideo node — keep only primary output (4852)
+            delete workflow['4823'];
 
             await queueWorkflow(workflow);
             toast('LTX Text-to-Video queued!', 'success');

@@ -1,9 +1,11 @@
-// Video Page - LTX I2V, LTX T2V, Lipsync, Scene Builder with video preview
+// Video Page - LTX I2V, LTX T2V, LTX-2 I2V+Sound, LTX-2 Lipsync, WAN Lipsync, Scene Builder
 import { useState, useEffect, useRef } from 'react';
 import { Film } from 'lucide-react';
 import { ModelDownloader } from '../components/ModelDownloader';
 import { LtxI2vTab } from '../components/video/LtxI2vTab';
 import { LtxT2vTab } from '../components/video/LtxT2vTab';
+import { Ltx2I2vSoundTab } from '../components/video/Ltx2I2vSoundTab';
+import { Ltx2LipsyncTab } from '../components/video/Ltx2LipsyncTab';
 import { LipsyncTab } from '../components/video/LipsyncTab';
 import { SceneBuilderTab } from '../components/video/SceneBuilderTab';
 import { useComfyExecution } from '../contexts/ComfyExecutionContext';
@@ -15,13 +17,21 @@ interface VideoPageProps {
     modelLabel: string;
 }
 
+const PREFIX_MAP: Record<string, string> = {
+    'ltx-i2v': 'VIDEO/LTX23/I2V',
+    'ltx-t2v': 'VIDEO/LTX23/T2V',
+    'ltx2-i2v-sound': 'VIDEO/LTX2/',
+    'ltx2-lipsync': 'VIDEO/LTX2/',
+};
+
 export const VideoPage = ({ modelId }: VideoPageProps) => {
     const [videoUrls, setVideoUrls] = useState<string[]>([]);
     const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+    const [hasNewVideo, setHasNewVideo] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
 
     const { lastCompletedPromptId, lastOutputVideos, outputReadyCount } = useComfyExecution();
-    const expectedPrefix = modelId === 'ltx-i2v' ? 'VIDEO/LTX23/I2V' : modelId === 'ltx-t2v' ? 'VIDEO/LTX23/T2V' : null;
+    const expectedPrefix = PREFIX_MAP[modelId] ?? null;
 
     useEffect(() => {
         if (!lastCompletedPromptId) return;
@@ -38,6 +48,7 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                     if (urls.length > 0) {
                         setVideoUrls(urls);
                         setActiveVideoIndex(urls.length - 1);
+                        setHasNewVideo(true);
                         return;
                     }
                 }
@@ -63,6 +74,7 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                     if (urls.length > 0) {
                         setVideoUrls(urls);
                         setActiveVideoIndex(urls.length - 1);
+                        setHasNewVideo(true);
                     }
                 }
             } catch (err) {
@@ -73,9 +85,20 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
         fetchVideos();
     }, [lastCompletedPromptId, outputReadyCount, lastOutputVideos, expectedPrefix]);
 
+    // Reset forceExpand flag after it triggers
+    useEffect(() => {
+        if (hasNewVideo) {
+            const t = setTimeout(() => setHasNewVideo(false), 500);
+            return () => clearTimeout(t);
+        }
+    }, [hasNewVideo]);
+
     return (
         <WorkbenchShell
-            leftWidthClassName="w-[480px]"
+            leftWidthClassName="w-[520px]"
+            collapsible
+            collapseKey="video_preview_collapsed"
+            forceExpand={hasNewVideo}
             leftPane={
                 <>
                     <ModelDownloader modelGroup={modelId} />
@@ -86,6 +109,12 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                         </div>
                         <div style={{ display: modelId === 'ltx-t2v' ? undefined : 'none' }}>
                             <LtxT2vTab />
+                        </div>
+                        <div style={{ display: modelId === 'ltx2-i2v-sound' ? undefined : 'none' }}>
+                            <Ltx2I2vSoundTab />
+                        </div>
+                        <div style={{ display: modelId === 'ltx2-lipsync' ? undefined : 'none' }}>
+                            <Ltx2LipsyncTab />
                         </div>
                         <div style={{ display: modelId === 'lipsync' ? undefined : 'none' }}>
                             <LipsyncTab />
@@ -134,7 +163,7 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                                 <Film className="w-16 h-16" />
                                 <p className="tracking-[0.2em] font-light uppercase text-sm">Video Preview</p>
                                 <p className="text-xs text-slate-500 max-w-xs">
-                                    Generate a lipsync video or scene to see the output here
+                                    Generate a video to see the output here
                                 </p>
                             </div>
                         )}

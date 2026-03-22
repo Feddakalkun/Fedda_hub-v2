@@ -65,8 +65,10 @@ export const MODELS = {
         { id: 'qwen-angle', label: 'Qwen Multi-Angle', icon: 'Box' },
     ],
     VIDEO: [
-        { id: 'ltx-i2v', label: 'Image to Video', icon: 'ImagePlay', category: 'LTX' },
-        { id: 'ltx-t2v', label: 'Text to Video', icon: 'Type', category: 'LTX' },
+        { id: 'ltx-i2v', label: 'Image to Video', icon: 'ImagePlay', category: 'LTX 2.3' },
+        { id: 'ltx-t2v', label: 'Text to Video', icon: 'Type', category: 'LTX 2.3' },
+        { id: 'ltx2-i2v-sound', label: 'I2V + Sound', icon: 'Volume2', category: 'LTX 2' },
+        { id: 'ltx2-lipsync', label: 'Lipsync', icon: 'Mic2', category: 'LTX 2' },
         { id: 'lipsync', label: 'Lipsync', icon: 'Mic2', category: 'WAN' },
         { id: 'scene-builder', label: 'Scene Builder', icon: 'Film', category: 'WAN' },
     ],

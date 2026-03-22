@@ -1096,6 +1096,87 @@ REQUIRED_MODELS["ltx-i2v"] = [
 # T2V uses the same models as I2V
 REQUIRED_MODELS["ltx-t2v"] = REQUIRED_MODELS["ltx-i2v"]
 
+# ─── LTX-2 (19B) — I2V + Sound ─────────────────────────────────────
+# Uses DualCLIPLoader (gemma_3 + embeddings_connector) instead of LTXAVTextEncoderLoader
+# Separate video/audio VAEs (not embedded in checkpoint like 2.3)
+REQUIRED_MODELS["ltx2-i2v-sound"] = [
+    {
+        "id": "ltx2-checkpoint-fp8",
+        "name": "ltx-2-19b-dev-fp8.safetensors",
+        "url": "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-dev-fp8.safetensors",
+        "path": "checkpoints/ltx-2-19b-dev-fp8.safetensors",
+        "size_gb": 25.22
+    },
+    {
+        "id": "ltx2-gemma3-text-encoder",
+        "name": "gemma_3_12B_it.safetensors",
+        "url": "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it.safetensors",
+        "path": "text_encoders/gemma_3_12B_it.safetensors",
+        "size_gb": 22.71
+    },
+    {
+        "id": "ltx2-embeddings-connector",
+        "name": "ltx-2-19b-embeddings_connector_distill_bf16.safetensors",
+        "url": "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/text_encoders/ltx-2-19b-embeddings_connector_distill_bf16.safetensors",
+        "path": "text_encoders/ltx-2-19b-embeddings_connector_distill_bf16.safetensors",
+        "size_gb": 0.05
+    },
+    {
+        "id": "ltx2-spatial-upscaler",
+        "name": "ltx-2-spatial-upscaler-x2-1.0.safetensors",
+        "url": "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors",
+        "path": "latent_upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors",
+        "size_gb": 0.93
+    },
+    {
+        "id": "ltx2-distilled-lora",
+        "name": "ltx-2-19b-distilled-lora-384.safetensors",
+        "url": "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled-lora-384.safetensors",
+        "path": "loras/ltx-2-19b-distilled-lora-384.safetensors",
+        "size_gb": 7.15
+    },
+]
+
+# ─── LTX-2 (19B) — Lipsync ─────────────────────────────────────────
+# Same base as I2V+Sound, plus separate video/audio VAEs, MelBandRoFormer, and extra LoRAs
+REQUIRED_MODELS["ltx2-lipsync"] = REQUIRED_MODELS["ltx2-i2v-sound"] + [
+    {
+        "id": "ltx2-video-vae",
+        "name": "LTX2_video_vae_bf16.safetensors",
+        "url": "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/VAE/LTX2_video_vae_bf16.safetensors",
+        "path": "vae/LTX2_video_vae_bf16.safetensors",
+        "size_gb": 0.32
+    },
+    {
+        "id": "ltx2-audio-vae",
+        "name": "LTX2_audio_vae_bf16.safetensors",
+        "url": "https://huggingface.co/Kijai/LTXV2_comfy/resolve/main/VAE/LTX2_audio_vae_bf16.safetensors",
+        "path": "vae/LTX2_audio_vae_bf16.safetensors",
+        "size_gb": 0.16
+    },
+    {
+        "id": "ltx2-ic-lora-detailer",
+        "name": "ltx-2-19b-ic-lora-detailer.safetensors",
+        "url": "https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Detailer/resolve/main/ltx-2-19b-ic-lora-detailer.safetensors",
+        "path": "loras/ltx-2-19b-ic-lora-detailer.safetensors",
+        "size_gb": 2.44
+    },
+    {
+        "id": "ltx2-herocam-lora",
+        "name": "HeroCam_LTX2_bucket113_step_02000.safetensors",
+        "url": "https://huggingface.co/Nebsh/LTX2_Herocam_Lora/resolve/main/HeroCam_LTX2_bucket113_step_02000.safetensors",
+        "path": "loras/HeroCam_LTX2_bucket113_step_02000.safetensors",
+        "size_gb": 0.31
+    },
+    {
+        "id": "melband-roformer",
+        "name": "MelBandRoformer_fp16.safetensors",
+        "url": "https://huggingface.co/ank-ai/MelBandRoformer/resolve/main/MelBandRoformer_fp16.safetensors",
+        "path": "audio_separation/MelBandRoformer_fp16.safetensors",
+        "size_gb": 0.14
+    },
+]
+
 download_progress = {} # { model_id: { downloaded: 0, total: 0, status: 'idle' } }
 
 def start_download(model_info, hf_token=None):

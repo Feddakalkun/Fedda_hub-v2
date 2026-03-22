@@ -15,7 +15,6 @@ Requires: RUNPOD_API_KEY environment variable (or prompts for it)
 import os
 import sys
 import json
-import time
 import argparse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -30,17 +29,8 @@ MIN_MEMORY_GB = 16
 PORTS = "3000/http,8199/http,8888/http,22/tcp"
 VOLUME_MOUNT = "/workspace"
 
-# Popular GPU choices for video generation
-GPU_PRESETS = {
-    "1": ("NVIDIA RTX A6000",       "48 GB", "Great all-rounder"),
-    "2": ("NVIDIA RTX 4090",        "24 GB", "Fast, good for LTX-2"),
-    "3": ("NVIDIA A100 80GB PCIe",  "80 GB", "Premium, large models"),
-    "4": ("NVIDIA A100-SXM4-80GB",  "80 GB", "Fastest A100"),
-    "5": ("NVIDIA RTX A5000",       "24 GB", "Budget option"),
-    "6": ("NVIDIA L40S",            "48 GB", "Ada Lovelace"),
-    "7": ("NVIDIA RTX 4080",        "16 GB", "Entry level"),
-    "8": ("NVIDIA H100 80GB HBM3",  "80 GB", "Top tier"),
-}
+# Minimum VRAM for FEDDA (LTX-2 needs ~20GB, LTX-2.3 needs ~40GB)
+MIN_VRAM_GB = 24
 
 API_URL = "https://api.runpod.io/graphql"
 
@@ -72,7 +62,7 @@ def get_api_key():
     return key
 
 
-def graphql(api_key: str, query: str, variables: dict = None) -> dict:
+def graphql(api_key: str, query: str, variables: dict = None):
     """Execute a GraphQL query against RunPod API."""
     payload = {"query": query}
     if variables:
@@ -94,10 +84,10 @@ def graphql(api_key: str, query: str, variables: dict = None) -> dict:
     except HTTPError as e:
         body = e.read().decode("utf-8") if e.fp else ""
         print(f"\n  API Error {e.code}: {body}")
-        sys.exit(1)
+        return None
     except URLError as e:
         print(f"\n  Connection error: {e.reason}")
-        sys.exit(1)
+        return None
 
     if "errors" in result:
         for err in result["errors"]:
@@ -107,8 +97,10 @@ def graphql(api_key: str, query: str, variables: dict = None) -> dict:
     return result.get("data", {})
 
 
-def check_gpu_availability(api_key: str, gpu_type_id: str) -> dict | None:
-    """Check if a specific GPU type is available and return its info."""
+# ─── GPU Queries ─────────────────────────────────────────────────────
+
+def fetch_gpus_with_stock(api_key: str) -> list:
+    """Fetch all GPU types with availability info from RunPod."""
     query = """
     query GpuTypes {
         gpuTypes {
@@ -118,17 +110,94 @@ def check_gpu_availability(api_key: str, gpu_type_id: str) -> dict | None:
             communityPrice
             securePrice
             communitySpotPrice
-            secureSpotPrice
+            lowestPrice(input: { gpuCount: 1 }) {
+                minimumBidPrice
+                uninterruptablePrice
+            }
         }
     }
     """
     data = graphql(api_key, query)
     if not data:
-        return None
-    for gpu in data.get("gpuTypes", []):
-        if gpu["id"] == gpu_type_id or gpu.get("displayName") == gpu_type_id:
-            return gpu
-    return None
+        return []
+    return data.get("gpuTypes", [])
+
+
+def check_stock(api_key: str, gpu_id: str) -> dict:
+    """Check real-time stock for a specific GPU type."""
+    query = """
+    query GpuTypes($id: String!) {
+        gpuTypes(input: { id: $id }) {
+            id
+            displayName
+            memoryInGb
+            communityPrice
+            securePrice
+            lowestPrice(input: { gpuCount: 1 }) {
+                minimumBidPrice
+                uninterruptablePrice
+            }
+            communityCloud {
+                stockStatus
+                gpuAvailability {
+                    available
+                    stockStatus
+                }
+            }
+            secureCloud {
+                stockStatus
+                gpuAvailability {
+                    available
+                    stockStatus
+                }
+            }
+        }
+    }
+    """
+    data = graphql(api_key, query, {"id": gpu_id})
+    if not data:
+        return {}
+    types = data.get("gpuTypes", [])
+    return types[0] if types else {}
+
+
+def get_stock_label(gpu_detail: dict) -> str:
+    """Get a human-readable stock label from GPU detail."""
+    community = gpu_detail.get("communityCloud", {})
+    secure = gpu_detail.get("secureCloud", {})
+
+    comm_status = community.get("stockStatus", "").lower() if community else ""
+    sec_status = secure.get("stockStatus", "").lower() if secure else ""
+
+    # Check availability arrays
+    comm_avail = False
+    if community and community.get("gpuAvailability"):
+        for a in community["gpuAvailability"]:
+            if a.get("available", False):
+                comm_avail = True
+                break
+
+    sec_avail = False
+    if secure and secure.get("gpuAvailability"):
+        for a in secure["gpuAvailability"]:
+            if a.get("available", False):
+                sec_avail = True
+                break
+
+    if comm_avail or sec_avail:
+        return "IN STOCK"
+    elif "high" in comm_status or "high" in sec_status:
+        return "HIGH"
+    elif "medium" in comm_status or "medium" in sec_status:
+        return "MEDIUM"
+    elif "low" in comm_status or "low" in sec_status:
+        return "LOW"
+    elif "unavailable" in comm_status and "unavailable" in sec_status:
+        return "SOLD OUT"
+    elif comm_status or sec_status:
+        return (comm_status or sec_status).upper()
+    else:
+        return "?"
 
 
 # ─── Core Operations ────────────────────────────────────────────────
@@ -189,7 +258,6 @@ def show_pods(api_key: str):
         gpu = p.get("machine", {}).get("gpuDisplayName", "?")
         cost = p.get("costPerHr", "?")
 
-        # Status indicator
         if status == "RUNNING":
             indicator = "●"
         elif status == "EXITED":
@@ -215,7 +283,6 @@ def show_pods(api_key: str):
             print(f"    ComfyUI:   https://{pod_id}-8199.proxy.runpod.net")
             print(f"    Jupyter:   https://{pod_id}-8888.proxy.runpod.net")
 
-            # GPU utilization
             if runtime and runtime.get("gpus"):
                 for g in runtime["gpus"]:
                     gpu_util = g.get("gpuUtilPercent", 0)
@@ -228,15 +295,8 @@ def show_pods(api_key: str):
 def deploy_pod(api_key: str, gpu_type_id: str, volume_gb: int = VOLUME_GB, container_disk_gb: int = CONTAINER_DISK_GB):
     """Deploy a new pod on RunPod."""
 
-    # Check GPU availability first
-    gpu_info = check_gpu_availability(api_key, gpu_type_id)
-    if gpu_info:
-        price = gpu_info.get("communityPrice") or gpu_info.get("securePrice") or "?"
-        print(f"  GPU:    {gpu_info.get('displayName', gpu_type_id)} ({gpu_info.get('memoryInGb', '?')} GB)")
-        print(f"  Price:  ~${price}/hr")
-    else:
-        print(f"  GPU:    {gpu_type_id}")
-
+    # Show what we're deploying
+    print(f"  GPU:    {gpu_type_id}")
     print(f"  Image:  {DOCKER_IMAGE}")
     print(f"  Volume: {volume_gb} GB  |  Disk: {container_disk_gb} GB")
     print(f"  Ports:  3000 (Frontend) · 8199 (ComfyUI) · 8888 (Jupyter) · 22 (SSH)")
@@ -299,7 +359,7 @@ def deploy_pod(api_key: str, gpu_type_id: str, volume_gb: int = VOLUME_GB, conta
     print("  ║              Pod Deployed Successfully            ║")
     print("  ╠═══════════════════════════════════════════════════╣")
     print(f"  ║  Pod ID:   {pod_id:<39} ║")
-    print(f"  ║  Cost:     ${cost}/hr{' ' * (36 - len(str(cost)))} ║")
+    print(f"  ║  Cost:     ${cost}/hr{' ' * max(0, 36 - len(str(cost)))} ║")
     print("  ╠═══════════════════════════════════════════════════╣")
     print("  ║  URLs (ready in ~2-3 min):                       ║")
     print(f"  ║  Frontend: https://{pod_id}-3000.proxy.runpod.net  ║")
@@ -327,7 +387,7 @@ def stop_pod(api_key: str, pod_id: str):
     if data:
         pod = data.get("podStop", {})
         print(f"\n  Pod {pod.get('id', pod_id)} stopped.")
-        print(f"  Volume preserved — resume anytime from RunPod console.\n")
+        print(f"  Volume preserved — resume anytime.\n")
 
 
 def resume_pod(api_key: str, pod_id: str, gpu_type_id: str = None):
@@ -369,35 +429,39 @@ def terminate_pod(api_key: str, pod_id: str):
     print(f"\n  Pod {pod_id} terminated and deleted.\n")
 
 
-def list_gpus(api_key: str):
-    """List available GPU types on RunPod with pricing."""
-    query = """
-    query {
-        gpuTypes {
-            id
-            displayName
-            memoryInGb
-            communityPrice
-            securePrice
-        }
-    }
-    """
-    data = graphql(api_key, query)
-    if not data:
-        return
-    gpus = data.get("gpuTypes", [])
-    gpus.sort(key=lambda g: g.get("memoryInGb", 0), reverse=True)
+def list_gpus(api_key: str, show_all: bool = False):
+    """List GPU types with pricing and live stock status."""
+    print("  Fetching GPU list with availability...\n")
 
-    print(f"\n  {'GPU':<35} {'VRAM':<8} {'$/hr':<8} {'ID'}")
-    print(f"  {'─' * 35} {'─' * 8} {'─' * 8} {'─' * 30}")
-    for g in gpus:
+    gpus = fetch_gpus_with_stock(api_key)
+    if not gpus:
+        print("  Could not fetch GPU list.\n")
+        return
+
+    # Filter to GPUs with enough VRAM (unless show_all)
+    if not show_all:
+        gpus = [g for g in gpus if (g.get("memoryInGb") or 0) >= MIN_VRAM_GB]
+
+    # Sort by VRAM descending, then price
+    gpus.sort(key=lambda g: (-(g.get("memoryInGb") or 0), g.get("communityPrice") or 999))
+
+    print(f"  {'#':<4} {'GPU':<35} {'VRAM':<8} {'$/hr':<8} {'ID (for --gpu flag)'}")
+    print(f"  {'─' * 4} {'─' * 35} {'─' * 8} {'─' * 8} {'─' * 35}")
+
+    for i, g in enumerate(gpus, 1):
         name = g.get("displayName", g.get("id", "?"))
         mem = f"{g.get('memoryInGb', '?')} GB"
         price = g.get("communityPrice") or g.get("securePrice") or "?"
-        price_str = f"${price}" if price != "?" else "?"
+        price_str = f"${price}" if price != "?" else "N/A"
         gid = g.get("id", "?")
-        print(f"  {name:<35} {mem:<8} {price_str:<8} {gid}")
+        print(f"  {i:<4} {name:<35} {mem:<8} {price_str:<8} {gid}")
+
+    print(f"\n  Showing {len(gpus)} GPUs with >= {MIN_VRAM_GB} GB VRAM")
+    if not show_all:
+        print(f"  (Use --list --all to see ALL GPUs)")
     print()
+
+    return gpus
 
 
 # ─── Interactive Menu ────────────────────────────────────────────────
@@ -431,7 +495,7 @@ def interactive_menu(api_key: str, volume_gb: int, container_disk_gb: int):
 
         # Menu
         print("  ─── Actions ─────────────────────────────────────")
-        print("  [D]  Deploy new pod (pick GPU)")
+        print("  [D]  Deploy new pod (live GPU list)")
         print("  [P]  View all pods (detailed)")
         print("  [R]  Resume a stopped pod")
         print("  [S]  Stop a running pod")
@@ -445,10 +509,11 @@ def interactive_menu(api_key: str, volume_gb: int, container_disk_gb: int):
         if choice == "D":
             clear_screen()
             print_header()
-            gpu = gpu_picker_with_availability(api_key)
-            if gpu:
-                deploy_pod(api_key, gpu, volume_gb, container_disk_gb)
-                input("  Press Enter to continue...")
+            gpu_id = live_gpu_picker(api_key)
+            if gpu_id:
+                print()
+                deploy_pod(api_key, gpu_id, volume_gb, container_disk_gb)
+            input("  Press Enter to continue...")
 
         elif choice == "P":
             clear_screen()
@@ -527,36 +592,83 @@ def interactive_menu(api_key: str, volume_gb: int, container_disk_gb: int):
             break
 
         else:
-            pass  # Invalid choice, just loop
+            pass
 
 
-def gpu_picker_with_availability(api_key: str) -> str | None:
-    """Show GPU menu with live availability check."""
-    print("  ─── Select GPU ──────────────────────────────────\n")
-    for key, (name, vram, desc) in GPU_PRESETS.items():
-        print(f"  [{key}]  {name:<30} {vram:<8} {desc}")
-    print(f"  [C]  Custom GPU ID")
+def live_gpu_picker(api_key: str) -> str:
+    """Fetch live GPU list and let user pick one by number."""
+    print("  ─── Available GPUs ──────────────────────────────\n")
+    print("  Fetching live GPU data...\n")
+
+    gpus = fetch_gpus_with_stock(api_key)
+    if not gpus:
+        print("  Could not fetch GPU list.\n")
+        return None
+
+    # Filter to suitable GPUs (>= MIN_VRAM_GB)
+    suitable = [g for g in gpus if (g.get("memoryInGb") or 0) >= MIN_VRAM_GB]
+
+    # Sort: price ascending (cheapest first that can run our workloads)
+    suitable.sort(key=lambda g: g.get("communityPrice") or g.get("securePrice") or 999)
+
+    if not suitable:
+        print(f"  No GPUs found with >= {MIN_VRAM_GB} GB VRAM.\n")
+        return None
+
+    # Check stock for each GPU and display
+    print(f"  {'#':<4} {'GPU':<32} {'VRAM':<8} {'$/hr':<8} {'Stock'}")
+    print(f"  {'─' * 4} {'─' * 32} {'─' * 8} {'─' * 8} {'─' * 10}")
+
+    gpu_stock = []
+    for i, g in enumerate(suitable, 1):
+        name = g.get("displayName", g.get("id", "?"))
+        mem = f"{g.get('memoryInGb', '?')} GB"
+        price = g.get("communityPrice") or g.get("securePrice") or "?"
+        price_str = f"${price}" if price != "?" else "N/A"
+        gid = g.get("id", "?")
+
+        # Check stock for this GPU
+        detail = check_stock(api_key, gid)
+        stock = get_stock_label(detail) if detail else "?"
+        gpu_stock.append((g, stock))
+
+        # Color coding via symbols
+        if stock == "IN STOCK":
+            marker = "  ✓"
+        elif stock in ("HIGH", "MEDIUM"):
+            marker = "  ~"
+        elif stock in ("LOW",):
+            marker = "  !"
+        else:
+            marker = "  ✗"
+
+        print(f"  {i:<4} {name:<32} {mem:<8} {price_str:<8} {stock}{marker}")
+
+    print()
+    print(f"  ✓ = available   ~ = limited   ! = low   ✗ = sold out")
     print()
 
-    choice = input("  Select GPU [1-8, C, or Q to cancel]: ").strip().upper()
+    choice = input("  Select GPU [number, or Q to cancel]: ").strip().upper()
 
     if choice == "Q":
         return None
-    elif choice == "C":
-        gpu_id = input("  Enter GPU type ID: ").strip()
-        return gpu_id if gpu_id else None
-    elif choice in GPU_PRESETS:
-        gpu_id = GPU_PRESETS[choice][0]
-        print(f"\n  Checking availability for {gpu_id}...", end="", flush=True)
-        info = check_gpu_availability(api_key, gpu_id)
-        if info:
-            print(f" found!")
+
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(suitable):
+            selected = suitable[idx]
+            gpu_id = selected.get("id", "?")
+            print(f"\n  Selected: {selected.get('displayName', gpu_id)} ({gpu_id})")
+            return gpu_id
         else:
-            print(f" (could not verify, trying anyway)")
-        print()
-        return gpu_id
-    else:
-        print(f"  Invalid choice.")
+            print("  Invalid number.")
+            return None
+    except ValueError:
+        # Maybe they typed a GPU ID directly
+        for g in gpus:
+            if choice.lower() in (g.get("id", "").lower(), g.get("displayName", "").lower()):
+                return g["id"]
+        print("  Invalid selection.")
         return None
 
 
@@ -568,9 +680,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python deploy.py                      Interactive menu
-  python deploy.py --gpu "RTX 4090"     Deploy with specific GPU
-  python deploy.py --list               List all available GPUs
+  python deploy.py                      Interactive menu with live GPU stock
+  python deploy.py --gpu "RTX A6000"    Deploy with specific GPU (use ID from --list)
+  python deploy.py --list               List all GPUs with pricing
   python deploy.py --pods               List your running pods
   python deploy.py --stop <pod_id>      Stop pod (preserves volume)
   python deploy.py --resume <pod_id>    Resume a stopped pod
@@ -580,7 +692,7 @@ Environment:
   RUNPOD_API_KEY    Your RunPod API key (or will be prompted)
         """,
     )
-    parser.add_argument("--gpu", type=str, help="GPU type ID or name — deploy directly")
+    parser.add_argument("--gpu", type=str, help="GPU type ID — deploy directly (use exact ID from --list)")
     parser.add_argument("--list", action="store_true", help="List available GPU types")
     parser.add_argument("--pods", action="store_true", help="List your current pods")
     parser.add_argument("--stop", type=str, metavar="POD_ID", help="Stop a pod")
@@ -596,8 +708,8 @@ Environment:
 
     api_key = get_api_key()
 
-    # Direct CLI commands
     if args.list:
+        print_header()
         list_gpus(api_key)
     elif args.pods:
         print_header()
@@ -612,7 +724,6 @@ Environment:
         print_header()
         deploy_pod(api_key, args.gpu, volume_gb, container_disk_gb)
     else:
-        # Interactive menu
         interactive_menu(api_key, volume_gb, container_disk_gb)
 
 

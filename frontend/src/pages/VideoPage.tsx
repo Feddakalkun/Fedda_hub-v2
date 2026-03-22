@@ -21,6 +21,7 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     const { lastCompletedPromptId, lastOutputVideos, outputReadyCount } = useComfyExecution();
+    const expectedPrefix = modelId === 'ltx-i2v' ? 'VIDEO/LTX23/I2V' : modelId === 'ltx-t2v' ? 'VIDEO/LTX23/T2V' : null;
 
     useEffect(() => {
         if (!lastCompletedPromptId) return;
@@ -28,12 +29,17 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
         const fetchVideos = async () => {
             try {
                 if (lastOutputVideos.length > 0) {
-                    const urls = lastOutputVideos.map((v) =>
+                    const scoped = expectedPrefix
+                        ? lastOutputVideos.filter((v) => v.filename?.startsWith(expectedPrefix))
+                        : lastOutputVideos;
+                    const urls = scoped.map((v) =>
                         comfyService.getImageUrl(v.filename, v.subfolder, v.type)
                     );
-                    setVideoUrls(urls);
-                    setActiveVideoIndex(urls.length - 1);
-                    return;
+                    if (urls.length > 0) {
+                        setVideoUrls(urls);
+                        setActiveVideoIndex(urls.length - 1);
+                        return;
+                    }
                 }
 
                 const history = await comfyService.getHistory(lastCompletedPromptId);
@@ -42,14 +48,16 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                     const urls: string[] = [];
                     Object.values(results.outputs).forEach((nodeOutput: any) => {
                         if (nodeOutput.gifs) {
-                            nodeOutput.gifs.forEach((v: any) =>
-                                urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type))
-                            );
+                            nodeOutput.gifs.forEach((v: any) => {
+                                if (expectedPrefix && !String(v.filename || '').startsWith(expectedPrefix)) return;
+                                urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type));
+                            });
                         }
                         if (nodeOutput.videos) {
-                            nodeOutput.videos.forEach((v: any) =>
-                                urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type))
-                            );
+                            nodeOutput.videos.forEach((v: any) => {
+                                if (expectedPrefix && !String(v.filename || '').startsWith(expectedPrefix)) return;
+                                urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type));
+                            });
                         }
                     });
                     if (urls.length > 0) {
@@ -63,7 +71,7 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
         };
 
         fetchVideos();
-    }, [lastCompletedPromptId, outputReadyCount, lastOutputVideos]);
+    }, [lastCompletedPromptId, outputReadyCount, lastOutputVideos, expectedPrefix]);
 
     return (
         <WorkbenchShell

@@ -8,10 +8,10 @@ import { usePersistentState } from '../../hooks/usePersistentState';
 
 type PresetTier = 'fast' | 'balanced' | 'quality';
 
-const PRESETS: Record<PresetTier, { label: string; description: string; steps: number; cfg: number }> = {
-    fast: { label: 'Fast', description: 'Quick iterations', steps: 16, cfg: 4.0 },
-    balanced: { label: 'Balanced', description: 'Social-ready quality', steps: 24, cfg: 4.5 },
-    quality: { label: 'Quality', description: 'Hero shots, best detail', steps: 36, cfg: 4.2 },
+const PRESETS: Record<PresetTier, { label: string; description: string; steps: number; cfg: number; fps: number }> = {
+    fast: { label: 'Fast', description: 'Quick iterations', steps: 12, cfg: 3.8, fps: 16 },
+    balanced: { label: 'Balanced', description: 'Social-ready quality', steps: 18, cfg: 4.2, fps: 20 },
+    quality: { label: 'Quality', description: 'Hero shots, best detail', steps: 28, cfg: 4.0, fps: 24 },
 };
 
 const RESOLUTIONS = [
@@ -37,9 +37,12 @@ export const LtxT2vTab = () => {
     const [cfg, setCfg] = usePersistentState('ltx_t2v_cfg', PRESETS.balanced.cfg);
     const [seed, setSeed] = usePersistentState('ltx_t2v_seed', -1);
     const [showAdvanced, setShowAdvanced] = usePersistentState('ltx_t2v_show_advanced', false);
+    const [safeModeCpuLoader, setSafeModeCpuLoader] = usePersistentState('ltx_t2v_safe_mode_cpu_loader', false);
     const [isGenerating, setIsGenerating] = useState(false);
 
     const resolution = RESOLUTIONS[resolutionIdx] || RESOLUTIONS[2];
+    const targetFps = PRESETS[preset].fps;
+    const targetFrames = duration * targetFps + 1;
 
     const applyPreset = (tier: PresetTier) => {
         setPreset(tier);
@@ -56,8 +59,7 @@ export const LtxT2vTab = () => {
         setIsGenerating(true);
 
         try {
-            // Clear VRAM
-            try { await comfyService.freeMemory(true, true); } catch {}
+            // Intentionally keep models in memory between runs for faster iteration.
 
             // Load official LTX-2.3 single-stage workflow (same as I2V, but with bypass_i2v=true)
             const response = await fetch(`/workflows/ltx23-single-stage-api.json?v=${Date.now()}`);
@@ -83,8 +85,13 @@ export const LtxT2vTab = () => {
             // Node 2612: CLIPTextEncode (negative prompt)
             if (workflow['2612']) workflow['2612'].inputs.text = negativePrompt;
 
-            // Node 4979: Number of frames (duration * fps + 1)
-            if (workflow['4979']) workflow['4979'].inputs.value = duration * 24 + 1;
+            // Node 4960: LTXAVTextEncoderLoader
+            // Safe mode can force CPU loading to avoid occasional Windows torch access violations.
+            if (workflow['4960']) workflow['4960'].inputs.device = safeModeCpuLoader ? 'cpu' : 'default';
+
+            // Node 4978/4979: fps + number of frames
+            if (workflow['4978']) workflow['4978'].inputs.value = targetFps;
+            if (workflow['4979']) workflow['4979'].inputs.value = targetFrames;
 
             // Node 4814: RandomNoise (seed - distilled pass)
             if (workflow['4814']) workflow['4814'].inputs.noise_seed = activeSeed;
@@ -98,8 +105,20 @@ export const LtxT2vTab = () => {
             // Node 4966: LTXVScheduler (steps)
             if (workflow['4966']) workflow['4966'].inputs.steps = steps;
 
-            // Node 4852: SaveVideo output prefix
-            if (workflow['4852']) workflow['4852'].inputs.filename_prefix = 'VIDEO/LTX23';
+            // Fast preset: skip expensive refinement branch by saving distilled pass output.
+            if (preset === 'fast') {
+                if (workflow['4852']) {
+                    workflow['4852'].inputs.video = ['4819', 0];
+                    workflow['4852'].inputs.filename_prefix = 'VIDEO/LTX23/T2V_FAST';
+                }
+                if (workflow['4823']) workflow['4823'].inputs.filename_prefix = 'VIDEO/LTX23/T2V_FAST_ALT';
+            } else {
+                if (workflow['4852']) {
+                    workflow['4852'].inputs.video = ['4849', 0];
+                    workflow['4852'].inputs.filename_prefix = 'VIDEO/LTX23/T2V';
+                }
+                if (workflow['4823']) workflow['4823'].inputs.filename_prefix = 'VIDEO/LTX23/T2V_ALT';
+            }
 
             await queueWorkflow(workflow);
             toast('LTX Text-to-Video queued!', 'success');
@@ -231,6 +250,18 @@ export const LtxT2vTab = () => {
                                 onChange={(e) => setNegativePrompt(e.target.value)}
                                 className="w-full h-16 bg-black border border-white/5 rounded-lg p-2 text-[10px] text-slate-400 focus:outline-none focus:border-white/20 resize-none"
                             />
+                        </div>
+                        <div>
+                            <button
+                                onClick={() => setSafeModeCpuLoader(!safeModeCpuLoader)}
+                                className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                    safeModeCpuLoader
+                                        ? 'bg-white text-black border-white'
+                                        : 'bg-black text-slate-300 border-white/10 hover:border-white/30'
+                                }`}
+                            >
+                                Safe Mode CPU Loader {safeModeCpuLoader ? 'ON' : 'OFF'}
+                            </button>
                         </div>
                     </div>
                 )}

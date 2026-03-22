@@ -44,6 +44,8 @@ export const BACKEND_API = {
         AUDIO_TTS: '/api/audio/tts',
         AUDIO_REFERENCE_INFO: '/api/audio/reference-info',
         VIDEO_LIPSYNC: '/api/video/lipsync',
+        VIDEO_ANALYZE_PROMPT: '/api/video/analyze-image-prompt',
+        OLLAMA_VISION_MODELS: '/api/ollama/vision-models',
         HARDWARE_STATS: '/api/hardware/stats',
     },
 };

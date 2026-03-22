@@ -5,6 +5,8 @@ Runs on port 8000
 import sys
 import threading
 import requests
+import base64
+import re
 from pathlib import Path
 
 # Add backend directory to Python path
@@ -1410,6 +1412,159 @@ async def tiktok_serve_file(path: str):
 class ChatRequest(BaseModel):
     messages: list
     model: str = "qwen2.5-3b-instruct"
+
+
+def _parse_vision_prompt_response(raw: str):
+    """Parse model output into (description, suggestions) with forgiving fallbacks."""
+    text = (raw or "").strip()
+    if not text:
+        return "", []
+
+    # Remove fenced markdown wrappers.
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+
+    # Try full JSON first.
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        parsed = None
+
+    # Try extracting first JSON object if model surrounded it with prose.
+    if parsed is None:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                parsed = json.loads(text[start:end + 1])
+            except Exception:
+                parsed = None
+
+    if isinstance(parsed, dict):
+        description = str(parsed.get("description", "")).strip()
+        suggestions = parsed.get("suggestions", [])
+        if not isinstance(suggestions, list):
+            suggestions = []
+        suggestions = [str(s).strip() for s in suggestions if str(s).strip()]
+        return description, suggestions[:3]
+
+    # Plain text fallback:
+    lines = [ln.strip("-* \t") for ln in text.splitlines() if ln.strip()]
+    description = lines[0] if lines else text[:180]
+    suggestions = []
+    for ln in lines[1:]:
+        if len(ln) > 20:
+            suggestions.append(ln)
+        if len(suggestions) >= 3:
+            break
+    return description, suggestions
+
+
+@app.get("/api/ollama/vision-models")
+async def ollama_vision_models():
+    """Return installed Ollama models that are likely vision-capable."""
+    try:
+        resp = requests.get("http://127.0.0.1:11434/api/tags", timeout=10)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Ollama returned HTTP {resp.status_code}")
+
+        data = resp.json()
+        models = data.get("models", []) if isinstance(data, dict) else []
+        names = []
+        for m in models:
+            name = str(m.get("name", "")).strip()
+            if not name:
+                continue
+            lowered = name.lower()
+            if any(k in lowered for k in ["vision", "llava", "joycaption", "moondream", "minicpm-v"]):
+                names.append(name)
+
+        names = sorted(set(names))
+        return {"success": True, "models": names, "default": names[0] if names else "llava"}
+    except HTTPException:
+        raise
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Ollama request failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/video/analyze-image-prompt")
+async def analyze_image_prompt(
+    image: UploadFile = File(...),
+    model: str = Form("llava"),
+):
+    """
+    Analyze a source image with a vision model and return:
+    - short scene description
+    - 3 motion prompt suggestions for Image-to-Video
+    """
+    try:
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Empty image upload")
+
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert prompt engineer for image-to-video generation. "
+                    "Return ONLY valid JSON with keys: description (string), suggestions (array of 3 strings). "
+                    "Each suggestion must describe realistic motion/camera action while preserving identity/style of the source image."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Analyze this image. "
+                    "1) Write a concise visual description (1-2 sentences). "
+                    "2) Provide exactly 3 different motion prompt ideas for image-to-video. "
+                    "The prompts should be cinematic, specific, and production-ready."
+                ),
+                "images": [image_b64],
+            },
+        ]
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {"num_predict": 500, "num_ctx": 4096},
+        }
+
+        resp = requests.post("http://127.0.0.1:11434/api/chat", json=payload, timeout=90)
+        if resp.status_code != 200:
+            detail = resp.text[:400] if resp.text else f"Ollama returned HTTP {resp.status_code}"
+            raise HTTPException(status_code=500, detail=detail)
+
+        out = resp.json()
+        content = out.get("message", {}).get("content", "").strip()
+        if not content:
+            raise HTTPException(status_code=500, detail="Vision model returned empty response")
+
+        description, suggestions = _parse_vision_prompt_response(content)
+
+        # Robust fallback if model didn't follow format perfectly.
+        if not description:
+            description = "Image analyzed, but the model did not return a structured description."
+        while len(suggestions) < 3:
+            suggestions.append("Subtle camera push-in while the subject naturally shifts posture and expression.")
+
+        return {
+            "success": True,
+            "description": description,
+            "suggestions": suggestions,
+            "model": model,
+        }
+    except HTTPException:
+        raise
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Ollama request failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat")
 async def chat_with_llm(request: ChatRequest):

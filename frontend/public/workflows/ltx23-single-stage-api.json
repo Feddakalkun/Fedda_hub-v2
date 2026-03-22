@@ -456,13 +456,13 @@
   },
   "4960": {
     "inputs": {
-      "gemma_path": "comfy_gemma_3_12B_it.safetensors",
-      "ltxv_path": "ltx-2.3-22b-dev.safetensors",
-      "max_length": 1024
+      "text_encoder": "comfy_gemma_3_12B_it.safetensors",
+      "ckpt_name": "ltx-2.3-22b-dev.safetensors",
+      "device": "default"
     },
-    "class_type": "LTXVGemmaCLIPModelLoader",
+    "class_type": "LTXAVTextEncoderLoader",
     "_meta": {
-      "title": "LTXVGemmaCLIPModelLoader"
+      "title": "LTXAVTextEncoderLoader"
     }
   },
   "2612": {

@@ -131,25 +131,11 @@ def check_stock(api_key: str, gpu_id: str) -> dict:
             id
             displayName
             memoryInGb
-            communityPrice
-            securePrice
+            communityCloud
+            secureCloud
             lowestPrice(input: { gpuCount: 1 }) {
                 minimumBidPrice
                 uninterruptablePrice
-            }
-            communityCloud {
-                stockStatus
-                gpuAvailability {
-                    available
-                    stockStatus
-                }
-            }
-            secureCloud {
-                stockStatus
-                gpuAvailability {
-                    available
-                    stockStatus
-                }
             }
         }
     }
@@ -163,41 +149,18 @@ def check_stock(api_key: str, gpu_id: str) -> dict:
 
 def get_stock_label(gpu_detail: dict) -> str:
     """Get a human-readable stock label from GPU detail."""
-    community = gpu_detail.get("communityCloud", {})
-    secure = gpu_detail.get("secureCloud", {})
+    # communityCloud and secureCloud are booleans indicating availability
+    community = gpu_detail.get("communityCloud", False)
+    secure = gpu_detail.get("secureCloud", False)
 
-    comm_status = community.get("stockStatus", "").lower() if community else ""
-    sec_status = secure.get("stockStatus", "").lower() if secure else ""
-
-    # Check availability arrays
-    comm_avail = False
-    if community and community.get("gpuAvailability"):
-        for a in community["gpuAvailability"]:
-            if a.get("available", False):
-                comm_avail = True
-                break
-
-    sec_avail = False
-    if secure and secure.get("gpuAvailability"):
-        for a in secure["gpuAvailability"]:
-            if a.get("available", False):
-                sec_avail = True
-                break
-
-    if comm_avail or sec_avail:
+    if community and secure:
         return "IN STOCK"
-    elif "high" in comm_status or "high" in sec_status:
-        return "HIGH"
-    elif "medium" in comm_status or "medium" in sec_status:
-        return "MEDIUM"
-    elif "low" in comm_status or "low" in sec_status:
-        return "LOW"
-    elif "unavailable" in comm_status and "unavailable" in sec_status:
-        return "SOLD OUT"
-    elif comm_status or sec_status:
-        return (comm_status or sec_status).upper()
+    elif community:
+        return "COMMUNITY"
+    elif secure:
+        return "SECURE"
     else:
-        return "?"
+        return "SOLD OUT"
 
 
 # ─── Core Operations ────────────────────────────────────────────────
@@ -633,19 +596,17 @@ def live_gpu_picker(api_key: str) -> str:
         gpu_stock.append((g, stock))
 
         # Color coding via symbols
-        if stock == "IN STOCK":
+        if stock in ("IN STOCK", "COMMUNITY", "SECURE"):
             marker = "  ✓"
-        elif stock in ("HIGH", "MEDIUM"):
-            marker = "  ~"
-        elif stock in ("LOW",):
-            marker = "  !"
-        else:
+        elif stock == "SOLD OUT":
             marker = "  ✗"
+        else:
+            marker = "  ?"
 
         print(f"  {i:<4} {name:<32} {mem:<8} {price_str:<8} {stock}{marker}")
 
     print()
-    print(f"  ✓ = available   ~ = limited   ! = low   ✗ = sold out")
+    print(f"  ✓ = available   ✗ = sold out")
     print()
 
     choice = input("  Select GPU [number, or Q to cancel]: ").strip().upper()

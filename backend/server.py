@@ -18,7 +18,15 @@ from fastapi.responses import FileResponse
 import uvicorn
 from audio_service import transcribe_audio, save_temp_audio, cleanup_temp_audio, text_to_speech, get_available_voices, unload_audio_models
 from lipsync_service import generate_lipsync
-from lora_service import start_lora_download, get_download_status, refresh_comfy_models, sync_premium_folder, get_installed_premium_loras
+from lora_service import (
+    start_lora_download,
+    get_download_status,
+    refresh_comfy_models,
+    sync_premium_folder,
+    get_installed_premium_loras,
+    start_zimage_turbo_sync,
+    get_zimage_turbo_sync_status,
+)
 try:
     import tiktok_service
 except ImportError as e:
@@ -376,6 +384,29 @@ async def list_installed_loras():
     try:
         installed = get_installed_premium_loras()
         return {"success": True, "installed": installed}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/lora/sync-zimage-turbo")
+async def sync_zimage_turbo_loras(limit: Optional[int] = None):
+    """
+    Start background sync for HF repo: pmczip/Z-Image-Turbo_Models
+    Downloads to ComfyUI/models/loras/zimage_turbo and skips existing files.
+    """
+    try:
+        result = start_zimage_turbo_sync(limit=limit)
+        return {"success": True, **result}
+    except Exception as e:
+        print(f"[ERROR] Sync Z-Image Turbo error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/lora/sync-zimage-turbo/status")
+async def get_sync_zimage_turbo_status():
+    try:
+        status = get_zimage_turbo_sync_status()
+        return {"success": True, **status}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1494,6 +1525,70 @@ class ChatRequest(BaseModel):
     messages: list
     model: str = "qwen2.5-3b-instruct"
 
+CHAT_MODEL_ALIASES = {
+    "qwen2.5-3b-instruct": ["qwen2.5:3b", "qwen2.5:3b-instruct", "goonsai/qwen2.5-3B-goonsai-nsfw-100k:latest"],
+    "llama-3.2-3b": ["llama3.2:3b", "llama3.2:latest", "dolphin-llama3:latest", "zarigata/unfiltered-llama3:latest"],
+}
+
+
+def _is_vision_model_name(model_name: str) -> bool:
+    lowered = (model_name or "").lower()
+    return any(k in lowered for k in ["vision", "llava", "joycaption", "moondream", "minicpm-v"])
+
+
+def _fetch_ollama_models() -> list[str]:
+    resp = requests.get("http://127.0.0.1:11434/api/tags", timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+    models = data.get("models", []) if isinstance(data, dict) else []
+    names: list[str] = []
+    for m in models:
+        name = str(m.get("name", "")).strip()
+        if name:
+            names.append(name)
+    return sorted(set(names))
+
+
+def _resolve_chat_model(requested_model: str, available_models: list[str]) -> str:
+    if not available_models:
+        return requested_model
+
+    requested = (requested_model or "").strip()
+    available_lower = {m.lower(): m for m in available_models}
+
+    if requested.lower() in available_lower:
+        return available_lower[requested.lower()]
+
+    if requested and ":" not in requested and f"{requested.lower()}:latest" in available_lower:
+        return available_lower[f"{requested.lower()}:latest"]
+
+    for alias in CHAT_MODEL_ALIASES.get(requested.lower(), []):
+        if alias.lower() in available_lower:
+            return available_lower[alias.lower()]
+
+    non_vision = [m for m in available_models if not _is_vision_model_name(m)]
+    return non_vision[0] if non_vision else available_models[0]
+
+def _pick_default_chat_model(available_models: list[str]) -> str:
+    if not available_models:
+        return ""
+    non_vision = [m for m in available_models if not _is_vision_model_name(m)]
+    candidates = non_vision if non_vision else available_models
+    preferred_order = [
+        "qwen2.5",
+        "qwen",
+        "llama3.2",
+        "llama",
+        "gpt-oss",
+        "dolphin",
+    ]
+    lowered = [(m, m.lower()) for m in candidates]
+    for pref in preferred_order:
+        for original, low in lowered:
+            if pref in low:
+                return original
+    return candidates[0]
+
 
 def _parse_vision_prompt_response(raw: str):
     """Parse model output into (description, suggestions) with forgiving fallbacks."""
@@ -1647,6 +1742,22 @@ async def analyze_image_prompt(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/chat/models")
+async def get_chat_models():
+    """Return installed Ollama models suitable for text chat."""
+    try:
+        names = _fetch_ollama_models()
+        text_models = [m for m in names if not _is_vision_model_name(m)]
+        models = text_models if text_models else names
+        default_model = _pick_default_chat_model(models)
+        return {"success": True, "models": models, "default": default_model}
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Ollama request failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/chat")
 async def chat_with_llm(request: ChatRequest):
     """Chat using Ollama directly (local) or IF_AI_tools (RunPod)."""
@@ -1736,8 +1847,10 @@ async def chat_with_llm(request: ChatRequest):
     else:
         # Local: call Ollama directly
         try:
+            available_models = _fetch_ollama_models()
+            resolved_model = _resolve_chat_model(request.model, available_models)
             ollama_payload = json.dumps({
-                "model": request.model,
+                "model": resolved_model,
                 "messages": request.messages,
                 "stream": False,
                 "keep_alive": "30s",

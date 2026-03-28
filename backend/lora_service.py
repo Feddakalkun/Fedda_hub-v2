@@ -3,12 +3,24 @@ import re
 import requests
 from pathlib import Path
 import threading
+from typing import Optional
 
 # Global storage for tracking download progress
 download_progress = {}
 
 # Premium LoRA source (Google Drive folder)
 PREMIUM_DRIVE_FOLDER_ID = "1jdliAnhXJG2TdqU6tNi5tbpoAOPuJalv"
+ZIMAGE_TURBO_REPO = "pmczip/Z-Image-Turbo_Models"
+HF_TIMEOUT = 30
+
+zimage_sync_state = {
+    "status": "idle",  # idle | running | completed | error
+    "message": "",
+    "downloaded": 0,
+    "skipped": 0,
+    "total": 0,
+}
+_zimage_sync_lock = threading.Lock()
 
 
 def _get_gdrive_confirm_token(response):
@@ -102,10 +114,10 @@ def download_lora_task(url: str, filename: str, destination_dir: Path):
 
         if gdrive_match or 'drive.google.com' in url:
             file_id = gdrive_match.group(1) if gdrive_match else url.split('/')[-1]
-            print(f"📥 Google Drive download: {filename} (ID: {file_id})")
+            print(f"[DL] Google Drive download: {filename} (ID: {file_id})")
             _download_gdrive_file(file_id, dest_path, filename)
         else:
-            print(f"📥 HTTP download: {filename}")
+            print(f"[DL] HTTP download: {filename}")
             response = requests.get(url, stream=True, timeout=30)
             response.raise_for_status()
 
@@ -122,11 +134,11 @@ def download_lora_task(url: str, filename: str, destination_dir: Path):
                             download_progress[filename]["progress"] = progress
 
         download_progress[filename] = {"status": "completed", "progress": 100, "local_path": str(dest_path)}
-        print(f"✅ Downloaded: {filename} ({dest_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        print(f"[OK] Downloaded: {filename} ({dest_path.stat().st_size / 1024 / 1024:.1f} MB)")
         refresh_comfy_models()
 
     except Exception as e:
-        print(f"❌ Download error {filename}: {e}")
+        print(f"[ERROR] Download error {filename}: {e}")
         download_progress[filename] = {"status": "error", "message": str(e)}
         partial = destination_dir / filename
         if partial.exists() and partial.stat().st_size < 10000:
@@ -169,7 +181,7 @@ def sync_premium_folder(folder_id: str = None):
         }
 
     except Exception as e:
-        print(f"❌ Sync error: {e}")
+        print(f"[ERROR] Sync error: {e}")
         return {"status": "error", "message": str(e)}
 
 
@@ -180,10 +192,10 @@ def _download_gdrive_file_task(file_id: str, filename: str, dest_dir: Path):
         dest_path = dest_dir / filename
         _download_gdrive_file(file_id, dest_path, filename)
         download_progress[filename] = {"status": "completed", "progress": 100, "local_path": str(dest_path)}
-        print(f"✅ Synced: {filename} ({dest_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        print(f"[OK] Synced: {filename} ({dest_path.stat().st_size / 1024 / 1024:.1f} MB)")
         refresh_comfy_models()
     except Exception as e:
-        print(f"❌ Sync error for {filename}: {e}")
+        print(f"[ERROR] Sync error for {filename}: {e}")
         download_progress[filename] = {"status": "error", "message": str(e)}
 
 
@@ -224,3 +236,99 @@ def start_lora_download(url: str, filename: str):
 def get_download_status(filename: str):
     """Returns the current status of a specific download."""
     return download_progress.get(filename, {"status": "not_found"})
+
+
+def _list_hf_safetensors(repo_id: str):
+    """List .safetensors files in an HF model repo root."""
+    url = f"https://huggingface.co/api/models/{repo_id}/tree/main"
+    response = requests.get(url, timeout=HF_TIMEOUT)
+    response.raise_for_status()
+    items = response.json() if isinstance(response.json(), list) else []
+    files = []
+    for item in items:
+        path = str(item.get("path", "")).strip()
+        if path.lower().endswith(".safetensors") and "/" not in path:
+            files.append(path)
+    return sorted(set(files))
+
+
+def _resolve_hf_file_url(repo_id: str, filename: str) -> str:
+    return f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+
+
+def _run_zimage_turbo_sync(limit: Optional[int] = None):
+    target_dir = Path(__file__).parent.parent / "ComfyUI" / "models" / "loras" / "zimage_turbo"
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    with _zimage_sync_lock:
+        zimage_sync_state.update({
+            "status": "running",
+            "message": "Fetching file list...",
+            "downloaded": 0,
+            "skipped": 0,
+            "total": 0,
+        })
+
+    try:
+        files = _list_hf_safetensors(ZIMAGE_TURBO_REPO)
+        if limit is not None and limit > 0:
+            files = files[:limit]
+
+        with _zimage_sync_lock:
+            zimage_sync_state["total"] = len(files)
+            zimage_sync_state["message"] = f"Syncing {len(files)} LoRAs..."
+
+        downloaded = 0
+        skipped = 0
+
+        for idx, filename in enumerate(files, start=1):
+            dest = target_dir / filename
+            if dest.exists() and dest.stat().st_size > 10000:
+                skipped += 1
+                with _zimage_sync_lock:
+                    zimage_sync_state["skipped"] = skipped
+                    zimage_sync_state["message"] = f"Skipping existing ({idx}/{len(files)}): {filename}"
+                continue
+
+            url = _resolve_hf_file_url(ZIMAGE_TURBO_REPO, filename)
+            with _zimage_sync_lock:
+                zimage_sync_state["message"] = f"Downloading ({idx}/{len(files)}): {filename}"
+            download_lora_task(url, filename, target_dir)
+            if get_download_status(filename).get("status") == "completed":
+                downloaded += 1
+                with _zimage_sync_lock:
+                    zimage_sync_state["downloaded"] = downloaded
+
+        refresh_comfy_models()
+        with _zimage_sync_lock:
+            zimage_sync_state["status"] = "completed"
+            zimage_sync_state["message"] = f"Completed. Downloaded {downloaded}, skipped {skipped}."
+            zimage_sync_state["downloaded"] = downloaded
+            zimage_sync_state["skipped"] = skipped
+    except Exception as e:
+        with _zimage_sync_lock:
+            zimage_sync_state["status"] = "error"
+            zimage_sync_state["message"] = str(e)
+
+
+def start_zimage_turbo_sync(limit: Optional[int] = None):
+    """Start background sync of Z-Image Turbo celeb LoRAs from Hugging Face."""
+    with _zimage_sync_lock:
+        if zimage_sync_state.get("status") == "running":
+            return {"status": "running", "message": zimage_sync_state.get("message", "Already syncing")}
+        zimage_sync_state.update({
+            "status": "running",
+            "message": "Starting sync...",
+            "downloaded": 0,
+            "skipped": 0,
+            "total": 0,
+        })
+
+    thread = threading.Thread(target=_run_zimage_turbo_sync, args=(limit,), daemon=True)
+    thread.start()
+    return {"status": "started", "message": "Z-Image Turbo sync started in background"}
+
+
+def get_zimage_turbo_sync_status():
+    with _zimage_sync_lock:
+        return dict(zimage_sync_state)

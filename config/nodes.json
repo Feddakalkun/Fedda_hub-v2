@@ -60,6 +60,12 @@
     "folder": "ComfyUI-Custom-Scripts",
     "note": "ShowText|pysssss — debug display"
   },
+  {
+    "name": "comfy-image-saver",
+    "url": "https://github.com/giriss/comfy-image-saver.git",
+    "folder": "comfy-image-saver",
+    "note": "String Literal and enhanced image saver nodes used by FLUX2KLEIN workflows"
+  },
 
   {
     "name": "ComfyUI-Florence2",

@@ -1,22 +1,24 @@
 // Image Generation Page - Tab Container
 import { useState, useCallback, useEffect } from 'react';
-import { Sparkles, Image, Paintbrush, Layers, FileText } from 'lucide-react';
+import { Sparkles, Image, Paintbrush, Layers, FileText, Sun } from 'lucide-react';
 import { ModelDownloader } from '../components/ModelDownloader';
 import { ImageGallery } from '../components/image/ImageGallery';
 import { GenerateTab } from '../components/image/GenerateTab';
 import { HQPortraitTab } from '../components/image/HQPortraitTab';
 import { Img2ImgTab } from '../components/image/Img2ImgTab';
+import { MoodEditTab } from '../components/image/MoodEditTab';
 import { InpaintTab } from '../components/image/InpaintTab';
 import { MetadataTab } from '../components/image/MetadataTab';
 import { WorkbenchShell } from '../components/layout/WorkbenchShell';
 import { PageTabs } from '../components/layout/PageTabs';
 
-type ImageMode = 'generate' | 'hq' | 'img2img' | 'inpaint' | 'metadata';
+type ImageMode = 'generate' | 'hq' | 'img2img' | 'mood-edit' | 'inpaint' | 'metadata';
 
 const TABS: { id: ImageMode; label: string; icon: React.ElementType }[] = [
     { id: 'generate', label: 'GENERATE', icon: Sparkles },
     { id: 'hq', label: 'HQ PORTRAIT', icon: Layers },
     { id: 'img2img', label: 'IMG2IMG', icon: Image },
+    { id: 'mood-edit', label: 'MOOD EDIT', icon: Sun },
     { id: 'inpaint', label: 'INPAINT', icon: Paintbrush },
     { id: 'metadata', label: 'METADATA', icon: FileText },
 ];
@@ -71,6 +73,14 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
                                 onConsumeImage={() => setPendingImageUrl(null)}
                             />
                         </div>
+                        <div style={{ display: activeMode === 'mood-edit' ? undefined : 'none' }}>
+                            <MoodEditTab
+                                isGenerating={isGenerating}
+                                setIsGenerating={setIsGenerating}
+                                initialImageUrl={activeMode === 'mood-edit' ? pendingImageUrl : null}
+                                onConsumeImage={() => setPendingImageUrl(null)}
+                            />
+                        </div>
                         <div style={{ display: activeMode === 'inpaint' ? undefined : 'none' }}>
                             <InpaintTab
                                 isGenerating={isGenerating}
@@ -105,4 +115,3 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
         />
     );
 };
-

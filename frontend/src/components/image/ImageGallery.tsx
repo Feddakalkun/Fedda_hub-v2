@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles, Maximize2, X, Trash2, Video, FileText, Image, Paintbrush, Download } from 'lucide-react';
+import { Sparkles, Maximize2, X, Trash2, Video, FileText, Image, Paintbrush, Download, Sun } from 'lucide-react';
 import { comfyService } from '../../services/comfyService';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { useToast } from '../ui/Toast';
@@ -124,7 +124,7 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
     return (
         <>
             <div className="lg:col-span-1 bg-[#121218] border border-white/5 rounded-2xl p-1 flex flex-col relative overflow-hidden group min-h-[400px] animate-in slide-in-from-right-4 duration-500">
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20 pointer-events-none"></div>
 
                 {/* Generating indicator with live preview */}
                 {(isGenerating || execState === 'executing') && (
@@ -188,6 +188,9 @@ export const ImageGallery = ({ generatedImages, setGeneratedImages, isGenerating
                                             <>
                                                 <button onClick={(e) => { e.stopPropagation(); onSendToTab('img2img', img); }} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-full backdrop-blur-sm transition-all" title="Send to Img2Img">
                                                     <Image className="w-3.5 h-3.5 text-emerald-400" />
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); onSendToTab('mood-edit', img); }} className="p-2 bg-orange-500/20 hover:bg-orange-500/30 rounded-full backdrop-blur-sm transition-all" title="Send to Mood Edit">
+                                                    <Sun className="w-3.5 h-3.5 text-orange-300" />
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); onSendToTab('inpaint', img); }} className="p-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-full backdrop-blur-sm transition-all" title="Send to Inpaint">
                                                     <Paintbrush className="w-3.5 h-3.5 text-purple-400" />

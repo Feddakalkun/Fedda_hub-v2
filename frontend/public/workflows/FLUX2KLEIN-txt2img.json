@@ -1,0 +1,310 @@
+{
+  "99": {
+    "inputs": {
+      "download_links": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors diffusion_models\nhttps://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors text_encoders\nhttps://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors vae",
+      "auto_download": true,
+      "max_concurrent_downloads": 3,
+      "max_download_speed_mbps": 0,
+      "enable_resume": true,
+      "validate_files": false,
+      "enable_notifications": true,
+      "auto_organize": false,
+      "hf_token": ""
+    },
+    "class_type": "HuggingFaceDownloader",
+    "_meta": {
+      "title": "🤗 HuggingFace Model Downloader Pro"
+    }
+  },
+  "116": {
+    "inputs": {
+      "download_links": "https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8/resolve/main/flux-2-klein-9b-fp8.safetensors diffusion_models\nhttps://huggingface.co/Comfy-Org/flux2-klein-9B/resolve/main/split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors text_encoders\nhttps://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors vae",
+      "auto_download": true,
+      "max_concurrent_downloads": 3,
+      "max_download_speed_mbps": 0,
+      "enable_resume": true,
+      "validate_files": false,
+      "enable_notifications": true,
+      "auto_organize": false,
+      "hf_token": ""
+    },
+    "class_type": "HuggingFaceDownloader",
+    "_meta": {
+      "title": "🤗 HuggingFace Model Downloader Pro"
+    }
+  },
+  "119": {
+    "inputs": {
+      "anything": [
+        "99",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "121": {
+    "inputs": {
+      "anything": [
+        "116",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "179": {
+    "inputs": {
+      "filename_prefix": "IMAGE/FLUX-2-klein/0",
+      "images": [
+        "205:187",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "180": {
+    "inputs": {
+      "value": "portrait\n\n"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "192": {
+    "inputs": {
+      "noise_seed": 1074742713512551
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "199": {
+    "inputs": {
+      "width": 0,
+      "height": 0,
+      "aspect_ratio": "1:1",
+      "direction": "Horizontal"
+    },
+    "class_type": "AspectRatioImageSize",
+    "_meta": {
+      "title": "🧩 Aspect Ratio Image Size"
+    }
+  },
+  "201": {
+    "inputs": {
+      "delimiter": ", ",
+      "clean_whitespace": "true",
+      "text_a": [
+        "180",
+        0
+      ],
+      "text_b": [
+        "202",
+        0
+      ]
+    },
+    "class_type": "Text Concatenate",
+    "_meta": {
+      "title": "Text Concatenate"
+    }
+  },
+  "202": {
+    "inputs": {
+      "styles": "Painting | Digital",
+      "csv_file_path": "styles.csv"
+    },
+    "class_type": "Load Styles CSV",
+    "_meta": {
+      "title": "Load Styles CSV"
+    }
+  },
+  "204": {
+    "inputs": {
+      "value": 5
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "STEPS"
+    }
+  },
+  "205:185": {
+    "inputs": {
+      "cfg": 5,
+      "model": [
+        "205:193",
+        0
+      ],
+      "positive": [
+        "205:196",
+        0
+      ],
+      "negative": [
+        "205:189",
+        0
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFGGuider"
+    }
+  },
+  "205:186": {
+    "inputs": {
+      "noise": [
+        "192",
+        0
+      ],
+      "guider": [
+        "205:185",
+        0
+      ],
+      "sampler": [
+        "205:184",
+        0
+      ],
+      "sigmas": [
+        "205:197",
+        0
+      ],
+      "latent_image": [
+        "205:188",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "205:188": {
+    "inputs": {
+      "width": [
+        "199",
+        0
+      ],
+      "height": [
+        "199",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "205:189": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "205:194",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "205:193": {
+    "inputs": {
+      "unet_name": "flux-2-klein-9b-fp8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "205:194": {
+    "inputs": {
+      "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "205:195": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "205:196": {
+    "inputs": {
+      "text": [
+        "201",
+        0
+      ],
+      "clip": [
+        "205:194",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "205:187": {
+    "inputs": {
+      "samples": [
+        "205:186",
+        0
+      ],
+      "vae": [
+        "205:195",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "205:197": {
+    "inputs": {
+      "steps": [
+        "204",
+        0
+      ],
+      "width": [
+        "199",
+        0
+      ],
+      "height": [
+        "199",
+        1
+      ]
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {
+      "title": "Flux2Scheduler"
+    }
+  },
+  "205:184": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  }
+}

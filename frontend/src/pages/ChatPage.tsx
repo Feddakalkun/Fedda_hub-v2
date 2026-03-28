@@ -21,6 +21,70 @@ interface Message {
 import { AGENT_SYSTEM_PROMPT } from '../config/agentPrompt';
 import { useChatAudio } from '../hooks/useChatAudio';
 
+const IMAGE_INTENT_KEYWORDS = [
+    'generate', 'create', 'make', 'draw', 'picture', 'image', 'photo', 'portrait', 'render',
+    'show', 'change', 'add', 'remove', 'variant', 'version', 'look like', 'bilde', 'vis', 'lag'
+];
+
+function hasImageGenerationIntent(text: string): boolean {
+    const lower = (text || '').toLowerCase();
+    return IMAGE_INTENT_KEYWORDS.some(kw => lower.includes(kw)) || lower.length > 30;
+}
+
+function extractFallbackPrompt(responseText: string): string | null {
+    if (!responseText) return null;
+
+    const generatedTagMatch = responseText.match(/\[Generated Image:\s*([^\]]+)\]/i);
+    if (generatedTagMatch?.[1]?.trim()) {
+        return generatedTagMatch[1].trim();
+    }
+
+    const promptFieldMatch = responseText.match(/(?:^|\n)\s*(?:prompt|image prompt)[^:\n]*:\s*["“]?([^"”\n]{20,600})["”]?/i);
+    if (promptFieldMatch?.[1]?.trim()) {
+        return promptFieldMatch[1].trim();
+    }
+
+    const quotedMatch = responseText.match(/["“]([^"”]{25,700})["”]/);
+    if (quotedMatch?.[1]?.trim()) {
+        return quotedMatch[1].trim();
+    }
+
+    return null;
+}
+
+function derivePromptFromResponse(responseText: string): string | null {
+    const text = (responseText || '').trim();
+    if (!text) return null;
+
+    const cleaned = text
+        .replace(/\[Image[^\]]*\]/ig, '')
+        .replace(/<<GENERATE>>[\s\S]*?(?:<<\/GENERATE>>|<<\/GENERATOR>>|$)/i, '')
+        .replace(/```[\s\S]*?```/g, '')
+        .replace(/\b(?:would you like|let me know if|i can(?:not|'t)? generate images?|i can provide text-based descriptions?)[^.\n]*[.\n]?/ig, '')
+        .trim();
+
+    const lines = cleaned
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(Boolean)
+        .filter(l => l.length > 20)
+        .filter(l => !/^let'?s create/i.test(l))
+        .filter(l => !/^sure[,!]?/i.test(l))
+        .filter(l => !/^of course[,!]?/i.test(l));
+
+    if (lines.length > 0) {
+        lines.sort((a, b) => b.length - a.length);
+        const best = lines[0].replace(/^prompt\s*[:\-]\s*/i, '').trim();
+        if (best.length >= 20) return best.slice(0, 700);
+    }
+
+    if (cleaned.length >= 20) {
+        return cleaned.slice(0, 700);
+    }
+
+    return null;
+}
+
 
 export const ChatPage = () => {
     const { toast } = useToast();
@@ -83,20 +147,73 @@ export const ChatPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // IF_AI_tools models (auto-download on first use)
-                const models = ['qwen2.5-3b-instruct', 'llama-3.2-3b'];
-                setAvailableModels(models);
-                setSelectedModel(models[0]);
+                // Prefer backend-resolved model list (guaranteed installed names).
+                let models: string[] = [];
+                let defaultModel = '';
+                try {
+                    const modelResp = await fetch('/api/chat/models');
+                    if (modelResp.ok) {
+                        const modelData = await modelResp.json();
+                        if (modelData?.success && Array.isArray(modelData.models)) {
+                            models = modelData.models;
+                            defaultModel = modelData.default || '';
+                        }
+                    }
+                } catch {
+                    // Fallback below
+                }
+
+                // Fallback to raw Ollama tags if backend endpoint is unavailable.
+                if (models.length === 0) {
+                    try {
+                        const tagsResp = await fetch('/ollama/tags');
+                        if (tagsResp.ok) {
+                            const tagsData = await tagsResp.json();
+                            const rawModels = Array.isArray(tagsData?.models) ? tagsData.models : [];
+                            models = rawModels
+                                .map((m: any) => String(m?.name || '').trim())
+                                .filter(Boolean);
+                        }
+                    } catch {
+                        // Leave empty; UI will still load with existing selected value.
+                    }
+                }
+
+                if (models.length > 0) {
+                    setAvailableModels(models);
+                    setSelectedModel(defaultModel && models.includes(defaultModel) ? defaultModel : models[0]);
+                }
 
                 // LoRAs
                 const loras = await comfyService.getLoras();
                 setAvailableLoras(loras);
+
+                // Auto-sync celeb LoRA pack from Hugging Face in background.
+                // Safe to call repeatedly: backend returns "running" if already in progress.
+                fetch('/api/lora/sync-zimage-turbo', { method: 'POST' }).catch(() => { });
 
             } catch (error) {
                 console.error('Failed to load data:', error);
             }
         };
         fetchData();
+
+        // Keep LoRA list fresh while background sync downloads new files.
+        const interval = setInterval(async () => {
+            try {
+                const loras = await comfyService.getLoras();
+                setAvailableLoras(prev => {
+                    const prevSorted = [...prev].sort();
+                    const nextSorted = [...loras].sort();
+                    if (JSON.stringify(prevSorted) === JSON.stringify(nextSorted)) return prev;
+                    return loras;
+                });
+            } catch {
+                // Ignore transient polling errors
+            }
+        }, 15000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const scrollToBottom = () => {
@@ -149,8 +266,7 @@ export const ChatPage = () => {
 
             // Determine if the user actually intended to generate something
             // (Prevents model from hallucinating cards on "Hi" or small talk)
-            const generationKeywords = ['generate', 'create', 'make', 'draw', 'picture', 'image', 'photo', 'portrait', 'show', 'change', 'add', 'remove', 'variant', 'version', 'look like', 'lag', 'bilde', 'vis'];
-            const userHasIntent = generationKeywords.some(kw => input.toLowerCase().includes(kw)) || input.length > 30;
+            const userHasIntent = hasImageGenerationIntent(input);
 
             // Parse response for <<GENERATE>> (Robust)
             const genMatch = responseText.match(/<<GENERATE>>([\s\S]*?)(?:<<\/GENERATE>>|<<\/GENERATOR>>|$)/i);
@@ -195,6 +311,36 @@ export const ChatPage = () => {
                 }
 
             } else {
+                // Fallback for models that ignore <<GENERATE>> formatting.
+                if (userHasIntent) {
+                    const fallbackPrompt = extractFallbackPrompt(responseText) || derivePromptFromResponse(responseText);
+                    if (fallbackPrompt) {
+                        const cleanText = responseText
+                            .replace(/\[Generated Image:[^\]]+\]/ig, '')
+                            .replace(/(?:^|\n)\s*(?:prompt|image prompt)[^:\n]*:\s*["“]?[^"”\n]{20,600}["”]?/ig, '')
+                            .trim();
+
+                        if (cleanText) {
+                            setMessages(prev => [...prev, {
+                                id: Date.now().toString(),
+                                role: 'assistant',
+                                content: cleanText,
+                                timestamp: Date.now(),
+                                type: 'text'
+                            }]);
+                        }
+
+                        setMessages(prev => [...prev, {
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
+                            content: fallbackPrompt,
+                            timestamp: Date.now(),
+                            type: 'image-generation-request'
+                        }]);
+                        return;
+                    }
+                }
+
                 // Normal text response (strip hallucinated tags if they shouldn't be there)
                 const cleanText = responseText.replace(/<<GENERATE>>[\s\S]*?(?:<<\/GENERATE>>|<<\/GENERATOR>>|$)/i, '').trim();
 
@@ -225,10 +371,21 @@ export const ChatPage = () => {
         setGeneratingMsgId(msgId);
 
         try {
-            // Load the same Z-Image workflow as ImagePage
-            const response = await fetch('/workflows/z-image.json');
-            if (!response.ok) throw new Error('Failed to load Z-Image workflow');
-            const workflow = await response.json();
+            // Load the same Z-Image workflow as ImagePage (support legacy filenames)
+            let workflow: any = null;
+            const workflowCandidates = [
+                '/workflows/z-image-master.json',
+                '/workflows/z-image.json',
+                '/workflows/zimage-HQ.json',
+            ];
+            for (const candidate of workflowCandidates) {
+                const response = await fetch(candidate);
+                if (response.ok) {
+                    workflow = await response.json();
+                    break;
+                }
+            }
+            if (!workflow) throw new Error('Failed to load Z-Image workflow');
 
             // Generate random seed
             const seed = Math.floor(Math.random() * 1000000000);

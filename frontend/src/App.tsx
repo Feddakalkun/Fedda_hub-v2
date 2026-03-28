@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { ImagePage } from './pages/ImagePage';
 import { QwenAnglePage } from './pages/QwenAnglePage';
+import { Flux2KleinPage } from './pages/Flux2KleinPage';
 import { VideoPage } from './pages/VideoPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AudioPage } from './pages/AudioPage';
@@ -22,6 +23,8 @@ const UI_STATE_KEY = 'fedda_ui_state_v1';
 const VALID_TABS = new Set([
   'chat',
   'image',
+  'qwen',
+  'flux2klein',
   'video',
   'audio',
   'logs',
@@ -34,6 +37,8 @@ const VALID_TABS = new Set([
 
 const MODEL_TAB_MAP = {
   image: MODELS.IMAGE,
+  qwen: MODELS.QWEN,
+  flux2klein: MODELS.FLUX2KLEIN,
   video: MODELS.VIDEO,
   audio: MODELS.AUDIO,
 } as const;
@@ -275,7 +280,7 @@ function App() {
 
 
   const getCurrentModel = () => {
-    const allModels = [...MODELS.IMAGE, ...MODELS.VIDEO, ...MODELS.AUDIO];
+    const allModels = [...MODELS.IMAGE, ...MODELS.QWEN, ...MODELS.FLUX2KLEIN, ...MODELS.VIDEO, ...MODELS.AUDIO];
     return allModels.find((m) => m.id === activeSubTab) || allModels[0];
   };
 
@@ -297,7 +302,7 @@ function App() {
             <header className="h-20 border-b border-white/5 flex items-center px-8 z-10 justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-                  {['image', 'video', 'audio'].includes(activeTab)
+                  {['image', 'qwen', 'flux2klein', 'video', 'audio'].includes(activeTab)
                     ? currentModel.label
                     : activeTab === 'chat'
                       ? 'AI-Assistent'
@@ -314,7 +319,7 @@ function App() {
                                 : activeTab === 'logs'
                                   ? 'Console'
                                   : activeTab}
-                  {['image', 'video', 'audio'].includes(activeTab) && (
+                  {['image', 'qwen', 'flux2klein', 'video', 'audio'].includes(activeTab) && (
                     <span className="text-sm font-normal text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
                       {activeTab}
                     </span>
@@ -343,12 +348,16 @@ function App() {
 
             <div className="flex-1 flex overflow-hidden relative z-0">
               <div className="flex-1 overflow-auto">
-                <div className="h-full" style={{ display: activeTab === 'image' && currentModel.id === 'qwen-angle' ? undefined : 'none' }}>
+                <div className="h-full" style={{ display: activeTab === 'qwen' ? undefined : 'none' }}>
                   <QwenAnglePage modelId={currentModel.id} modelLabel={currentModel.label} />
                 </div>
 
-                <div className="h-full" style={{ display: activeTab === 'image' && currentModel.id !== 'qwen-angle' ? undefined : 'none' }}>
+                <div className="h-full" style={{ display: activeTab === 'image' ? undefined : 'none' }}>
                   <ImagePage modelId={currentModel.id} modelLabel={currentModel.label} />
+                </div>
+
+                <div className="h-full" style={{ display: activeTab === 'flux2klein' ? undefined : 'none' }}>
+                  <Flux2KleinPage modelId={currentModel.id} modelLabel={currentModel.label} />
                 </div>
 
                 <div className="h-full" style={{ display: activeTab === 'video' ? undefined : 'none' }}>

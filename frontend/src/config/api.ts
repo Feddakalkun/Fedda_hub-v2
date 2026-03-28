@@ -62,7 +62,15 @@ export const APP_CONFIG = {
 export const MODELS = {
     IMAGE: [
         { id: 'z-image', label: 'Z-Image', icon: 'Sparkles' },
-        { id: 'qwen-angle', label: 'Qwen Multi-Angle', icon: 'Box' },
+    ],
+    QWEN: [
+        { id: 'qwen-angle', label: 'MULTIANGLE', icon: 'Box', category: 'QWEN' },
+    ],
+    FLUX2KLEIN: [
+        { id: 'flux2klein-txt2img9b', label: 'TXT2IMG 9B', icon: 'Sparkles', category: 'FLUX2KLEIN' },
+        { id: 'flux2klein-image-edit', label: 'IMAGE EDIT', icon: 'Image', category: 'FLUX2KLEIN' },
+        { id: 'flux2klein-2-referenceimg', label: '2 REFERENCE IMG', icon: 'Layers', category: 'FLUX2KLEIN' },
+        { id: 'flux2klein-multiangle', label: 'MULTIANGLE', icon: 'Box', category: 'FLUX2KLEIN' },
     ],
     VIDEO: [
         { id: 'ltx-i2v', label: 'Image to Video', icon: 'ImagePlay', category: 'LTX 2.3' },

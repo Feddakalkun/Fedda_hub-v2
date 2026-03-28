@@ -1,8 +1,10 @@
 // Sidebar Navigation Component
+import { useState } from 'react';
 import {
-    Image as ImageIcon,
     Video,
     Music,
+    Sparkles,
+    Box,
     Settings,
     Terminal,
     ChevronRight,
@@ -23,6 +25,14 @@ interface SidebarProps {
 }
 
 type ModelEntry = { id: string; label: string; icon: string; category?: string };
+type SidebarItem = {
+    id: string;
+    label: string;
+    icon: any;
+    models?: ModelEntry[];
+    targetTab?: string;
+    targetSubTab?: string;
+};
 
 function groupByCategory(models: ModelEntry[]): { category: string | null; items: ModelEntry[] }[] {
     const groups: { category: string | null; items: ModelEntry[] }[] = [];
@@ -40,15 +50,19 @@ function groupByCategory(models: ModelEntry[]): { category: string | null; items
 }
 
 export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) => {
+    const [collapsedMenus, setCollapsedMenus] = useState<Record<string, boolean>>({});
+
     const sections = [
         {
             label: 'CREATE',
             items: [
                 { id: 'chat', label: 'Agent Chat', icon: MessageSquare },
-                { id: 'image', label: 'Image Generation', icon: ImageIcon, models: MODELS.IMAGE },
+                { id: 'image-z', label: 'Z-Image', icon: Sparkles, targetTab: 'image', targetSubTab: 'z-image' },
+                { id: 'qwen', label: 'QWEN', icon: Box, models: MODELS.QWEN },
+                { id: 'flux2klein', label: 'FLUX2KLEIN', icon: Sparkles, models: MODELS.FLUX2KLEIN },
                 { id: 'video', label: 'Video', icon: Video, models: MODELS.VIDEO },
                 { id: 'audio', label: 'Audio/SFX', icon: Music, models: MODELS.AUDIO },
-            ],
+            ] as SidebarItem[],
         },
         {
             label: 'MANAGE',
@@ -57,14 +71,14 @@ export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) 
                 { id: 'tiktok', label: 'TikTok Studio', icon: Download },
                 { id: 'videos', label: 'Videos', icon: Film },
                 { id: 'library', label: 'LoRA Library', icon: Package },
-            ],
+            ] as SidebarItem[],
         },
         {
             label: 'SYSTEM',
             items: [
                 { id: 'logs', label: 'Console Logs', icon: Terminal },
                 { id: 'settings', label: 'Settings', icon: Settings },
-            ],
+            ] as SidebarItem[],
         },
     ];
 
@@ -92,19 +106,46 @@ export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) 
                         <div className="space-y-1">
                             {section.items.map((item) => (
                                 <div key={item.id}>
+                                    {(() => {
+                                        const isDirectImageEntry = item.targetTab === 'image' && item.targetSubTab;
+                                        const isActive = isDirectImageEntry
+                                            ? activeTab === 'image' && activeSubTab === item.targetSubTab
+                                            : activeTab === item.id;
+                                        const isCollapsed = !!collapsedMenus[item.id];
+                                        const isExpanded = isActive && !isCollapsed;
+
+                                        return (
                                     <button
                                         onClick={() => {
-                                            const firstModel = item.models?.[0]?.id;
-                                            onTabChange(item.id, firstModel);
+                                            if (item.targetTab) {
+                                                onTabChange(item.targetTab, item.targetSubTab);
+                                                return;
+                                            }
+
+                                            if (item.models) {
+                                                if (isActive && !isCollapsed) {
+                                                    setCollapsedMenus((prev) => ({ ...prev, [item.id]: true }));
+                                                    return;
+                                                }
+
+                                                setCollapsedMenus((prev) => ({ ...prev, [item.id]: false }));
+                                                const targetSubTab = isActive && activeSubTab
+                                                    ? activeSubTab
+                                                    : item.models[0]?.id;
+                                                onTabChange(item.id, targetSubTab);
+                                                return;
+                                            }
+
+                                            onTabChange(item.id);
                                         }}
-                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${activeTab === item.id
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
                                             ? 'bg-white text-black shadow-lg'
                                             : 'text-slate-400 hover:text-white hover:bg-white/5'
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <item.icon
-                                                className={`w-5 h-5 ${activeTab === item.id
+                                                className={`w-5 h-5 ${isActive
                                                     ? 'text-black'
                                                     : 'text-slate-500 group-hover:text-slate-300'
                                                     } transition-colors`}
@@ -113,14 +154,16 @@ export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) 
                                         </div>
                                         {item.models && (
                                             <ChevronRight
-                                                className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${activeTab === item.id ? 'rotate-90 text-black' : ''
+                                                className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-black' : ''
                                                     }`}
                                             />
                                         )}
                                     </button>
+                                        );
+                                    })()}
 
                                     {/* Sub-menu (grouped by category when available) */}
-                                    {activeTab === item.id && item.models && (
+                                    {activeTab === item.id && item.models && !collapsedMenus[item.id] && (
                                         <div className="pl-8 pr-2 py-2 animate-in slide-in-from-top-2 fade-in duration-200">
                                             {groupByCategory(item.models).map((group) => (
                                                 <div key={group.category ?? '__ungrouped'}>

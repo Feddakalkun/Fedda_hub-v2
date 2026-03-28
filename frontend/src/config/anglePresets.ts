@@ -60,11 +60,12 @@ export const PRESETS: Record<string, AngleConfig[]> = {
 
 export const MLS_NEGATIVE_PROMPT = 'low quality, blurry, noisy, grainy, oversharpened, cgi, 3d render, cartoon, plastic texture, waxy walls, warped windows, distorted roof lines';
 export const MLS_ULTRA_NEGATIVE_PROMPT = 'low quality, blurry, noisy, grainy, oversharpened, cgi, 3d render, cartoon, anime, game render, plastic texture, waxy walls, fake grass, fake sky, warped windows, distorted roof lines, texture flicker, banding, halos';
+export const MLS_STRICT_PRESERVE_NEGATIVE_PROMPT = 'new objects, extra buildings, extra people, extra vehicles, extra trees, added furniture, changed architecture, changed facade, changed layout, moved landmarks, wrong placement, text, logo, watermark, low quality, blurry, noisy, grainy, oversharpened, cgi, 3d render, cartoon, anime, game render, plastic texture, waxy surfaces, warped geometry, distorted lines, fake sky, fake grass, hallucinated details';
 
 export const QUALITY_PRESETS = {
-    Fast: { steps: 4, cfg: 1.0, scheduler: 'simple' },
-    Balanced: { steps: 8, cfg: 1.2, scheduler: 'normal' },
-    Quality: { steps: 12, cfg: 1.3, scheduler: 'normal' },
+    Fast: { steps: 4, cfg: 1.0, sampler: 'euler', scheduler: 'simple' },
+    Balanced: { steps: 8, cfg: 1.2, sampler: 'euler', scheduler: 'simple' },
+    Quality: { steps: 12, cfg: 1.3, sampler: 'euler', scheduler: 'simple' },
 } as const;
 
 export type QualityPresetKey = keyof typeof QUALITY_PRESETS;

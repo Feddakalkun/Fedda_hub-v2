@@ -14,7 +14,8 @@ import {
     ACE_PRESETS,
     ACE_FEATURED_PRESET_IDS,
     ACE_DEFAULT_MODELS,
-    ACE_REQUIRED_NODE_TYPES
+    ACE_REQUIRED_NODE_TYPES,
+    type AcePreset,
 } from '../config/audioPresets';
 import {
     buildReferenceSuggestions,

@@ -44,6 +44,7 @@ CORE_FOLDERS = {
     "ComfyUI-LTXVideo",
     "ComfyMath",
     "RES4LYF",
+    "comfy-image-saver",
     "ComfyUI-IF_AI_tools",
     "ComfyUI-Custom-Scripts",
     "ComfyUI_essentials",

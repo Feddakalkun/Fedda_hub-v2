@@ -332,3 +332,52 @@ def start_zimage_turbo_sync(limit: Optional[int] = None):
 def get_zimage_turbo_sync_status():
     with _zimage_sync_lock:
         return dict(zimage_sync_state)
+
+
+def _filename_to_celebrity_label(filename: str) -> str:
+    name = Path(filename).stem
+    name = re.sub(r"_PMv\d+[a-z]?_ZImage$", "", name, flags=re.IGNORECASE)
+    name = name.replace("_", " ").strip()
+    return name
+
+
+def get_zimage_turbo_catalog(max_items: int = 500):
+    """
+    Returns celebrity catalog for Z-Image Turbo pack.
+    Includes remote repo files + local installed status.
+    """
+    local_dir = Path(__file__).parent.parent / "ComfyUI" / "models" / "loras" / "zimage_turbo"
+    local_files = {}
+    if local_dir.exists():
+        for f in local_dir.glob("*.safetensors"):
+            if f.stat().st_size > 10000:
+                local_files[f.name] = f.stat().st_size
+
+    remote_files = []
+    remote_error = None
+    try:
+        remote_files = _list_hf_safetensors(ZIMAGE_TURBO_REPO)
+    except Exception as e:
+        remote_error = str(e)
+
+    source_files = remote_files if remote_files else sorted(local_files.keys())
+    if max_items and max_items > 0:
+        source_files = source_files[:max_items]
+
+    celebs = []
+    for file_name in source_files:
+        celebs.append({
+            "name": _filename_to_celebrity_label(file_name),
+            "file": file_name,
+            "installed": file_name in local_files,
+            "size_mb": round((local_files.get(file_name, 0) / 1024 / 1024), 1) if file_name in local_files else None,
+        })
+
+    installed_count = sum(1 for c in celebs if c["installed"])
+    return {
+        "repo": ZIMAGE_TURBO_REPO,
+        "total": len(celebs),
+        "installed": installed_count,
+        "items": celebs,
+        "remote_error": remote_error,
+    }

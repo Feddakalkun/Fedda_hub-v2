@@ -87,6 +87,93 @@ function Pause-Step {
     }
 }
 
+function Download-ZImageTurboCelebPack {
+    param(
+        [string]$PythonExe,
+        [string]$ComfyDir
+    )
+
+    Write-Log "`n[ComfyUI 8.6/9] Downloading Z-Image Turbo Celeb LoRA pack (HuggingFace)..."
+    $TargetDir = Join-Path $ComfyDir "models\loras\zimage_turbo"
+    if (-not (Test-Path $TargetDir)) {
+        New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+    }
+
+    $PyScript = Join-Path $env:TEMP "feddaz_zimage_turbo_sync.py"
+    $PyCode = @"
+import json
+import os
+import subprocess
+import sys
+import urllib.request
+
+repo = "pmczip/Z-Image-Turbo_Models"
+target = r"$TargetDir"
+api = f"https://huggingface.co/api/models/{repo}/tree/main"
+
+os.makedirs(target, exist_ok=True)
+
+with urllib.request.urlopen(api, timeout=60) as resp:
+    items = json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+files = []
+for item in items:
+    p = str(item.get("path", "")).strip()
+    if p.lower().endswith(".safetensors") and "/" not in p:
+        files.append(p)
+
+files = sorted(set(files))
+print(f"[Z-Image Turbo] Found {len(files)} LoRA files")
+
+downloaded = 0
+skipped = 0
+failed = 0
+
+for i, name in enumerate(files, start=1):
+    out = os.path.join(target, name)
+    if os.path.exists(out) and os.path.getsize(out) > 10000:
+        skipped += 1
+        print(f"[{i}/{len(files)}] Skip existing: {name}")
+        continue
+
+    url = f"https://huggingface.co/{repo}/resolve/main/{name}"
+    print(f"[{i}/{len(files)}] Download: {name}")
+    cmd = ["curl.exe", "-L", "--retry", "3", "--retry-delay", "2", "-o", out, url]
+    result = subprocess.run(cmd)
+    if result.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 10000:
+        downloaded += 1
+    else:
+        failed += 1
+        try:
+            if os.path.exists(out) and os.path.getsize(out) < 10000:
+                os.remove(out)
+        except Exception:
+            pass
+
+print(f"[Z-Image Turbo] Done. Downloaded={downloaded}, Skipped={skipped}, Failed={failed}")
+sys.exit(0 if failed == 0 else 2)
+"@
+    Set-Content -Path $PyScript -Value $PyCode -Encoding UTF8
+
+    try {
+        Start-Process -FilePath $PythonExe -ArgumentList "$PyScript" -NoNewWindow -Wait
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "Z-Image Turbo celeb pack download completed."
+        }
+        else {
+            Write-Log "WARNING: Z-Image Turbo download completed with partial failures (code $LASTEXITCODE)."
+        }
+    }
+    catch {
+        Write-Log "WARNING: Z-Image Turbo pack download failed: $_"
+    }
+    finally {
+        if (Test-Path $PyScript) {
+            Remove-Item $PyScript -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Write-Log "========================================="
 Write-Log " FEDDA - Full Portable Installation"
 Write-Log "========================================="
@@ -614,6 +701,11 @@ if (Test-Path $SrcLoraDir) {
 else {
     Write-Log "Warning: Bundled LoRAs not found in assets. Skipping."
 }
+
+Pause-Step
+
+# 8.6 Download full celeb LoRA pack for Z-Image Turbo (HuggingFace)
+Download-ZImageTurboCelebPack -PythonExe $PyExe -ComfyDir $ComfyDir
 
 Pause-Step
 

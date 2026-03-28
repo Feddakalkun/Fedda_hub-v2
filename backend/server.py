@@ -26,6 +26,7 @@ from lora_service import (
     get_installed_premium_loras,
     start_zimage_turbo_sync,
     get_zimage_turbo_sync_status,
+    get_zimage_turbo_catalog,
 )
 try:
     import tiktok_service
@@ -407,6 +408,16 @@ async def get_sync_zimage_turbo_status():
     try:
         status = get_zimage_turbo_sync_status()
         return {"success": True, **status}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/lora/zimage-turbo/celebs")
+async def get_zimage_turbo_celebs(limit: int = 500):
+    """Return celeb LoRA catalog for Z-Image Turbo pack."""
+    try:
+        catalog = get_zimage_turbo_catalog(max_items=limit)
+        return {"success": True, **catalog}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

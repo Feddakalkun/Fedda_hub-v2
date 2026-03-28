@@ -17,6 +17,11 @@ interface Message {
     metadata?: any;
     images?: string[]; // Base64 images for vision models
 }
+interface CelebCatalogItem {
+    name: string;
+    file: string;
+    installed: boolean;
+}
 
 import { AGENT_SYSTEM_PROMPT } from '../config/agentPrompt';
 import { useChatAudio } from '../hooks/useChatAudio';
@@ -85,6 +90,53 @@ function derivePromptFromResponse(responseText: string): string | null {
     return null;
 }
 
+function extractSubjectAnchor(userText: string): string | null {
+    const text = (userText || '').trim().toLowerCase();
+    if (!text) return null;
+
+    const patterns = [
+        /(?:image|picture|photo|portrait|render)\s+of\s+(.{2,80})/i,
+        /create\s+(.{2,80})/i,
+        /generate\s+(.{2,80})/i,
+    ];
+
+    for (const p of patterns) {
+        const m = userText.match(p);
+        if (m?.[1]) {
+            return m[1].replace(/[.?!,;:]+$/g, '').trim();
+        }
+    }
+    return null;
+}
+
+function isCelebListQuery(text: string): boolean {
+    const t = (text || '').toLowerCase();
+    return (
+        (t.includes('celeb') || t.includes('celebrity') || t.includes('who can we make')) &&
+        (t.includes('image') || t.includes('images') || t.includes('make'))
+    );
+}
+
+function isGenericImageRequest(text: string): boolean {
+    const t = (text || '').toLowerCase().trim();
+    if (!hasImageGenerationIntent(t)) return false;
+    const specificTokens = ['hello kitty', 'portrait of', 'image of', 'photo of', 'with ', 'wearing ', 'in ', 'at ', 'scene', 'style'];
+    return !specificTokens.some(tok => t.includes(tok));
+}
+
+function ensureCelebInPrompt(prompt: string, userInput: string, celebList: CelebCatalogItem[]): string {
+    if (!prompt) return prompt;
+    const lowerPrompt = prompt.toLowerCase();
+    if (celebList.some(c => lowerPrompt.includes(c.name.toLowerCase()))) {
+        return prompt;
+    }
+    if (!isGenericImageRequest(userInput) || celebList.length === 0) {
+        return prompt;
+    }
+    const pick = celebList[Math.floor(Math.random() * celebList.length)];
+    return `${pick.name}, ${prompt}`;
+}
+
 
 export const ChatPage = () => {
     const { toast } = useToast();
@@ -103,6 +155,7 @@ export const ChatPage = () => {
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
+    const [celebCatalog, setCelebCatalog] = useState<CelebCatalogItem[]>([]);
     const [selectedLora, setSelectedLora] = useState<string>('');
     const [executionStatus, setExecutionStatus] = useState('');
     const [progress, setProgress] = useState(0);
@@ -192,6 +245,19 @@ export const ChatPage = () => {
                 // Safe to call repeatedly: backend returns "running" if already in progress.
                 fetch('/api/lora/sync-zimage-turbo', { method: 'POST' }).catch(() => { });
 
+                // Load celeb catalog for chat helpers.
+                try {
+                    const celebResp = await fetch('/api/lora/zimage-turbo/celebs?limit=500');
+                    if (celebResp.ok) {
+                        const celebData = await celebResp.json();
+                        if (celebData?.success && Array.isArray(celebData.items)) {
+                            setCelebCatalog(celebData.items);
+                        }
+                    }
+                } catch {
+                    // Ignore catalog load failure.
+                }
+
             } catch (error) {
                 console.error('Failed to load data:', error);
             }
@@ -244,6 +310,40 @@ export const ChatPage = () => {
         setIsThinking(true);
 
         try {
+            if (isCelebListQuery(input)) {
+                let items = celebCatalog;
+                if (!items.length) {
+                    try {
+                        const celebResp = await fetch('/api/lora/zimage-turbo/celebs?limit=500');
+                        if (celebResp.ok) {
+                            const celebData = await celebResp.json();
+                            if (celebData?.success && Array.isArray(celebData.items)) {
+                                items = celebData.items;
+                                setCelebCatalog(items);
+                            }
+                        }
+                    } catch {
+                        // noop
+                    }
+                }
+
+                const names = items.map(c => c.name).sort();
+                const preview = names.slice(0, 30).join(', ');
+                const more = names.length > 30 ? `\n...and ${names.length - 30} more.` : '';
+                const reply = names.length
+                    ? `We can generate these celeb LoRAs from the Z-Image Turbo pack:\n${preview}${more}`
+                    : `Celeb catalog is still syncing/downloading. Ask again in a minute, or generate and I’ll use available celeb LoRAs as they arrive.`;
+
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: reply,
+                    timestamp: Date.now(),
+                    type: 'text'
+                }]);
+                return;
+            }
+
             // Prepare history for Ollama
             // We keep the prompt content in history so the model knows what it generated previously
             const history = messages.map(m => ({
@@ -281,6 +381,7 @@ export const ChatPage = () => {
 
                 // Add the generation request card ONLY if prompt is valid
                 if (promptPart && promptPart.length > 5 && !['hi', 'hello', 'hey'].includes(promptPart.toLowerCase())) {
+                    const tunedPrompt = ensureCelebInPrompt(promptPart, input, celebCatalog);
                     // Add text
                     if (textPart) {
                         setMessages(prev => [...prev, {
@@ -295,9 +396,10 @@ export const ChatPage = () => {
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
                         role: 'assistant',
-                        content: promptPart,
+                        content: tunedPrompt,
                         timestamp: Date.now(),
-                        type: 'image-generation-request'
+                        type: 'image-generation-request',
+                        metadata: { sourceUserInput: input }
                     }]);
                 } else {
                     // Malformed or empty prompt -> Treat as text
@@ -315,6 +417,7 @@ export const ChatPage = () => {
                 if (userHasIntent) {
                     const fallbackPrompt = extractFallbackPrompt(responseText) || derivePromptFromResponse(responseText);
                     if (fallbackPrompt) {
+                        const tunedPrompt = ensureCelebInPrompt(fallbackPrompt, input, celebCatalog);
                         const cleanText = responseText
                             .replace(/\[Generated Image:[^\]]+\]/ig, '')
                             .replace(/(?:^|\n)\s*(?:prompt|image prompt)[^:\n]*:\s*["“]?[^"”\n]{20,600}["”]?/ig, '')
@@ -333,9 +436,10 @@ export const ChatPage = () => {
                         setMessages(prev => [...prev, {
                             id: (Date.now() + 1).toString(),
                             role: 'assistant',
-                            content: fallbackPrompt,
+                            content: tunedPrompt,
                             timestamp: Date.now(),
-                            type: 'image-generation-request'
+                            type: 'image-generation-request',
+                            metadata: { sourceUserInput: input }
                         }]);
                         return;
                     }
@@ -367,7 +471,7 @@ export const ChatPage = () => {
         }
     };
 
-    const handleGenerateImage = async (msgId: string, prompt: string) => {
+    const handleGenerateImage = async (msgId: string, prompt: string, sourceUserInput?: string) => {
         setGeneratingMsgId(msgId);
 
         try {
@@ -399,14 +503,26 @@ export const ChatPage = () => {
                 workflow["3"].inputs.cfg = 1;
             }
 
-            // Node 33: Positive Prompt
+            // Strengthen prompt adherence in chat context.
+            const anchor = extractSubjectAnchor(sourceUserInput || '');
+            const anchoredPrompt = anchor
+                ? `${prompt}\n\nStrict subject lock: ${anchor}. Keep this exact subject identity and do not replace with unrelated objects.`
+                : prompt;
+
+            // Node 33/6: Positive Prompt
             if (workflow["33"]) {
-                workflow["33"].inputs.string = prompt;
+                workflow["33"].inputs.string = anchoredPrompt;
+            }
+            if (workflow["6"]) {
+                workflow["6"].inputs.text = anchoredPrompt;
             }
 
-            // Node 34: Negative Prompt
+            // Negative prompt
             if (workflow["34"]) {
                 workflow["34"].inputs.string = "text, watermark, blur, ugly";
+            }
+            if (workflow["7"]) {
+                workflow["7"].inputs.text = "text, watermark, blur, ugly";
             }
 
             // Node 30: Dimensions (1024x1024 default for chat)
@@ -432,10 +548,12 @@ export const ChatPage = () => {
                 }
             }
 
-            // Node 3: Randomize Seed (Critical for variations)
+            // Node 3: stronger conditioning for better intent adherence in chat.
             if (workflow["3"]) {
                 const randomSeed = Math.floor(Math.random() * 1000000000000000); // 15 digits
                 workflow["3"].inputs.seed = randomSeed;
+                workflow["3"].inputs.cfg = Math.max(3.2, Number(workflow["3"].inputs.cfg || 1));
+                workflow["3"].inputs.steps = Math.max(14, Number(workflow["3"].inputs.steps || 9));
                 console.log('🎲 New Seed generated:', randomSeed);
             }
 
@@ -487,6 +605,19 @@ export const ChatPage = () => {
                             console.log('✅ Fresh Image found!', imageUrl);
                         }
                     }
+
+                    // Surface execution errors immediately (instead of timing out with generic message)
+                    if (history[prompt_id] && history[prompt_id].status?.status_str === 'error') {
+                        const statusAny = history[prompt_id].status as any;
+                        const messages = statusAny?.messages || [];
+                        const execError = messages.find((m: any) => m?.[0] === 'execution_error')?.[1];
+                        if (execError) {
+                            const node = execError.node_id ? `Node #${execError.node_id} (${execError.node_type || 'Unknown'})` : 'Workflow';
+                            const detail = (execError.exception_message || 'Execution failed').toString().trim();
+                            throw new Error(`${node}: ${detail}`);
+                        }
+                        throw new Error('Workflow execution failed');
+                    }
                 } catch (err) {
                     console.warn(`⚠️ Attempt ${attempts} failed:`, err);
                 }
@@ -510,10 +641,11 @@ export const ChatPage = () => {
 
         } catch (error) {
             console.error("Gen Error:", error);
+            const msg = error instanceof Error ? error.message : 'Unknown generation error';
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: "Something went wrong sending the image to ComfyUI.",
+                content: `Generation failed: ${msg}`,
                 timestamp: Date.now(),
                 type: 'text'
             }]);
@@ -766,7 +898,7 @@ export const ChatPage = () => {
                                     )}
 
                                     <button
-                                        onClick={() => handleGenerateImage(msg.id, msg.content)}
+                                        onClick={() => handleGenerateImage(msg.id, msg.content, msg.metadata?.sourceUserInput)}
                                         disabled={generatingMsgId !== null}
                                         className="w-full bg-white hover:bg-slate-200 text-black py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
                                     >

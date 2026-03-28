@@ -72,6 +72,90 @@ function Install-EmbeddedOllama {
     }
 }
 
+function Download-ZImageTurboCelebPack {
+    param(
+        [string]$PythonExe,
+        [string]$ComfyDir
+    )
+
+    Write-Header "STEP 4.5/7 - Z-Image Turbo Celeb LoRA Pack"
+    $TargetDir = Join-Path $ComfyDir "models\loras\zimage_turbo"
+    if (-not (Test-Path $TargetDir)) {
+        New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+    }
+
+    $PyScript = Join-Path $env:TEMP "feddaz_zimage_turbo_sync_lite.py"
+    $PyCode = @"
+import json
+import os
+import subprocess
+import sys
+import urllib.request
+
+repo = "pmczip/Z-Image-Turbo_Models"
+target = r"$TargetDir"
+api = f"https://huggingface.co/api/models/{repo}/tree/main"
+
+os.makedirs(target, exist_ok=True)
+
+with urllib.request.urlopen(api, timeout=60) as resp:
+    items = json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+files = []
+for item in items:
+    p = str(item.get("path", "")).strip()
+    if p.lower().endswith(".safetensors") and "/" not in p:
+        files.append(p)
+
+files = sorted(set(files))
+print(f"[Z-Image Turbo] Found {len(files)} LoRA files")
+
+downloaded = 0
+skipped = 0
+failed = 0
+
+for i, name in enumerate(files, start=1):
+    out = os.path.join(target, name)
+    if os.path.exists(out) and os.path.getsize(out) > 10000:
+        skipped += 1
+        print(f"[{i}/{len(files)}] Skip existing: {name}")
+        continue
+
+    url = f"https://huggingface.co/{repo}/resolve/main/{name}"
+    print(f"[{i}/{len(files)}] Download: {name}")
+    cmd = ["curl.exe", "-L", "--retry", "3", "--retry-delay", "2", "-o", out, url]
+    result = subprocess.run(cmd)
+    if result.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 10000:
+        downloaded += 1
+    else:
+        failed += 1
+        try:
+            if os.path.exists(out) and os.path.getsize(out) < 10000:
+                os.remove(out)
+        except Exception:
+            pass
+
+print(f"[Z-Image Turbo] Done. Downloaded={downloaded}, Skipped={skipped}, Failed={failed}")
+sys.exit(0 if failed == 0 else 2)
+"@
+    Set-Content -Path $PyScript -Value $PyCode -Encoding UTF8
+
+    try {
+        & $PythonExe $PyScript
+        if ($LASTEXITCODE -eq 0) {
+            Write-Step "Z-Image Turbo celeb pack installed." "Green"
+        } else {
+            Write-Step "Z-Image Turbo download completed with partial failures (code $LASTEXITCODE)." "Yellow"
+        }
+    } catch {
+        Write-Step "Z-Image Turbo download failed: $_" "Yellow"
+    } finally {
+        if (Test-Path $PyScript) {
+            Remove-Item $PyScript -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 
 Clear-Host
 Write-Host ""
@@ -403,6 +487,8 @@ foreach ($Node in $NodesConfig) {
 $NodeColor = "Green"
 if ($Failed -gt 0) { $NodeColor = "Yellow" }
 Write-Step "Nodes: $Installed installed, $Skipped already present, $Failed failed" $NodeColor
+
+Download-ZImageTurboCelebPack -PythonExe $VenvPy -ComfyDir $ComfyDir
 
 # ============================================================================
 # 5. FRONTEND

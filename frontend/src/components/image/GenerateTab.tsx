@@ -22,11 +22,12 @@ export const GenerateTab = ({ isGenerating, setIsGenerating }: GenerateTabProps)
     const [prompt, setPrompt] = usePersistentState('image_generate_prompt', '');
     const [negativePrompt, setNegativePrompt] = usePersistentState('image_generate_negative', 'blurry, low quality, distorted, bad anatomy, flat lighting');
     const [showAdvanced, setShowAdvanced] = usePersistentState('image_generate_show_advanced', false);
-    const [steps, setSteps] = usePersistentState('image_generate_steps', 9);
+    const [steps, setSteps] = usePersistentState('image_generate_steps', 20);
     const [cfg, setCfg] = usePersistentState('image_generate_cfg', 1);
     const [dimensions, setDimensions] = usePersistentState('image_generate_dimensions', '1024x1536');
     const [seed, setSeed] = usePersistentState('image_generate_seed', -1);
     const [batchCount, setBatchCount] = usePersistentState('image_generate_batch_count', 1);
+    const [faceEnhance, setFaceEnhance] = usePersistentState('image_generate_face_enhance', true);
     const [selectedLoras, setSelectedLoras] = usePersistentState<SelectedLora[]>('image_generate_selected_loras', []);
     const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
@@ -85,10 +86,13 @@ export const GenerateTab = ({ isGenerating, setIsGenerating }: GenerateTabProps)
                     });
                 }
 
-                // Node 181: FaceDetailer resolution
+                // Node 181: FaceDetailer resolution (bypass if disabled)
                 const maxDim = Math.max(w, h);
                 workflow["181"].inputs.guide_size = maxDim;
                 workflow["181"].inputs.max_size = maxDim;
+                if (!faceEnhance) {
+                    workflow["181"].inputs.bbox_threshold = 1.0; // impossibly high = no faces detected = skipped
+                }
 
                 await queueWorkflow(workflow);
             }
@@ -138,15 +142,32 @@ export const GenerateTab = ({ isGenerating, setIsGenerating }: GenerateTabProps)
                         {/* CFG */}
                         <div>
                             <label className="block text-xs text-slate-400 mb-2">CFG Scale: {cfg}</label>
-                            <input type="range" min="1" max="20" step="0.5" value={cfg} onChange={(e) => setCfg(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white" />
+                            <input type="range" min="1" max="4" step="0.1" value={cfg} onChange={(e) => setCfg(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white" />
+                            <p className="text-[10px] text-slate-600 mt-1">FLUX models work best at 1.0–2.0</p>
                         </div>
 
                         {/* Dimensions */}
                         <DimensionSelector dimensions={dimensions} setDimensions={setDimensions} />
 
+                        {/* Face Enhancement Toggle */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <label className="block text-xs text-slate-400 uppercase tracking-wider">Face Enhancement</label>
+                                <p className="text-[10px] text-slate-600 mt-0.5">Skip for non-portrait images to save time</p>
+                            </div>
+                            <button
+                                onClick={() => setFaceEnhance(!faceEnhance)}
+                                className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${faceEnhance ? 'bg-white' : 'bg-white/10'}`}
+                            >
+                                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-200 ${faceEnhance ? 'translate-x-5 bg-black' : 'translate-x-0 bg-slate-400'}`} />
+                            </button>
+                        </div>
+
                         {/* Seed */}
-                        <div>
-                            <label className="block text-xs text-slate-400 mb-2">Seed (-1 for random)</label>
+                        <div className={batchCount > 1 ? 'opacity-40 pointer-events-none' : ''}>
+                            <label className="block text-xs text-slate-400 mb-2">
+                                Seed (-1 for random){batchCount > 1 && <span className="ml-2 text-slate-600 normal-case">— ignored in batch mode</span>}
+                            </label>
                             <input type="number" value={seed} onChange={(e) => setSeed(parseInt(e.target.value))} className="w-full bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20" />
                         </div>
 

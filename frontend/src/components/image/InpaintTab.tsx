@@ -25,7 +25,7 @@ export const InpaintTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
     const [prompt, setPrompt] = usePersistentState('image_inpaint_prompt', '');
     const [negativePrompt, setNegativePrompt] = usePersistentState('image_inpaint_negative', 'blurry, low quality, distorted');
     const [showAdvanced, setShowAdvanced] = usePersistentState('image_inpaint_show_advanced', false);
-    const [steps, setSteps] = usePersistentState('image_inpaint_steps', 6);
+    const [steps, setSteps] = usePersistentState('image_inpaint_steps', 20);
     const [cfg, setCfg] = usePersistentState('image_inpaint_cfg', 1);
     const [denoise, setDenoise] = usePersistentState('image_inpaint_denoise', 0.77);
     const [dimensions, setDimensions] = usePersistentState('image_inpaint_dimensions', '1024x1024');
@@ -229,7 +229,8 @@ export const InpaintTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
 
                         <div>
                             <label className="block text-xs text-slate-400 mb-2">CFG Scale: {cfg}</label>
-                            <input type="range" min="1" max="20" step="0.5" value={cfg} onChange={(e) => setCfg(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white" />
+                            <input type="range" min="1" max="4" step="0.1" value={cfg} onChange={(e) => setCfg(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-white" />
+                            <p className="text-[10px] text-slate-600 mt-1">FLUX models work best at 1.0–2.0</p>
                         </div>
 
                         {/* Output Dimensions */}

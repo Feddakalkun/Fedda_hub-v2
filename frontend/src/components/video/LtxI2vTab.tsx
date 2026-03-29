@@ -207,17 +207,12 @@ export const LtxI2vTab = () => {
 
             const runTag = Date.now().toString(36);
 
-            // Fast preset: skip expensive refinement branch by saving distilled pass output.
-            if (preset === 'fast') {
-                if (workflow['4852']) {
-                    workflow['4852'].inputs.video = ['4819', 0];
-                    workflow['4852'].inputs.filename_prefix = `VIDEO/LTX23/I2V_FAST_${runTag}`;
-                }
-            } else {
-                if (workflow['4852']) {
-                    workflow['4852'].inputs.video = ['4849', 0];
-                    workflow['4852'].inputs.filename_prefix = `VIDEO/LTX23/I2V_${runTag}`;
-                }
+            // Route all presets through the stable CFG branch to avoid MultimodalGuider AV unpack errors.
+            if (workflow['4852']) {
+                workflow['4852'].inputs.video = ['4849', 0];
+                workflow['4852'].inputs.filename_prefix = preset === 'fast'
+                    ? `VIDEO/LTX23/I2V_FAST_${runTag}`
+                    : `VIDEO/LTX23/I2V_${runTag}`;
             }
 
             // Remove duplicate SaveVideo node — keep only primary output (4852)

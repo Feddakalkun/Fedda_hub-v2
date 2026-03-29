@@ -100,7 +100,7 @@
   },
   "242": {
     "inputs": {
-      "model_name": "ltx-2-spatial-upscaler-x2-1.0.safetensors"
+      "model_name": "ltx-2.3-spatial-upscaler-x2-1.0.safetensors"
     },
     "class_type": "LatentUpscaleModelLoader",
     "_meta": {
@@ -168,7 +168,7 @@
   },
   "460": {
     "inputs": {
-      "clip_name1": "gemma_3_12B_it.safetensors",
+      "clip_name1": "comfy_gemma_3_12B_it.safetensors",
       "clip_name2": "ltx-2-19b-embeddings_connector_distill_bf16.safetensors",
       "type": "ltxv",
       "device": "default"
@@ -529,10 +529,7 @@
   },
   "389:376": {
     "inputs": {
-      "frame_rate": [
-        "389:356",
-        0
-      ],
+      "frame_rate": 25.0,
       "positive": [
         "389:384",
         0

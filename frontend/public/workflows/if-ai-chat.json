@@ -1,34 +1,21 @@
 {
   "1": {
     "inputs": {
-      "prompt": "User message here",
-      "llm_provider": "transformers",
-      "llm_model": "Qwen/Qwen2.5-3B-Instruct",
-      "base_ip": "localhost",
-      "port": "8080",
-      "max_tokens": 512,
-      "temperature": 0.7,
-      "top_p": 0.9,
-      "keep_alive": false,
-      "clear_history": false,
-      "history_steps": 10,
-      "seed": 0,
-      "random": true,
-      "mode": true,
-      "text_cleanup": true,
-      "fill_mask": false
+      "value": "IF_AI_tools not loaded. Install/fix custom node to enable chat workflow in ComfyUI."
     },
-    "class_type": "IF_ChatPrompt",
+    "class_type": "PrimitiveString",
     "_meta": {
-      "title": "LLM Chat"
+      "title": "Chat Placeholder"
     }
   },
   "2": {
     "inputs": {
-      "text": ["1", 1],
-      "select": 0
+      "text": [
+        "1",
+        0
+      ]
     },
-    "class_type": "IF_DisplayText",
+    "class_type": "ShowText|pysssss",
     "_meta": {
       "title": "Output"
     }

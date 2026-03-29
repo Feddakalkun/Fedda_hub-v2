@@ -99,8 +99,9 @@
   },
   "173": {
     "inputs": {
-      "UNKNOWN": "[false,true]"
+      "value": ""
     },
+    "class_type": "PrimitiveString",
     "_meta": {
       "title": "PROMPT"
     }

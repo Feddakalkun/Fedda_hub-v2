@@ -50,7 +50,7 @@ export const WorkbenchShell = ({
                         <div className="flex items-center justify-end px-3 py-1.5 border-b border-white/5">
                             <button
                                 onClick={() => setCollapsed(!collapsed)}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] text-slate-500 hover:text-white hover:bg-white/5 transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-slate-300 bg-white/5 hover:text-white hover:bg-white/10 transition-colors border border-white/10"
                             >
                                 {isCollapsed ? (
                                     <><PanelRightOpen className="w-3.5 h-3.5" /> Show Preview</>

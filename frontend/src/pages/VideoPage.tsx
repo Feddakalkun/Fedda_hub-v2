@@ -25,6 +25,7 @@ const PREFIX_MAP: Record<string, string> = {
 };
 
 const normalizePath = (value: string) => String(value || '').replace(/\\/g, '/');
+const isVideoFile = (name?: string) => /\.(mp4|webm|mov|mkv)$/i.test(String(name || ''));
 
 const matchesExpectedPrefix = (
     expectedPrefix: string | null,
@@ -51,8 +52,9 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
     const [hasNewVideo, setHasNewVideo] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    const { lastCompletedPromptId, lastOutputVideos, outputReadyCount } = useComfyExecution();
+    const { state, error, lastCompletedPromptId, lastOutputVideos, outputReadyCount } = useComfyExecution();
     const expectedPrefix = PREFIX_MAP[modelId] ?? null;
+    const lastMemoryFreeAtRef = useRef(0);
 
     useEffect(() => {
         if (!lastCompletedPromptId) return;
@@ -81,6 +83,13 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                 if (results?.outputs) {
                     const urls: string[] = [];
                     Object.values(results.outputs).forEach((nodeOutput: any) => {
+                        if (nodeOutput.images) {
+                            nodeOutput.images.forEach((v: any) => {
+                                if (!isVideoFile(v?.filename)) return;
+                                if (!matchesExpectedPrefix(expectedPrefix, v.filename, v.subfolder)) return;
+                                urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type));
+                            });
+                        }
                         if (nodeOutput.gifs) {
                             nodeOutput.gifs.forEach((v: any) => {
                                 if (!matchesExpectedPrefix(expectedPrefix, v.filename, v.subfolder)) return;
@@ -108,6 +117,18 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
         fetchVideos();
     }, [lastCompletedPromptId, outputReadyCount, lastOutputVideos, expectedPrefix]);
 
+    // Free VRAM/cache automatically when a run ends or errors on Video page.
+    useEffect(() => {
+        if (state !== 'done' && state !== 'error') return;
+        const now = Date.now();
+        if (now - lastMemoryFreeAtRef.current < 15000) return;
+        lastMemoryFreeAtRef.current = now;
+        const t = setTimeout(() => {
+            comfyService.freeMemory(true, true).catch(() => {});
+        }, 1200);
+        return () => clearTimeout(t);
+    }, [state, lastCompletedPromptId]);
+
     // Reset forceExpand flag after it triggers
     useEffect(() => {
         if (hasNewVideo) {
@@ -118,7 +139,7 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
 
     return (
         <WorkbenchShell
-            leftWidthClassName="w-[520px]"
+            leftWidthClassName="w-[620px]"
             collapsible
             collapseKey="video_preview_collapsed"
             forceExpand={hasNewVideo}
@@ -182,13 +203,24 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                                 )}
                             </div>
                         ) : (
-                            <div className="text-center opacity-20 flex flex-col items-center gap-4">
-                                <Film className="w-16 h-16" />
-                                <p className="tracking-[0.2em] font-light uppercase text-sm">Video Preview</p>
-                                <p className="text-xs text-slate-500 max-w-xs">
-                                    Generate a video to see the output here
-                                </p>
-                            </div>
+                            <>
+                                {state === 'error' && error ? (
+                                    <div className="max-w-xl w-full rounded-xl border border-rose-500/30 bg-rose-950/20 p-5">
+                                        <p className="text-[11px] uppercase tracking-[0.2em] text-rose-300 mb-2">Execution Error</p>
+                                        <p className="text-sm text-rose-100 break-words whitespace-pre-wrap">
+                                            {error.nodeType ? `${error.nodeType}: ` : ''}{error.message}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="text-center opacity-20 flex flex-col items-center gap-4">
+                                        <Film className="w-16 h-16" />
+                                        <p className="tracking-[0.2em] font-light uppercase text-sm">Video Preview</p>
+                                        <p className="text-xs text-slate-500 max-w-xs">
+                                            Generate a video to see the output here
+                                        </p>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 

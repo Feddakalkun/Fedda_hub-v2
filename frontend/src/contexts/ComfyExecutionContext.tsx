@@ -71,6 +71,11 @@ function buildNodeMap(workflow: Record<string, any>): Record<string, { name: str
     return map;
 }
 
+function isVideoFile(filename?: string): boolean {
+    const lower = String(filename || '').toLowerCase();
+    return lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mov') || lower.endsWith('.mkv');
+}
+
 export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode }) => {
     const [state, setState] = useState<ExecutionState>('idle');
     const [currentNodeName, setCurrentNodeName] = useState('');
@@ -174,7 +179,14 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
                 setLastCompletedPromptId(promptId);
                 // Accumulate images
                 if (output?.images && Array.isArray(output.images)) {
-                    setLastOutputImages(prev => [...prev, ...output.images]);
+                    const videosFromImages = output.images.filter((f: OutputFile) => isVideoFile(f?.filename));
+                    const stillImages = output.images.filter((f: OutputFile) => !isVideoFile(f?.filename));
+                    if (stillImages.length > 0) {
+                        setLastOutputImages(prev => [...prev, ...stillImages]);
+                    }
+                    if (videosFromImages.length > 0) {
+                        setLastOutputVideos(prev => [...prev, ...videosFromImages]);
+                    }
                 }
                 // Accumulate videos (VHS_VideoCombine outputs as 'gifs' or 'videos')
                 if (output?.gifs && Array.isArray(output.gifs)) {
@@ -184,6 +196,26 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
                     setLastOutputVideos(prev => [...prev, ...output.videos]);
                 }
                 setOutputReadyCount(prev => prev + 1);
+            },
+
+            onExecutionError: (errData) => {
+                if (cancelledRef.current) return;
+                const message =
+                    errData?.exception_message ||
+                    errData?.message ||
+                    'Workflow execution failed';
+                setState('error');
+                stateRef.current = 'error';
+                setError({
+                    type: 'execution_error',
+                    message: String(message).trim(),
+                    nodeType: errData?.node_type,
+                    nodeId: errData?.node_id,
+                });
+                setCurrentNodeName(errData?.node_type ? `Error in ${errData.node_type}` : 'Execution Error');
+                setCurrentNodeId(errData?.node_id ? String(errData.node_id) : null);
+                setProgress(0);
+                setIsDownloaderNode(false);
             },
 
             onPreview: (blobUrl) => {

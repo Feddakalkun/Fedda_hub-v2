@@ -549,6 +549,7 @@ class ComfyUIService {
         onStatus?: (data: any) => void;
         onProgress?: (node: string, value: number, max: number) => void;
         onExecuting?: (nodeId: string | null) => void;
+        onExecutionError?: (data: any) => void;
         onCompleted?: (promptId: string, output?: any) => void;
         onPreview?: (blobUrl: string) => void;
     }): () => void {
@@ -599,9 +600,11 @@ class ComfyUIService {
                         break;
                     case 'execution_success':
                     case 'execution_interrupted':
-                    case 'execution_error':
-                        // Force transition to done when prompt finishes or errors
+                        // Force transition to done when prompt finishes
                         this._callbacks?.onExecuting?.(null);
+                        break;
+                    case 'execution_error':
+                        this._callbacks?.onExecutionError?.(data.data || {});
                         break;
                     case 'executed':
                         if (data.data.prompt_id) {
@@ -645,6 +648,7 @@ class ComfyUIService {
         onStatus?: (data: any) => void;
         onProgress?: (node: string, value: number, max: number) => void;
         onExecuting?: (nodeId: string | null) => void;
+        onExecutionError?: (data: any) => void;
         onCompleted?: (promptId: string, output?: any) => void;
         onPreview?: (blobUrl: string) => void;
     } | null = null;

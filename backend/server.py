@@ -21,6 +21,8 @@ from lipsync_service import generate_lipsync
 from lora_service import (
     start_lora_download,
     get_download_status,
+    start_lora_import_from_url,
+    get_lora_import_status,
     refresh_comfy_models,
     sync_premium_folder,
     get_installed_premium_loras,
@@ -40,8 +42,25 @@ import urllib.request
 import urllib.error
 import subprocess
 import shutil
+import uuid
 
 app = FastAPI()
+
+SETTINGS_PATH = Path(__file__).parent.parent / "config" / "runtime_settings.json"
+
+
+def _load_runtime_settings() -> dict:
+    if not SETTINGS_PATH.exists():
+        return {}
+    try:
+        return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_runtime_settings(data: dict) -> None:
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 # Register voice streaming WebSocket (/ws/voice)
 try:
@@ -332,11 +351,72 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/ltx/catalog")
+async def get_ltx_catalog():
+    try:
+        path = Path(__file__).parent.parent / "config" / "ltx_hub_catalog.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return {"success": True, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/ltx/catalog/validate")
+async def validate_ltx_catalog():
+    """
+    Lightweight quality-gate:
+    - required_nodes exist in Comfy object_info
+    - required_models exist in ComfyUI models tree
+    """
+    try:
+        cat_path = Path(__file__).parent.parent / "config" / "ltx_hub_catalog.json"
+        catalog = json.loads(cat_path.read_text(encoding="utf-8"))
+        comfy_url = "http://127.0.0.1:8199"
+        info = requests.get(f"{comfy_url}/object_info", timeout=10).json()
+        models_root = Path(__file__).parent.parent / "ComfyUI" / "models"
+
+        checked = []
+        for item in catalog.get("items", []):
+            nodes_ok = all(n in info for n in item.get("required_nodes", []))
+            models_ok = True
+            missing_models = []
+            for m in item.get("required_models", []):
+                found = any(p.name == m for p in models_root.rglob("*") if p.is_file())
+                if not found:
+                    models_ok = False
+                    missing_models.append(m)
+            checked.append({
+                "id": item.get("id"),
+                "nodes_ok": nodes_ok,
+                "models_ok": models_ok,
+                "missing_models": missing_models,
+                "status": "verified" if nodes_ok and models_ok else "blocked",
+            })
+        return {"success": True, "results": checked}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # === PREMIUM LORA DOWNLOADS ===
 
 class LoraInstallRequest(BaseModel):
     url: str
     filename: str
+
+
+class LoraImportUrlRequest(BaseModel):
+    url: str
+    provider: Optional[str] = "auto"
+    filename_override: Optional[str] = None
+
+
+class CivitaiKeyRequest(BaseModel):
+    api_key: str
+
+
+class LtxCopilotRequest(BaseModel):
+    model: str
+    instruction: str
 
 @app.post("/api/lora/install")
 async def install_lora(req: LoraInstallRequest):
@@ -360,6 +440,56 @@ async def get_lora_status(filename: str):
     Check the current status/progress of a specific download.
     """
     return get_download_status(filename)
+
+
+@app.post("/api/lora/import-url")
+async def import_lora_from_url(req: LoraImportUrlRequest):
+    """
+    Import LoRA from direct URL / HuggingFace / Civitai page URL.
+    For Civitai URLs, uses API key saved in runtime settings if present.
+    """
+    try:
+        settings = _load_runtime_settings()
+        civitai_key = settings.get("civitai_api_key", "")
+        result = start_lora_import_from_url(
+            url=req.url,
+            provider=req.provider,
+            filename_override=req.filename_override,
+            civitai_api_key=civitai_key or None,
+        )
+        return result
+    except Exception as e:
+        print(f"[ERROR] LoRA import-url error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/lora/import-status/{job_id}")
+async def get_lora_import_job_status(job_id: str):
+    try:
+        return get_lora_import_status(job_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/settings/civitai-key")
+async def set_civitai_key(req: CivitaiKeyRequest):
+    try:
+        data = _load_runtime_settings()
+        data["civitai_api_key"] = req.api_key.strip()
+        _save_runtime_settings(data)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/settings/civitai-key/status")
+async def get_civitai_key_status():
+    try:
+        data = _load_runtime_settings()
+        has_key = bool((data.get("civitai_api_key") or "").strip())
+        return {"success": True, "configured": has_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/lora/sync-premium")
@@ -1808,6 +1938,90 @@ async def get_chat_models():
         raise HTTPException(status_code=500, detail=f"Ollama request failed: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+_LTX_EXPLICIT_TERMS = [
+    "undress", "undressing", "fingering", "fingerbang", "handjob", "blowjob",
+    "penetrat", "sex", "nude", "naked", "nsfw", "porn", "explicit",
+]
+
+LTX_COPILOT_SYSTEM_PROMPT = """You are an LTX prompt copilot for cinematic video generation.
+Return JSON only with this schema:
+{
+  "mode":"i2v|t2v",
+  "subject":"string",
+  "motion":"string",
+  "camera":"string",
+  "lighting":"string",
+  "style":"string",
+  "negatives":"string",
+  "duration": number,
+  "fps": number,
+  "steps": number,
+  "cfg": number,
+  "denoise": number
+}
+Rules:
+- Keep content mature non-explicit. No explicit sexual acts.
+- Focus on cinematic, physically plausible motion.
+- negatives should include anti-artifact and anti-jitter terms.
+- Use practical defaults when details are missing.
+- JSON only, no markdown."""
+
+
+@app.post("/api/chat/ltx-copilot")
+async def ltx_copilot(req: LtxCopilotRequest):
+    """
+    Generate structured LTX prompt spec for I2V/T2V.
+    Enforces mature non-explicit policy with safe fallback.
+    """
+    instruction = (req.instruction or "").strip()
+    lowered = instruction.lower()
+    if any(term in lowered for term in _LTX_EXPLICIT_TERMS):
+        safe = {
+            "mode": "i2v" if "image" in lowered else "t2v",
+            "subject": "Adult subject in a tasteful cinematic scene",
+            "motion": "Subtle natural body movement, breathing, head turns, eye focus shifts",
+            "camera": "Slow dolly-in with minimal shake",
+            "lighting": "Moody low-key cinematic lighting with soft rim light",
+            "style": "Mature non-explicit cinematic realism",
+            "negatives": "explicit sexual acts, nudity, pornographic framing, anatomy artifacts, jitter, flicker, text, watermark",
+            "duration": 6,
+            "fps": 20,
+            "steps": 16,
+            "cfg": 4.0,
+            "denoise": 0.6,
+            "policy_note": "Converted to mature non-explicit safe alternative"
+        }
+        return {"success": True, "spec": safe}
+
+    try:
+        available_models = _fetch_ollama_models()
+        resolved_model = _resolve_chat_model(req.model, available_models)
+        payload = json.dumps({
+            "model": resolved_model,
+            "messages": [
+                {"role": "system", "content": LTX_COPILOT_SYSTEM_PROMPT},
+                {"role": "user", "content": instruction}
+            ],
+            "stream": False,
+            "keep_alive": "30s",
+            "options": {"num_predict": 600, "num_ctx": 4096}
+        }).encode("utf-8")
+        oreq = urllib.request.Request(
+            "http://127.0.0.1:11434/api/chat",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(oreq, timeout=90) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            reply = result.get("message", {}).get("content", "").strip()
+        spec = json.loads(reply) if isinstance(reply, str) and reply.startswith("{") else {}
+        if not spec:
+            raise ValueError("Copilot did not return JSON")
+        return {"success": True, "spec": spec}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LTX copilot failed: {e}")
 
 
 @app.post("/api/chat")

@@ -9,6 +9,7 @@ import { usePersistentState } from '../../hooks/usePersistentState';
 import { BACKEND_API } from '../../config/api';
 
 type PresetTier = 'fast' | 'balanced' | 'quality';
+type ModelBackendType = 'safetensors' | 'gguf';
 type ImageDims = { width: number; height: number };
 
 const PRESETS: Record<PresetTier, { label: string; description: string; steps: number; cfg: number; denoise: number; longEdge: number; fps: number }> = {
@@ -63,6 +64,7 @@ export const LtxI2vTab = () => {
     const [prioritizeSubjectMotion, setPrioritizeSubjectMotion] = usePersistentState('ltx_i2v_prioritize_subject_motion', true);
     const [lockSeedAcrossRuns, setLockSeedAcrossRuns] = usePersistentState('ltx_i2v_lock_seed', true);
     const [safeModeCpuLoader, setSafeModeCpuLoader] = usePersistentState('ltx_i2v_safe_mode_cpu_loader', false);
+    const [modelBackend, setModelBackend] = usePersistentState<ModelBackendType>('ltx_i2v_model_backend', 'safetensors');
 
     const targetResolution = useMemo(
         () => getAutoResolution(sourceDims, PRESETS[preset].longEdge),
@@ -71,6 +73,29 @@ export const LtxI2vTab = () => {
     const targetFps = PRESETS[preset].fps;
     const targetFrames = duration * targetFps + 1;
     const sourceOrientation = sourceDims ? (sourceDims.width >= sourceDims.height ? 'Landscape' : 'Portrait') : 'Unknown';
+
+    useEffect(() => {
+        const copilotPrompt = localStorage.getItem('ltx_copilot_prompt');
+        if (!copilotPrompt) return;
+        setPrompt(copilotPrompt);
+        const neg = localStorage.getItem('ltx_copilot_negative');
+        const st = localStorage.getItem('ltx_copilot_steps');
+        const cg = localStorage.getItem('ltx_copilot_cfg');
+        const dn = localStorage.getItem('ltx_copilot_denoise');
+        const dur = localStorage.getItem('ltx_copilot_duration');
+        if (neg) setNegativePrompt(neg);
+        if (st) setSteps(Number(st));
+        if (cg) setCfg(Number(cg));
+        if (dn) setDenoise(Number(dn));
+        if (dur) setDuration(Number(dur));
+        localStorage.removeItem('ltx_copilot_prompt');
+        localStorage.removeItem('ltx_copilot_negative');
+        localStorage.removeItem('ltx_copilot_steps');
+        localStorage.removeItem('ltx_copilot_cfg');
+        localStorage.removeItem('ltx_copilot_denoise');
+        localStorage.removeItem('ltx_copilot_duration');
+        localStorage.removeItem('ltx_copilot_fps');
+    }, [setPrompt, setNegativePrompt, setSteps, setCfg, setDenoise, setDuration]);
 
     const setSourceImageWithMeta = (url: string, filename: string) => {
         setSourceImage(url);
@@ -141,6 +166,20 @@ export const LtxI2vTab = () => {
             if (!response.ok) throw new Error('Failed to load LTX 2.3 I2V workflow');
             const workflow = await response.json();
 
+            let backendForRun: ModelBackendType = modelBackend;
+            if (modelBackend === 'gguf') {
+                const hasGgufNode = (await comfyService.getNodeInputOptions('UnetLoaderGGUF', 'unet_name')).length > 0;
+                const checkpoints = await comfyService.getCheckpoints();
+                const hasLtxGguf = checkpoints.some((c) => /ltx.*\.gguf$/i.test(c));
+                if (!hasGgufNode || !hasLtxGguf) {
+                    backendForRun = 'safetensors';
+                    toast('GGUF is not fully available for this LTX workflow on your install. Falling back to Safetensors.', 'error');
+                } else {
+                    toast('GGUF selected, but this workflow currently uses safetensors node graph. Running compatibility fallback.', 'error');
+                    backendForRun = 'safetensors';
+                }
+            }
+
             let activeSeed = seed;
             if (seed === -1) {
                 if (lockSeedAcrossRuns) {
@@ -173,6 +212,9 @@ export const LtxI2vTab = () => {
             // Node 4960: LTXAVTextEncoderLoader
             // Safe mode can force CPU loading to avoid occasional Windows torch access violations.
             if (workflow['4960']) workflow['4960'].inputs.device = safeModeCpuLoader ? 'cpu' : 'default';
+            if (backendForRun === 'safetensors' && workflow['4960']) {
+                workflow['4960'].inputs.ckpt_name = 'ltx-2.3-22b-dev.safetensors';
+            }
 
             // Node 4979: Number of frames (duration * fps)
             if (workflow['4979']) workflow['4979'].inputs.value = targetFrames;
@@ -386,8 +428,8 @@ export const LtxI2vTab = () => {
                     )}
                 </div>
 
-                {/* Preset Picker */}
-                <div>
+            {/* Preset Picker */}
+            <div>
                     <label className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Quality Preset</label>
                     <div className="flex gap-1 bg-black/40 rounded-lg p-1 border border-white/5">
                         {(Object.keys(PRESETS) as PresetTier[]).map((tier) => (
@@ -576,6 +618,36 @@ export const LtxI2vTab = () => {
                 >
                     {isGenerating ? 'Rendering...' : 'Generate Video'}
                 </Button>
+            </div>
+
+            {/* Model Backend */}
+            <div className="bg-[#0a0a0f] border border-white/10 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Model Backend</label>
+                    <span className="text-[10px] text-amber-400">GGUF = experimental</span>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setModelBackend('safetensors')}
+                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            modelBackend === 'safetensors'
+                                ? 'bg-white text-black border-white'
+                                : 'bg-black text-slate-300 border-white/10 hover:border-white/30'
+                        }`}
+                    >
+                        Safetensors
+                    </button>
+                    <button
+                        onClick={() => setModelBackend('gguf')}
+                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            modelBackend === 'gguf'
+                                ? 'bg-white text-black border-white'
+                                : 'bg-black text-slate-300 border-white/10 hover:border-white/30'
+                        }`}
+                    >
+                        GGUF
+                    </button>
+                </div>
             </div>
         </>
     );

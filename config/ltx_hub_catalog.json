@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "source": "awesome-ltx2 curated",
+  "items": [
+    {
+      "id": "ltx-generate-i2v",
+      "title": "LTX 2.3 Image to Video",
+      "quality_tier": "stable",
+      "workflow": "ltx23-single-stage-api.json",
+      "required_nodes": ["LTXAVTextEncoderLoader", "LTXVImgToVideoConditionOnly", "SaveVideo"],
+      "required_models": ["ltx-2.3-22b-dev.safetensors", "comfy_gemma_3_12B_it.safetensors"],
+      "status": "verified"
+    },
+    {
+      "id": "ltx-generate-t2v",
+      "title": "LTX 2.3 Text to Video",
+      "quality_tier": "stable",
+      "workflow": "ltx23-single-stage-api.json",
+      "required_nodes": ["LTXAVTextEncoderLoader", "SaveVideo"],
+      "required_models": ["ltx-2.3-22b-dev.safetensors", "comfy_gemma_3_12B_it.safetensors"],
+      "status": "verified"
+    },
+    {
+      "id": "ltx-edit-i2v-sound",
+      "title": "LTX 2 I2V + Sound",
+      "quality_tier": "experimental",
+      "workflow": "LTX2img2vidsound.json",
+      "required_nodes": ["LTXVAudioVAELoader", "CreateVideo", "SaveVideo"],
+      "required_models": ["ltx-2-19b-dev-fp8.safetensors"],
+      "status": "curated"
+    }
+  ]
+}

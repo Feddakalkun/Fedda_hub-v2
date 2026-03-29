@@ -65,10 +65,17 @@ export const SettingsPage = () => {
     // HuggingFace token state
     const [hfToken, setHfToken] = useState('');
     const [hfSaved, setHfSaved] = useState(false);
+    const [civitaiKey, setCivitaiKey] = useState('');
+    const [civitaiConfigured, setCivitaiConfigured] = useState(false);
+    const [civitaiSaved, setCivitaiSaved] = useState(false);
 
     useEffect(() => {
         const stored = localStorage.getItem(HF_TOKEN_KEY);
         if (stored) setHfToken(stored);
+        fetch('/api/settings/civitai-key/status')
+            .then(r => r.json())
+            .then(d => setCivitaiConfigured(Boolean(d?.configured)))
+            .catch(() => {});
     }, []);
 
     const handleHfSave = () => {
@@ -84,6 +91,23 @@ export const SettingsPage = () => {
     const handleHfClear = () => {
         setHfToken('');
         localStorage.removeItem(HF_TOKEN_KEY);
+    };
+
+    const handleCivitaiSave = async () => {
+        try {
+            const resp = await fetch('/api/settings/civitai-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ api_key: civitaiKey.trim() }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data?.success) throw new Error(data?.detail || 'Failed to save Civitai key');
+            setCivitaiConfigured(Boolean(civitaiKey.trim()));
+            setCivitaiSaved(true);
+            setTimeout(() => setCivitaiSaved(false), 2000);
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     const formatSize = (bytes: number) => {
@@ -387,6 +411,30 @@ export const SettingsPage = () => {
                             3. Accept model license at <a href="https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-400">Wan_2.2_ComfyUI_Repackaged</a><br />
                             4. Paste token here and save
                         </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5 space-y-3">
+                        <h3 className="text-sm font-semibold text-white">Civitai API Key (LoRA URL import)</h3>
+                        <input
+                            type="password"
+                            value={civitaiKey}
+                            onChange={(e) => setCivitaiKey(e.target.value)}
+                            placeholder="Civitai API key"
+                            className="w-full px-4 py-3 bg-[#0a0a0f] border border-white/10 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-white/20 font-mono"
+                        />
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleCivitaiSave}
+                                className="flex-1 px-4 py-2.5 bg-white hover:bg-slate-200 text-black text-xs font-bold uppercase tracking-wider rounded-lg transition-all active:scale-95"
+                            >
+                                {civitaiSaved ? 'Saved!' : 'Save Civitai Key'}
+                            </button>
+                            {civitaiConfigured && (
+                                <span className="text-[11px] text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 rounded">
+                                    Configured
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </CatalogCard>
             )}

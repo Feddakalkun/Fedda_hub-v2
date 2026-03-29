@@ -14,6 +14,9 @@ interface LoRAStatus {
 export const LoRADownloader = () => {
     const [loraStatus, setLoraStatus] = useState<Record<string, LoRAStatus>>({});
     const [isLoading, setIsLoading] = useState(true);
+    const [importUrl, setImportUrl] = useState('');
+    const [importJobId, setImportJobId] = useState<string | null>(null);
+    const [importStatus, setImportStatus] = useState<string>('');
 
     const checkStatus = async () => {
         try {
@@ -73,6 +76,52 @@ export const LoRADownloader = () => {
         const interval = setInterval(checkStatus, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if (!importJobId) return;
+        const interval = setInterval(async () => {
+            try {
+                const resp = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_STATUS}/${importJobId}`);
+                const data = await resp.json();
+                if (!data?.success) return;
+                if (data.status === 'completed') {
+                    setImportStatus(`Imported ${data.filename}`);
+                    setImportJobId(null);
+                    checkStatus();
+                    return;
+                }
+                if (data.status === 'error') {
+                    setImportStatus(`Import failed: ${data.message || 'unknown error'}`);
+                    setImportJobId(null);
+                    return;
+                }
+                const pct = Number(data.progress || 0);
+                setImportStatus(`Importing ${data.filename}... ${pct}%`);
+            } catch {
+                // ignore transient polling errors
+            }
+        }, 1500);
+        return () => clearInterval(interval);
+    }, [importJobId]);
+
+    const handleImportUrl = async () => {
+        const trimmed = importUrl.trim();
+        if (!trimmed) return;
+        setImportStatus('Starting import...');
+        try {
+            const resp = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.LORA_IMPORT_URL}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: trimmed, provider: 'auto' }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data?.success) throw new Error(data?.detail || data?.error || 'Import failed');
+            setImportJobId(data.job_id);
+        } catch (e: any) {
+            setImportStatus(e?.message || 'Import failed');
+            setImportJobId(null);
+        }
+    };
 
     const handleDownloadAll = async () => {
         for (const lora of FREE_LORAS) {
@@ -214,6 +263,29 @@ export const LoRADownloader = () => {
                         </div>
                     );
                 })}
+            </div>
+
+            <div className="p-5 border-t border-white/10 bg-black/20">
+                <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-white">Import LoRA from URL</h4>
+                    <span className="text-[10px] text-slate-500">HuggingFace / Civitai / direct</span>
+                </div>
+                <div className="flex gap-2">
+                    <input
+                        value={importUrl}
+                        onChange={(e) => setImportUrl(e.target.value)}
+                        placeholder="Paste model URL..."
+                        className="flex-1 bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <button
+                        onClick={handleImportUrl}
+                        disabled={Boolean(importJobId)}
+                        className="px-3 py-2 bg-white text-black text-xs font-semibold rounded-lg disabled:opacity-60"
+                    >
+                        {importJobId ? 'Importing...' : 'Import'}
+                    </button>
+                </div>
+                {importStatus && <p className="text-xs text-slate-400 mt-2">{importStatus}</p>}
             </div>
         </div>
     );

@@ -24,7 +24,7 @@ interface SidebarProps {
     onTabChange: (tab: string, subTab?: string) => void;
 }
 
-type ModelEntry = { id: string; label: string; icon: string; category?: string };
+type ModelEntry = { id: string; label: string; icon: string; category?: string; source?: string; mapsTo?: string };
 type SidebarItem = {
     id: string;
     label: string;
@@ -60,6 +60,7 @@ export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) 
                 { id: 'image', label: 'Z-Image', icon: Sparkles, models: MODELS.IMAGE },
                 { id: 'qwen', label: 'QWEN', icon: Box, models: MODELS.QWEN },
                 { id: 'flux2klein', label: 'FLUX2KLEIN', icon: Sparkles, models: MODELS.FLUX2KLEIN },
+                { id: 'ltxhub', label: 'LTX Hub', icon: Video, models: MODELS.LTXHUB },
                 { id: 'video', label: 'Video', icon: Video, models: MODELS.VIDEO },
                 { id: 'audio', label: 'Audio/SFX', icon: Music, models: MODELS.AUDIO },
             ] as SidebarItem[],
@@ -187,6 +188,11 @@ export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) 
                                                             >
                                                                 <span className={`text-[8px] ${activeSubTab === model.id ? 'text-white' : 'text-slate-600'}`}>●</span>
                                                                 <span className="font-medium">{model.label}</span>
+                                                                {model.source && (
+                                                                    <span className="ml-auto text-[9px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border border-white/10 text-slate-400">
+                                                                        {model.source}
+                                                                    </span>
+                                                                )}
                                                             </button>
                                                         ))}
                                                     </div>

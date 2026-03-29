@@ -124,6 +124,17 @@ function isGenericImageRequest(text: string): boolean {
     return !specificTokens.some(tok => t.includes(tok));
 }
 
+function hasLtxIntent(text: string): boolean {
+    const t = (text || '').toLowerCase();
+    return (
+        t.includes('ltx') ||
+        t.includes('image to video') ||
+        t.includes('text to video') ||
+        t.includes('video prompt') ||
+        t.includes('cinematic shot')
+    );
+}
+
 function ensureCelebInPrompt(prompt: string, userInput: string, celebList: CelebCatalogItem[]): string {
     if (!prompt) return prompt;
     const lowerPrompt = prompt.toLowerCase();
@@ -135,6 +146,12 @@ function ensureCelebInPrompt(prompt: string, userInput: string, celebList: Celeb
     }
     const pick = celebList[Math.floor(Math.random() * celebList.length)];
     return `${pick.name}, ${prompt}`;
+}
+
+function isKnownCelebInput(text: string, celebList: CelebCatalogItem[]): boolean {
+    const t = (text || '').trim().toLowerCase();
+    if (!t || celebList.length === 0) return false;
+    return celebList.some(c => c.name.toLowerCase() === t);
 }
 
 
@@ -310,6 +327,36 @@ export const ChatPage = () => {
         setIsThinking(true);
 
         try {
+            if (hasLtxIntent(input)) {
+                const spec = await assistantService.ltxCopilot(selectedModel, input);
+                const prompt = `${spec.subject}. ${spec.motion}. ${spec.camera}. ${spec.lighting}. ${spec.style}.`;
+                const reply = spec.policy_note
+                    ? `LTX Copilot switched this to a mature non-explicit cinematic variant.\n\n${prompt}`
+                    : `LTX Copilot ready.\n\n${prompt}`;
+
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: reply,
+                    timestamp: Date.now(),
+                    type: 'text'
+                }]);
+
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: prompt,
+                    timestamp: Date.now(),
+                    type: 'image-generation-request',
+                    metadata: {
+                        sourceUserInput: input,
+                        generator: 'ltx',
+                        ltxSpec: spec,
+                    }
+                }]);
+                return;
+            }
+
             if (isCelebListQuery(input)) {
                 let items = celebCatalog;
                 if (!items.length) {
@@ -366,12 +413,12 @@ export const ChatPage = () => {
 
             // Determine if the user actually intended to generate something
             // (Prevents model from hallucinating cards on "Hi" or small talk)
-            const userHasIntent = hasImageGenerationIntent(input);
+            const userHasIntent = hasImageGenerationIntent(input) || isKnownCelebInput(input, celebCatalog);
 
             // Parse response for <<GENERATE>> (Robust)
             const genMatch = responseText.match(/<<GENERATE>>([\s\S]*?)(?:<<\/GENERATE>>|<<\/GENERATOR>>|$)/i);
 
-            if (genMatch && userHasIntent) {
+            if (genMatch) {
                 const textPart = responseText.replace(/<<GENERATE>>[\s\S]*?(?:<<\/GENERATE>>|<<\/GENERATOR>>|$)/i, '').trim();
                 let promptPart = genMatch[1].trim();
 
@@ -656,6 +703,21 @@ export const ChatPage = () => {
         }
     };
 
+    const handleGenerateLtx = async (msg: Message) => {
+        const spec = msg.metadata?.ltxSpec;
+        if (!spec) return;
+        const mode = spec.mode === 't2v' ? 'ltx-generate-t2v' : 'ltx-generate-i2v';
+
+        localStorage.setItem('ltx_copilot_prompt', `${spec.subject}. ${spec.motion}. ${spec.camera}. ${spec.lighting}. ${spec.style}.`);
+        localStorage.setItem('ltx_copilot_negative', spec.negatives || '');
+        localStorage.setItem('ltx_copilot_steps', String(spec.steps ?? 16));
+        localStorage.setItem('ltx_copilot_cfg', String(spec.cfg ?? 4));
+        localStorage.setItem('ltx_copilot_denoise', String(spec.denoise ?? 0.6));
+        localStorage.setItem('ltx_copilot_duration', String(spec.duration ?? 6));
+        localStorage.setItem('ltx_copilot_fps', String(spec.fps ?? 20));
+        window.location.hash = `#ltxhub/${mode}`;
+    };
+
     // Drag & Drop Handlers
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -898,7 +960,13 @@ export const ChatPage = () => {
                                     )}
 
                                     <button
-                                        onClick={() => handleGenerateImage(msg.id, msg.content, msg.metadata?.sourceUserInput)}
+                                        onClick={() => {
+                                            if (msg.metadata?.generator === 'ltx') {
+                                                handleGenerateLtx(msg);
+                                                return;
+                                            }
+                                            handleGenerateImage(msg.id, msg.content, msg.metadata?.sourceUserInput);
+                                        }}
                                         disabled={generatingMsgId !== null}
                                         className="w-full bg-white hover:bg-slate-200 text-black py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
                                     >
@@ -910,7 +978,7 @@ export const ChatPage = () => {
                                         ) : (
                                             <>
                                                 <ImageIcon className="w-4 h-4" />
-                                                Generate Image
+                                                {msg.metadata?.generator === 'ltx' ? 'Generate with LTX' : 'Generate Image'}
                                             </>
                                         )}
                                     </button>

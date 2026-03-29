@@ -541,6 +541,12 @@ class ComfyUIService {
         return this.extractComboValues(data?.VAELoader, 'vae_name');
     }
 
+    async getNodeInputOptions(nodeName: string, inputName: string): Promise<string[]> {
+        const data = await this.getObjectInfoNode(nodeName);
+        if (!data || !data[nodeName]) return [];
+        return this.extractComboValues(data[nodeName], inputName);
+    }
+
     /**
      * Connect to WebSocket for real-time updates and return a listener cleanup function.
      * Safe to call multiple times (React Strict Mode) — reuses existing connection.

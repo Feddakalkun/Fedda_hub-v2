@@ -214,6 +214,22 @@ export interface Wan2Spec {
     notes: string;
 }
 
+export interface LtxCopilotSpec {
+    mode: 'i2v' | 't2v';
+    subject: string;
+    motion: string;
+    camera: string;
+    lighting: string;
+    style: string;
+    negatives: string;
+    duration: number;
+    fps: number;
+    steps: number;
+    cfg: number;
+    denoise: number;
+    policy_note?: string;
+}
+
 
 export interface AceStepSection {
     name: string;
@@ -576,6 +592,23 @@ JSON format:
             console.error('Chat Error:', error);
             throw error;
         }
+    }
+    ,
+    ltxCopilot: async (modelName: string, instruction: string): Promise<LtxCopilotSpec> => {
+        const { BACKEND_API } = await import('../config/api');
+        const response = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.CHAT_LTX_COPILOT}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: modelName,
+                instruction,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+            throw new Error(data?.detail || data?.error || 'LTX copilot failed');
+        }
+        return data.spec as LtxCopilotSpec;
     }
 };
 

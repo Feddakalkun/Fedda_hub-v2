@@ -93,6 +93,12 @@
     "note": "LTX-2/2.3 video nodes — ClownSampler_Beta, MultimodalGuider, GuiderParameters, LTXAVTextEncoderLoader, SaveVideo, upscalers"
   },
   {
+    "name": "ComfyUI-GGUF",
+    "url": "https://github.com/city96/ComfyUI-GGUF.git",
+    "folder": "ComfyUI-GGUF",
+    "note": "GGUF loaders and nodes for optional quantized-model workflows"
+  },
+  {
     "name": "ComfyMath",
     "url": "https://github.com/evanspearman/ComfyMath.git",
     "folder": "ComfyMath",

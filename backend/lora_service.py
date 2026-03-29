@@ -4,9 +4,12 @@ import requests
 from pathlib import Path
 import threading
 from typing import Optional
+from urllib.parse import urlparse, parse_qs
+import uuid
 
 # Global storage for tracking download progress
 download_progress = {}
+import_jobs = {}
 
 # Premium LoRA source (Google Drive folder)
 PREMIUM_DRIVE_FOLDER_ID = "1jdliAnhXJG2TdqU6tNi5tbpoAOPuJalv"
@@ -100,7 +103,7 @@ def _list_gdrive_folder(folder_id: str):
     return files
 
 
-def download_lora_task(url: str, filename: str, destination_dir: Path):
+def download_lora_task(url: str, filename: str, destination_dir: Path, headers: Optional[dict] = None):
     """Background task to download a LoRA. Supports regular URLs and Google Drive."""
     try:
         download_progress[filename] = {"status": "downloading", "progress": 0}
@@ -118,7 +121,7 @@ def download_lora_task(url: str, filename: str, destination_dir: Path):
             _download_gdrive_file(file_id, dest_path, filename)
         else:
             print(f"[DL] HTTP download: {filename}")
-            response = requests.get(url, stream=True, timeout=30)
+            response = requests.get(url, stream=True, timeout=30, headers=headers or {})
             response.raise_for_status()
 
             total_size = int(response.headers.get('content-length', 0))
@@ -225,10 +228,10 @@ def refresh_comfy_models():
         return False
 
 
-def start_lora_download(url: str, filename: str):
+def start_lora_download(url: str, filename: str, headers: Optional[dict] = None):
     """Triggers a background thread to download the LoRA."""
     comfy_loras = Path(__file__).parent.parent / "ComfyUI" / "models" / "loras" / "premium"
-    thread = threading.Thread(target=download_lora_task, args=(url, filename, comfy_loras))
+    thread = threading.Thread(target=download_lora_task, args=(url, filename, comfy_loras, headers))
     thread.start()
     return {"status": "started", "filename": filename}
 
@@ -236,6 +239,100 @@ def start_lora_download(url: str, filename: str):
 def get_download_status(filename: str):
     """Returns the current status of a specific download."""
     return download_progress.get(filename, {"status": "not_found"})
+
+
+def _safe_filename(name: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._")
+    return cleaned or f"lora_{uuid.uuid4().hex[:8]}.safetensors"
+
+
+def _resolve_civitai_download(url: str):
+    parsed = urlparse(url)
+    host = (parsed.netloc or "").lower()
+    if "civitai.com" not in host:
+        return None
+
+    path = parsed.path or ""
+    query = parse_qs(parsed.query or "")
+
+    # Direct API download link
+    m = re.search(r"/api/download/models/(\d+)", path)
+    if m:
+        version_id = m.group(1)
+        filename = query.get("filename", [None])[0]
+        return {
+            "provider": "civitai",
+            "url": f"https://civitai.com/api/download/models/{version_id}",
+            "filename_hint": filename,
+        }
+
+    # /models/<id>?modelVersionId=<id>
+    version = query.get("modelVersionId", [None])[0]
+    if version and str(version).isdigit():
+        return {
+            "provider": "civitai",
+            "url": f"https://civitai.com/api/download/models/{version}",
+            "filename_hint": None,
+        }
+
+    # /model-versions/<id>
+    m2 = re.search(r"/model-versions/(\d+)", path)
+    if m2:
+        return {
+            "provider": "civitai",
+            "url": f"https://civitai.com/api/download/models/{m2.group(1)}",
+            "filename_hint": None,
+        }
+
+    return {"provider": "civitai", "url": url, "filename_hint": None}
+
+
+def start_lora_import_from_url(
+    url: str,
+    provider: Optional[str] = None,
+    filename_override: Optional[str] = None,
+    civitai_api_key: Optional[str] = None,
+):
+    """
+    Start LoRA import from arbitrary URL (HF/Civitai/direct).
+    Returns a job id to poll.
+    """
+    resolved_url = url.strip()
+    detected_provider = (provider or "").strip().lower() or "auto"
+    filename_hint = None
+    headers: dict = {}
+
+    civitai_info = _resolve_civitai_download(resolved_url)
+    if detected_provider in ("auto", "civitai") and civitai_info:
+        detected_provider = "civitai"
+        resolved_url = civitai_info["url"]
+        filename_hint = civitai_info.get("filename_hint")
+        if civitai_api_key:
+            headers["Authorization"] = f"Bearer {civitai_api_key}"
+            sep = "&" if "?" in resolved_url else "?"
+            resolved_url = f"{resolved_url}{sep}token={civitai_api_key}"
+
+    filename = filename_override or filename_hint
+    if not filename:
+        tail = urlparse(resolved_url).path.split("/")[-1] or ""
+        filename = tail if tail.lower().endswith(".safetensors") else ""
+    if not filename or not filename.lower().endswith(".safetensors"):
+        filename = f"imported_lora_{uuid.uuid4().hex[:10]}.safetensors"
+    filename = _safe_filename(filename)
+
+    start_lora_download(resolved_url, filename, headers=headers if headers else None)
+    job_id = uuid.uuid4().hex
+    import_jobs[job_id] = {"filename": filename, "provider": detected_provider, "url": resolved_url}
+
+    return {"success": True, "job_id": job_id, "resolved_filename": filename}
+
+
+def get_lora_import_status(job_id: str):
+    job = import_jobs.get(job_id)
+    if not job:
+        return {"success": False, "status": "not_found"}
+    status = get_download_status(job["filename"])
+    return {"success": True, "job_id": job_id, "filename": job["filename"], "provider": job.get("provider"), **status}
 
 
 def _list_hf_safetensors(repo_id: str):

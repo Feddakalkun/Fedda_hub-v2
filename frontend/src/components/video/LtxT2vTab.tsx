@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
+import { comfyService } from '../../services/comfyService';
 
 import { useToast } from '../ui/Toast';
 import { usePersistentState } from '../../hooks/usePersistentState';
 
 type PresetTier = 'fast' | 'balanced' | 'quality';
+type ModelBackendType = 'safetensors' | 'gguf';
 
 const PRESETS: Record<PresetTier, { label: string; description: string; steps: number; cfg: number; fps: number }> = {
     fast: { label: 'Fast', description: 'Quick iterations', steps: 12, cfg: 3.8, fps: 16 },
@@ -38,7 +40,29 @@ export const LtxT2vTab = () => {
     const [seed, setSeed] = usePersistentState('ltx_t2v_seed', -1);
     const [showAdvanced, setShowAdvanced] = usePersistentState('ltx_t2v_show_advanced', false);
     const [safeModeCpuLoader, setSafeModeCpuLoader] = usePersistentState('ltx_t2v_safe_mode_cpu_loader', false);
+    const [modelBackend, setModelBackend] = usePersistentState<ModelBackendType>('ltx_t2v_model_backend', 'safetensors');
     const [isGenerating, setIsGenerating] = useState(false);
+
+    useEffect(() => {
+        const copilotPrompt = localStorage.getItem('ltx_copilot_prompt');
+        if (!copilotPrompt) return;
+        setPrompt(copilotPrompt);
+        const neg = localStorage.getItem('ltx_copilot_negative');
+        const st = localStorage.getItem('ltx_copilot_steps');
+        const cg = localStorage.getItem('ltx_copilot_cfg');
+        const dur = localStorage.getItem('ltx_copilot_duration');
+        if (neg) setNegativePrompt(neg);
+        if (st) setSteps(Number(st));
+        if (cg) setCfg(Number(cg));
+        if (dur) setDuration(Number(dur));
+        localStorage.removeItem('ltx_copilot_prompt');
+        localStorage.removeItem('ltx_copilot_negative');
+        localStorage.removeItem('ltx_copilot_steps');
+        localStorage.removeItem('ltx_copilot_cfg');
+        localStorage.removeItem('ltx_copilot_denoise');
+        localStorage.removeItem('ltx_copilot_duration');
+        localStorage.removeItem('ltx_copilot_fps');
+    }, [setPrompt, setNegativePrompt, setSteps, setCfg, setDuration]);
 
     const resolution = RESOLUTIONS[resolutionIdx] || RESOLUTIONS[2];
     const targetFps = PRESETS[preset].fps;
@@ -66,6 +90,20 @@ export const LtxT2vTab = () => {
             if (!response.ok) throw new Error('Failed to load LTX 2.3 workflow');
             const workflow = await response.json();
 
+            let backendForRun: ModelBackendType = modelBackend;
+            if (modelBackend === 'gguf') {
+                const hasGgufNode = (await comfyService.getNodeInputOptions('UnetLoaderGGUF', 'unet_name')).length > 0;
+                const checkpoints = await comfyService.getCheckpoints();
+                const hasLtxGguf = checkpoints.some((c: string) => /ltx.*\.gguf$/i.test(c));
+                if (!hasGgufNode || !hasLtxGguf) {
+                    backendForRun = 'safetensors';
+                    toast('GGUF is not fully available for this LTX workflow on your install. Falling back to Safetensors.', 'error');
+                } else {
+                    toast('GGUF selected, but this workflow currently uses safetensors node graph. Running compatibility fallback.', 'error');
+                    backendForRun = 'safetensors';
+                }
+            }
+
             const activeSeed = seed === -1 ? Math.floor(Math.random() * 1000000000000000) : seed;
 
             // --- Inject parameters into LTX-2.3 workflow ---
@@ -88,6 +126,9 @@ export const LtxT2vTab = () => {
             // Node 4960: LTXAVTextEncoderLoader
             // Safe mode can force CPU loading to avoid occasional Windows torch access violations.
             if (workflow['4960']) workflow['4960'].inputs.device = safeModeCpuLoader ? 'cpu' : 'default';
+            if (backendForRun === 'safetensors' && workflow['4960']) {
+                workflow['4960'].inputs.ckpt_name = 'ltx-2.3-22b-dev.safetensors';
+            }
 
             // Node 4978/4979: fps + number of frames
             if (workflow['4978']) workflow['4978'].inputs.value = targetFps;
@@ -189,6 +230,36 @@ export const LtxT2vTab = () => {
                             </div>
                         </button>
                     ))}
+                </div>
+            </div>
+
+            {/* Model Backend */}
+            <div className="bg-[#0a0a0f] border border-white/10 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Model Backend</label>
+                    <span className="text-[10px] text-amber-400">GGUF = experimental</span>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setModelBackend('safetensors')}
+                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            modelBackend === 'safetensors'
+                                ? 'bg-white text-black border-white'
+                                : 'bg-black text-slate-300 border-white/10 hover:border-white/30'
+                        }`}
+                    >
+                        Safetensors
+                    </button>
+                    <button
+                        onClick={() => setModelBackend('gguf')}
+                        className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                            modelBackend === 'gguf'
+                                ? 'bg-white text-black border-white'
+                                : 'bg-black text-slate-300 border-white/10 hover:border-white/30'
+                        }`}
+                    >
+                        GGUF
+                    </button>
                 </div>
             </div>
 

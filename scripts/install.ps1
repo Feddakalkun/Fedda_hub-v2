@@ -546,12 +546,17 @@ Pause-Step
 Write-Log "`n[ComfyUI 6/9] Installing Custom Nodes..."
 $NodesConfig = Get-Content (Join-Path $RootPath "config\nodes.json") | ConvertFrom-Json
 $CustomNodesDir = Join-Path $ComfyDir "custom_nodes"
+$InstallGguf = ($env:FEDDA_INSTALL_GGUF -eq "1")
 
 $InstalledCount = 0
 $SkippedCount = 0
 $FailedCount = 0
 
 foreach ($Node in $NodesConfig) {
+    if ($Node.folder -eq "ComfyUI-GGUF" -and -not $InstallGguf) {
+        Write-Log "[$($Node.name)] - Optional GGUF pack skipped (set FEDDA_INSTALL_GGUF=1 to include)"
+        continue
+    }
     # Skip local nodes (e.g., AutoModelFetcher)
     if ($Node.local -eq $true) {
         Write-Log "[$($Node.name)] - Local node, skipping git clone"

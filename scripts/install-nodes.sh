@@ -25,6 +25,7 @@ python3 << 'PYEOF'
 import json, subprocess, os, sys
 
 mode = os.environ.get("NODE_MODE", "full")
+install_gguf = os.environ.get("INSTALL_GGUF", "0") == "1"
 config_path = "/app/config/nodes.json"
 nodes_dir = "/workspace/custom_nodes"
 
@@ -42,6 +43,7 @@ CORE_FOLDERS = {
     "ComfyUI-VideoHelperSuite",
     "ComfyUI-WanVideoWrapper",
     "ComfyUI-LTXVideo",
+    "ComfyUI-GGUF",
     "ComfyMath",
     "RES4LYF",
     "comfy-image-saver",
@@ -55,6 +57,8 @@ with open(config_path, encoding="utf-8") as f:
     nodes = json.load(f)
 
 candidates = [n for n in nodes if not n.get("local")]
+if not install_gguf:
+    candidates = [n for n in candidates if n.get("folder") != "ComfyUI-GGUF"]
 if mode == "core":
     candidates = [n for n in candidates if n.get("folder") in CORE_FOLDERS]
 

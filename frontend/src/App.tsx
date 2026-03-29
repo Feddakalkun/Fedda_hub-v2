@@ -25,6 +25,7 @@ const VALID_TABS = new Set([
   'image',
   'qwen',
   'flux2klein',
+  'ltxhub',
   'video',
   'audio',
   'logs',
@@ -39,6 +40,7 @@ const MODEL_TAB_MAP = {
   image: MODELS.IMAGE,
   qwen: MODELS.QWEN,
   flux2klein: MODELS.FLUX2KLEIN,
+  ltxhub: MODELS.LTXHUB,
   video: MODELS.VIDEO,
   audio: MODELS.AUDIO,
 } as const;
@@ -302,11 +304,15 @@ function App() {
 
 
   const getCurrentModel = () => {
-    const allModels = [...MODELS.IMAGE, ...MODELS.QWEN, ...MODELS.FLUX2KLEIN, ...MODELS.VIDEO, ...MODELS.AUDIO];
+    const allModels = [...MODELS.IMAGE, ...MODELS.QWEN, ...MODELS.FLUX2KLEIN, ...MODELS.LTXHUB, ...MODELS.VIDEO, ...MODELS.AUDIO];
     return allModels.find((m) => m.id === activeSubTab) || allModels[0];
   };
 
   const currentModel = getCurrentModel();
+  const resolvedVideoModelId = (() => {
+    if (activeTab !== 'ltxhub') return currentModel.id;
+    return (currentModel as any)?.mapsTo || 'ltx-i2v';
+  })();
 
   return (
     <ToastProvider>
@@ -324,7 +330,7 @@ function App() {
             <header className="h-20 border-b border-white/5 flex items-center px-8 z-10 justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-                  {['image', 'qwen', 'flux2klein', 'video', 'audio'].includes(activeTab)
+                  {['image', 'qwen', 'flux2klein', 'ltxhub', 'video', 'audio'].includes(activeTab)
                     ? currentModel.label
                     : activeTab === 'chat'
                       ? 'AI-Assistent'
@@ -341,7 +347,7 @@ function App() {
                                 : activeTab === 'logs'
                                   ? 'Console'
                                   : activeTab}
-                  {['image', 'qwen', 'flux2klein', 'video', 'audio'].includes(activeTab) && (
+                  {['image', 'qwen', 'flux2klein', 'ltxhub', 'video', 'audio'].includes(activeTab) && (
                     <span className="text-sm font-normal text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
                       {activeTab}
                     </span>
@@ -380,6 +386,10 @@ function App() {
 
                 <div className="h-full" style={{ display: activeTab === 'flux2klein' ? undefined : 'none' }}>
                   <Flux2KleinPage modelId={currentModel.id} modelLabel={currentModel.label} />
+                </div>
+
+                <div className="h-full" style={{ display: activeTab === 'ltxhub' ? undefined : 'none' }}>
+                  <VideoPage modelId={resolvedVideoModelId} modelLabel={currentModel.label} />
                 </div>
 
                 <div className="h-full" style={{ display: activeTab === 'video' ? undefined : 'none' }}>

@@ -4,6 +4,7 @@ import { comfyService } from '../services/comfyService';
 import { useComfyExecution } from '../contexts/ComfyExecutionContext';
 import { useToast } from '../components/ui/Toast';
 import { usePersistentState } from '../hooks/usePersistentState';
+import { ModelDownloader } from '../components/ModelDownloader';
 import { WorkbenchShell } from '../components/layout/WorkbenchShell';
 import { CatalogCard } from '../components/layout/CatalogShell';
 import { ImageGallery } from '../components/image/ImageGallery';
@@ -260,7 +261,9 @@ export const Flux2KleinPage = ({ modelId, modelLabel }: Flux2KleinPageProps) => 
             leftWidthClassName="w-[500px]"
             leftPaneClassName="p-4"
             leftPane={
-                <div className="px-4 mt-4 space-y-4">
+                <>
+                    <ModelDownloader modelGroup={mode} />
+                    <div className="px-4 mt-4 space-y-4">
                     {(requiresOneImage || requiresTwoImages) && (
                         <CatalogCard className="p-5 shadow-xl space-y-3">
                             <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Reference Images</div>
@@ -516,7 +519,8 @@ export const Flux2KleinPage = ({ modelId, modelLabel }: Flux2KleinPageProps) => 
                         <Sparkles className="w-4 h-4" />
                         {isGenerating ? 'Generating...' : 'Generate FLUX2KLEIN'}
                     </button>
-                </div>
+                    </div>
+                </>
             }
             rightPane={
                 <div className="flex-1 p-5 overflow-y-auto custom-scrollbar">

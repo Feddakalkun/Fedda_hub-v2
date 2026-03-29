@@ -1064,6 +1064,29 @@ REQUIRED_MODELS = {
             "size_gb": 0.810
         }
     ],
+    "flux2klein-txt2img9b": [
+        {
+            "id": "flux2k-unet-9b",
+            "name": "flux-2-klein-9b-fp8.safetensors",
+            "url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8/resolve/main/flux-2-klein-9b-fp8.safetensors",
+            "path": "diffusion_models/flux-2-klein-9b-fp8.safetensors",
+            "size_gb": 8.79
+        },
+        {
+            "id": "flux2k-text-encoder",
+            "name": "qwen_3_8b_fp8mixed.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b/resolve/main/split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors",
+            "path": "text_encoders/qwen_3_8b_fp8mixed.safetensors",
+            "size_gb": 8.07
+        },
+        {
+            "id": "flux2k-vae",
+            "name": "flux2-vae.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b/resolve/main/split_files/vae/flux2-vae.safetensors",
+            "path": "vae/flux2-vae.safetensors",
+            "size_gb": 0.313
+        }
+    ],
     "lipsync": [
         {
             "id": "wan-infinite-unet",
@@ -1091,6 +1114,10 @@ REQUIRED_MODELS = {
 
 # Scene Builder uses the same WAN models as Lipsync
 REQUIRED_MODELS["scene-builder"] = REQUIRED_MODELS["lipsync"]
+# FLUX2KLEIN modes share the same base model set
+REQUIRED_MODELS["flux2klein-image-edit"] = REQUIRED_MODELS["flux2klein-txt2img9b"]
+REQUIRED_MODELS["flux2klein-2-referenceimg"] = REQUIRED_MODELS["flux2klein-txt2img9b"]
+REQUIRED_MODELS["flux2klein-multiangle"] = REQUIRED_MODELS["flux2klein-txt2img9b"]
 
 # LTX-2.3 (22B) - Image-to-Video and Text-to-Video share the same model set
 # No FP8 variants exist yet for 2.3 - full BF16 checkpoints

@@ -34,8 +34,17 @@ export const MoodEditTab = ({ isGenerating, setIsGenerating, initialImageUrl, on
     const [seed, setSeed] = usePersistentState('image_mood_edit_seed', Math.floor(Math.random() * 1000000000000000));
 
     useEffect(() => {
-        if (initialImageUrl) onConsumeImage?.();
-    }, [initialImageUrl, onConsumeImage]);
+        if (!initialImageUrl) return;
+        fetch(initialImageUrl)
+            .then(r => r.blob())
+            .then(blob => {
+                const file = new File([blob], 'from-gallery.png', { type: blob.type || 'image/png' });
+                setInputImage(file);
+                setPreviewUrl(URL.createObjectURL(blob));
+            })
+            .catch(() => { /* ignore */ })
+            .finally(() => onConsumeImage?.());
+    }, [initialImageUrl]);
 
     const denoise = useMemo(() => strengthToDenoise(strength), [strength]);
     const warningActive = denoise > HARD_LOCK_DEFAULTS.warningDenoise;

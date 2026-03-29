@@ -53,12 +53,19 @@ export const InpaintTab = ({ isGenerating, setIsGenerating, initialImageUrl, onC
         load();
     }, []);
 
-    // Consume gallery image when sent from another tab
+    // Load gallery image when sent from another tab
     useEffect(() => {
-        if (initialImageUrl) {
-            onConsumeImage?.();
-        }
-    }, [initialImageUrl, onConsumeImage]);
+        if (!initialImageUrl) return;
+        fetch(initialImageUrl)
+            .then(r => r.blob())
+            .then(blob => {
+                const file = new File([blob], 'from-gallery.png', { type: blob.type || 'image/png' });
+                setInputImage(file);
+                setPreviewUrl(URL.createObjectURL(blob));
+            })
+            .catch(() => { /* ignore */ })
+            .finally(() => onConsumeImage?.());
+    }, [initialImageUrl]);
 
     const handleImageSelected = (file: File) => {
         setInputImage(file);

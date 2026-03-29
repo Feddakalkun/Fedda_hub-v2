@@ -1107,7 +1107,7 @@ REQUIRED_MODELS = {
             "name": "ltx-2-19b-dev-fp8.safetensors",
             "url": "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-dev-fp8.safetensors",
             "path": "checkpoints/ltx-2-19b-dev-fp8.safetensors",
-            "size_gb": 19.3
+            "size_gb": 25.22
         }
     ]
 }

@@ -24,6 +24,27 @@ const PREFIX_MAP: Record<string, string> = {
     'ltx2-lipsync': 'VIDEO/LTX2/',
 };
 
+const normalizePath = (value: string) => String(value || '').replace(/\\/g, '/');
+
+const matchesExpectedPrefix = (
+    expectedPrefix: string | null,
+    filename: string | undefined,
+    subfolder: string | undefined
+) => {
+    if (!expectedPrefix) return true;
+    const normalizedPrefix = normalizePath(expectedPrefix);
+    const normalizedFile = normalizePath(filename || '');
+    const normalizedSubfolder = normalizePath(subfolder || '');
+    const combined = [normalizedSubfolder, normalizedFile].filter(Boolean).join('/');
+
+    // Some nodes place route prefix in subfolder, others in filename.
+    return (
+        normalizedFile.startsWith(normalizedPrefix) ||
+        normalizedSubfolder.startsWith(normalizedPrefix) ||
+        combined.startsWith(normalizedPrefix)
+    );
+};
+
 export const VideoPage = ({ modelId }: VideoPageProps) => {
     const [videoUrls, setVideoUrls] = useState<string[]>([]);
     const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -40,7 +61,9 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
             try {
                 if (lastOutputVideos.length > 0) {
                     const scoped = expectedPrefix
-                        ? lastOutputVideos.filter((v) => v.filename?.startsWith(expectedPrefix))
+                        ? lastOutputVideos.filter((v) =>
+                            matchesExpectedPrefix(expectedPrefix, v.filename, v.subfolder)
+                        )
                         : lastOutputVideos;
                     const urls = scoped.map((v) =>
                         comfyService.getImageUrl(v.filename, v.subfolder, v.type)
@@ -60,13 +83,13 @@ export const VideoPage = ({ modelId }: VideoPageProps) => {
                     Object.values(results.outputs).forEach((nodeOutput: any) => {
                         if (nodeOutput.gifs) {
                             nodeOutput.gifs.forEach((v: any) => {
-                                if (expectedPrefix && !String(v.filename || '').startsWith(expectedPrefix)) return;
+                                if (!matchesExpectedPrefix(expectedPrefix, v.filename, v.subfolder)) return;
                                 urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type));
                             });
                         }
                         if (nodeOutput.videos) {
                             nodeOutput.videos.forEach((v: any) => {
-                                if (expectedPrefix && !String(v.filename || '').startsWith(expectedPrefix)) return;
+                                if (!matchesExpectedPrefix(expectedPrefix, v.filename, v.subfolder)) return;
                                 urls.push(comfyService.getImageUrl(v.filename, v.subfolder, v.type));
                             });
                         }

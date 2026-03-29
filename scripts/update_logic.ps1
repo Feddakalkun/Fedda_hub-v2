@@ -98,6 +98,23 @@ foreach ($Node in $NodesConfig) {
     if (-not (Test-Path $NodeDir_Check)) { $HasMissing = $true; break }
 }
 
+# Always force-update nodes that ship new model architectures regularly
+$CriticalNodes = @("ComfyUI-LTXVideo", "RES4LYF", "ComfyUI-KJNodes")
+foreach ($CritNode in $CriticalNodes) {
+    $CritDir = Join-Path $CustomNodesDir $CritNode
+    if (Test-Path $CritDir) {
+        try {
+            Set-Location $CritDir
+            $ErrorActionPreference = "Continue"
+            & $GitExe pull 2>&1 | Out-Null
+            $ErrorActionPreference = "Stop"
+            Set-Location $RootPath
+        } catch {
+            Set-Location $RootPath
+        }
+    }
+}
+
 if ($NeedNodeUpdate -or $HasMissing) {
     if ($NeedNodeUpdate) {
         Write-Host "`n[1/3] Syncing custom nodes from config/nodes.json..." -ForegroundColor Yellow

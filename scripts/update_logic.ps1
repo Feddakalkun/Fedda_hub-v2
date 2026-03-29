@@ -118,7 +118,7 @@ if ($NeedNodeUpdate -or $HasMissing) {
             Write-Host "  [$($Node.name)] Installing..." -ForegroundColor White
             try {
                 $ErrorActionPreference = "Continue"
-                $cloneOutput = & $GitExe clone --depth 1 $Node.url "$NodeDir_Install" 2>&1 | Out-String
+                & $GitExe clone --depth 1 $Node.url "$NodeDir_Install" 2>&1 | Out-Null
                 $ErrorActionPreference = "Stop"
                 if ($LASTEXITCODE -eq 0) {
                     $InstalledCount++
@@ -180,6 +180,26 @@ if ($NeedNodeUpdate -or $HasMissing) {
     if ($SkippedCount -gt 0)  { $Parts += "$SkippedCount up to date" }
     if ($FailedCount -gt 0)   { $Parts += "$FailedCount failed" }
     Write-Host "`n  Summary: $($Parts -join ', ')" -ForegroundColor Cyan
+}
+
+# ============================================================================
+# 1b. PATCH PYTHON DEPENDENCIES - fix known version conflicts
+# ============================================================================
+Write-Host "`n[1b/3] Patching Python dependencies..." -ForegroundColor Yellow
+
+# Florence2 requires transformers >= 4.45 for is_flash_attn_greater_or_equal_2_10
+$TransformersVersion = & $PyExe -c "import transformers; print(transformers.__version__)" 2>$null
+$NeedsTransformersUpgrade = $true
+if ($TransformersVersion -match '^(\d+)\.(\d+)') {
+    $Major = [int]$Matches[1]; $Minor = [int]$Matches[2]
+    if ($Major -gt 4 -or ($Major -eq 4 -and $Minor -ge 45)) { $NeedsTransformersUpgrade = $false }
+}
+if ($NeedsTransformersUpgrade) {
+    Write-Host "  Upgrading transformers (Florence2 fix)..." -ForegroundColor White
+    & $PyExe -m pip install --upgrade transformers --no-warn-script-location 2>&1 | Out-Null
+    Write-Host "  transformers upgraded OK" -ForegroundColor Green
+} else {
+    Write-Host "  transformers OK ($TransformersVersion)" -ForegroundColor Green
 }
 
 # ============================================================================

@@ -72,6 +72,10 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
 
     const handleGenerate = async () => {
         if (!prompt.trim()) return;
+        if (!personA.lora) {
+            toast('Select a LoRA for Person A first', 'error');
+            return;
+        }
         setIsGenerating(true);
         try {
             const response = await fetch('/workflows/zimage-HQ.json');
@@ -120,9 +124,9 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
 
             if (dualPersonMode) {
                 // Dual person mode
-                const loraA = personA.lora || availableLoras[0] || 'none';
-                const strA = personA.lora ? personA.strength : 0;
-                const loraB = personB.lora || availableLoras[0] || 'none';
+                const loraA = personA.lora;
+                const strA = personA.strength;
+                const loraB = personB.lora || personA.lora; // fallback to A if B not set
                 const strB = personB.lora ? personB.strength : 0;
 
                 // Node 125: Person A LoRA (Main)
@@ -145,9 +149,9 @@ export const HQPortraitTab = ({ isGenerating, setIsGenerating }: HQPortraitTabPr
                 // Save to dual person path
                 workflow["145"].inputs.filename_prefix = "FEDDA/Image/z-image-2person";
             } else {
-                // Single person mode - use person A if set
-                const loraA = personA.lora || availableLoras[0] || 'none';
-                const strA = personA.lora ? personA.strength : 0;
+                // Single person mode
+                const loraA = personA.lora;
+                const strA = personA.strength;
 
                 workflow["125"].inputs.lora_name = loraA;
                 workflow["125"].inputs.strength_model = strA;

@@ -710,9 +710,8 @@ else {
 
 Pause-Step
 
-# 8.6 Download full celeb LoRA pack for Z-Image Turbo (HuggingFace)
-Download-ZImageTurboCelebPack -PythonExe $PyExe -ComfyDir $ComfyDir
-
+# 8.6 Z-Image Turbo celeb LoRA pack is now UI-only (no auto-download in installer)
+Write-Log "Skipping automatic Z-Image Turbo celeb pack download (available in UI on demand)."
 Pause-Step
 
 # 9. Configure ComfyUI-Manager Security (Weak Mode)

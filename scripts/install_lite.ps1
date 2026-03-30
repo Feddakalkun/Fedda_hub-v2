@@ -489,7 +489,7 @@ $NodeColor = "Green"
 if ($Failed -gt 0) { $NodeColor = "Yellow" }
 Write-Step "Nodes: $Installed installed, $Skipped already present, $Failed failed" $NodeColor
 
-Download-ZImageTurboCelebPack -PythonExe $VenvPy -ComfyDir $ComfyDir
+Write-Step "Skipping automatic Z-Image Turbo celeb pack download (available in UI on demand)." "Yellow"
 
 # ============================================================================
 # 5. FRONTEND

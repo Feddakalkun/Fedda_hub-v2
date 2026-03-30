@@ -76,7 +76,14 @@ timeout /t 3 /nobreak >nul
 :: 4. Start FastAPI Backend
 echo [4/5] Starting Backend (Port 8000)...
 start "" /B "%~f0" :svc_backend
-timeout /t 2 /nobreak >nul
+timeout /t 1 /nobreak >nul
+echo     Waiting for Backend API...
+call :wait_http "http://127.0.0.1:8000/health" 45 "Backend API"
+if errorlevel 1 (
+    echo     [WARN] Backend API did not respond yet (continuing startup).
+) else (
+    echo     [OK] Backend API is ready.
+)
 
 :: 5. Start Frontend (runs in this window)
 echo [5/5] Starting FEDDA UI (Port 5173)...
@@ -194,3 +201,24 @@ if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] Backend crashed with error code %errorlevel%
 )
 exit /b
+
+:: ============================================================================
+:: SUBROUTINE: WAIT FOR HTTP ENDPOINT
+:: Usage: call :wait_http "http://127.0.0.1:8000/health" 45 "Backend API"
+:: ============================================================================
+:wait_http
+set "WAIT_URL=%~1"
+set "WAIT_MAX=%~2"
+set "WAIT_NAME=%~3"
+set /a WAIT_ELAPSED=0
+
+:wait_http_loop
+powershell -NoProfile -Command ^
+  "try { $r = Invoke-WebRequest -Uri '%WAIT_URL%' -UseBasicParsing -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+if not errorlevel 1 exit /b 0
+
+if %WAIT_ELAPSED% geq %WAIT_MAX% exit /b 1
+
+set /a WAIT_ELAPSED+=1
+timeout /t 1 /nobreak >nul
+goto wait_http_loop

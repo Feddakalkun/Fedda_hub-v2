@@ -8,30 +8,69 @@ interface LandingPageProps {
 
 export const LandingPage = ({ onEnter }: LandingPageProps) => {
     const [activeVideo, setActiveVideo] = useState<'bg' | 'grok'>('bg');
+    const [backendOnline, setBackendOnline] = useState(false);
     const [comfyOnline, setComfyOnline] = useState(false);
+    const [startupDetail, setStartupDetail] = useState('Initializing services...');
     const [checks, setChecks] = useState(0);
     const [lastCheckedAt, setLastCheckedAt] = useState<number>(Date.now());
 
     const showDoneVideo = comfyOnline;
-    const readyPercent = comfyOnline ? 100 : 0;
+    const readyPercent = comfyOnline ? 100 : backendOnline ? 45 : 10;
     const statusLabel = showDoneVideo
         ? 'System Ready'
-        : 'Waiting for ComfyUI';
+        : 'Starting ComfyUI — Please Wait';
 
     // 1. Poll for ComfyUI status
     useEffect(() => {
         let isMounted = true;
         const checkStatus = async () => {
             try {
+                const healthRes = await fetch('/health', { cache: 'no-store' });
+                const backendAlive = healthRes.ok;
+                let detail = 'Initializing services...';
+
+                let nodePhase = '';
+                let bgTail: string[] = [];
+                if (backendAlive) {
+                    try {
+                        const nodeRes = await fetch('/api/system/node-install-status', { cache: 'no-store' });
+                        if (nodeRes.ok) {
+                            const nodeData = await nodeRes.json();
+                            nodePhase = nodeData?.phase || '';
+                            bgTail = Array.isArray(nodeData?.bg_log_tail) ? nodeData.bg_log_tail : [];
+                        }
+                    } catch {
+                        // Optional status endpoint; ignore in local setups where it may not provide useful data
+                    }
+                }
+
                 const comfyAlive = await comfyService.isAlive();
 
+                if (!backendAlive) {
+                    detail = 'Starting backend API service...';
+                } else if (!comfyAlive) {
+                    if (nodePhase === 'core_ready_full_installing') {
+                        detail = 'ComfyUI is starting and installing core nodes...';
+                    } else if (bgTail.length > 0) {
+                        detail = bgTail[bgTail.length - 1];
+                    } else {
+                        detail = 'ComfyUI startup in progress...';
+                    }
+                } else {
+                    detail = 'ComfyUI is online. System is ready.';
+                }
+
                 if (!isMounted) return;
+                setBackendOnline(backendAlive);
                 setComfyOnline(comfyAlive);
+                setStartupDetail(detail);
                 setChecks((prev) => prev + 1);
                 setLastCheckedAt(Date.now());
             } catch {
                 if (!isMounted) return;
+                setBackendOnline(false);
                 setComfyOnline(false);
+                setStartupDetail('Starting backend API service...');
                 setChecks((prev) => prev + 1);
                 setLastCheckedAt(Date.now());
             }
@@ -113,7 +152,7 @@ export const LandingPage = ({ onEnter }: LandingPageProps) => {
 
                 <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-700 delay-300">
                     {/* Status Indicator */}
-                    <div className={`flex items-center gap-3 px-4 py-2 rounded-full border transition-all duration-500 ${showDoneVideo
+                    <div className={`w-[320px] mx-auto flex items-center justify-center gap-3 px-4 py-2 rounded-full border transition-all duration-500 ${showDoneVideo
                         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                         : 'bg-white/5 border-white/10 text-slate-500'
                         }`}>
@@ -122,9 +161,12 @@ export const LandingPage = ({ onEnter }: LandingPageProps) => {
                         ) : (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         )}
-                        <span className="text-xs font-bold tracking-widest uppercase">
+                        <span className="text-xs font-bold tracking-widest uppercase text-center">
                             {statusLabel}
                         </span>
+                    </div>
+                    <div className="w-[320px] mx-auto -mt-3 text-[11px] text-slate-400 text-center">
+                        {startupDetail}
                     </div>
 
                     <div className="w-[320px] bg-black/40 border border-white/10 rounded-xl p-3 text-left space-y-2">
@@ -138,9 +180,12 @@ export const LandingPage = ({ onEnter }: LandingPageProps) => {
                                 style={{ width: `${readyPercent}%` }}
                             />
                         </div>
-                        <div className="grid grid-cols-1 gap-2 text-[11px]">
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className={`rounded-md px-2 py-1.5 border ${backendOnline ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400'}`}>
+                                API: {backendOnline ? 'Online' : 'Starting'}
+                            </div>
                             <div className={`rounded-md px-2 py-1.5 border ${comfyOnline ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400'}`}>
-                                ComfyUI: {comfyOnline ? 'Online' : 'Offline'}
+                                ComfyUI: {comfyOnline ? 'Online' : 'Starting'}
                             </div>
                         </div>
                         <div className="text-[10px] text-slate-500">

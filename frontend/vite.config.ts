@@ -7,6 +7,12 @@ export default defineConfig({
   server: {
     open: true,
     proxy: {
+      '/comfy': {
+        target: 'http://127.0.0.1:8199',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/comfy/, ''),
+      },
       '/ollama': {
         target: 'http://127.0.0.1:11434',
         changeOrigin: true,

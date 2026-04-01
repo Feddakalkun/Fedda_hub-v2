@@ -428,7 +428,7 @@ $Deps = @(
     "timm", "colour-science", "blend-modes", "loguru",
     "ultralytics", "opencv-python-headless", "dill",
     "fastapi", "uvicorn[standard]", "python-multipart",
-    "browser-cookie3"
+    "browser-cookie3", "edge-tts"
 )
 Venv-Pip "install $($Deps -join ' ')"
 

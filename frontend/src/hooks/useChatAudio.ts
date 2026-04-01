@@ -13,6 +13,19 @@ interface UseChatAudioProps {
     autoPlayTTSMsg?: PlayableMessage | null;
 }
 
+export interface VoiceOption {
+    id: string;
+    name: string;
+    engine?: string;
+}
+
+const FALLBACK_VOICES: VoiceOption[] = [
+    { id: 'female, clear voice', name: 'Female (Default)' },
+    { id: 'man with low pitch tembre', name: 'Male Deep' },
+    { id: 'cheerful woman', name: 'Cheerful' },
+    { id: 'professional male narrator', name: 'Professional' },
+];
+
 export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseChatAudioProps) => {
     // Mic state
     const [isRecording, setIsRecording] = useState(false);
@@ -26,7 +39,10 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
     const [ttsEnabled, setTtsEnabled] = useState(false);
     const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
     const [generatingTtsId, setGeneratingTtsId] = useState<string | null>(null);
-    const [voiceStyle, setVoiceStyle] = useState('female, clear voice');
+    const [voiceStyle, setVoiceStyle] = useState(() => localStorage.getItem('fedda_voice_style') || 'female, clear voice');
+    const [availableVoices, setAvailableVoices] = useState<VoiceOption[]>(FALLBACK_VOICES);
+    const [isLoadingVoices, setIsLoadingVoices] = useState(false);
+    const [isUnloadingAudio, setIsUnloadingAudio] = useState(false);
     const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
     // ======== MIC RECORDING ========
@@ -142,6 +158,7 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
 
     const playTTS = async (messageId: string, text: string) => {
         try {
+            if (!text?.trim()) return;
             setGeneratingTtsId(messageId);
 
             // Generate TTS
@@ -154,7 +171,16 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
                 })
             });
 
-            if (!response.ok) throw new Error('TTS generation failed');
+            if (!response.ok) {
+                let detail = 'TTS generation failed';
+                try {
+                    const err = await response.json();
+                    detail = err?.detail || detail;
+                } catch {
+                    // keep fallback detail
+                }
+                throw new Error(detail);
+            }
 
             // Get audio blob
             const audioBlob = await response.blob();
@@ -189,6 +215,7 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
             console.error('TTS error:', error);
             setPlayingMsgId(null);
             setGeneratingTtsId(null);
+            appendMessage('assistant', `⚠️ Voice playback failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     };
 
@@ -199,6 +226,58 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
         }
         setPlayingMsgId(null);
     };
+
+    const fetchAvailableVoices = async () => {
+        setIsLoadingVoices(true);
+        try {
+            const resp = await fetch('/api/audio/voices');
+            if (!resp.ok) throw new Error('Voice list request failed');
+            const data = await resp.json();
+            const voices = Array.isArray(data?.voices) ? data.voices : [];
+            const normalized: VoiceOption[] = voices
+                .map((v: any) => ({
+                    id: String(v?.name || v?.id || '').trim(),
+                    name: String(v?.name || v?.id || '').trim(),
+                    engine: v?.engine ? String(v.engine) : undefined
+                }))
+                .filter((v: VoiceOption) => v.id.length > 0);
+
+            if (normalized.length > 0) {
+                setAvailableVoices(normalized);
+                if (!normalized.some(v => v.id === voiceStyle)) {
+                    setVoiceStyle(normalized[0].id);
+                }
+            } else {
+                setAvailableVoices(FALLBACK_VOICES);
+            }
+        } catch (error) {
+            console.warn('Voice list fallback:', error);
+            setAvailableVoices(FALLBACK_VOICES);
+        } finally {
+            setIsLoadingVoices(false);
+        }
+    };
+
+    const unloadAudioModels = async () => {
+        setIsUnloadingAudio(true);
+        try {
+            const resp = await fetch('/api/audio/unload', { method: 'POST' });
+            if (!resp.ok) throw new Error('Unload request failed');
+            appendMessage('assistant', '🔋 Voice models unloaded from VRAM. Ready for heavy image/video jobs.');
+        } catch (error) {
+            appendMessage('assistant', `⚠️ Could not unload voice models: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsUnloadingAudio(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAvailableVoices();
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('fedda_voice_style', voiceStyle);
+    }, [voiceStyle]);
 
     useEffect(() => {
         if (!ttsEnabled || !autoPlayTTSMsg) return;
@@ -229,7 +308,12 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
         generatingTtsId,
         voiceStyle,
         setVoiceStyle,
+        availableVoices,
+        isLoadingVoices,
         playTTS,
         stopTTS,
+        fetchAvailableVoices,
+        unloadAudioModels,
+        isUnloadingAudio,
     };
 };

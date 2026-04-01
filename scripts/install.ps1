@@ -657,7 +657,7 @@ $Deps = @(
     "deepdiff", "fal_client", "matplotlib", "scipy", "scikit-image", "scikit-learn",
     "timm", "colour-science", "blend-modes", "loguru",
     "fastapi", "uvicorn[standard]", "python-multipart",
-    "browser-cookie3"
+    "browser-cookie3", "edge-tts"
 )
 Run-Pip "install $($Deps -join ' ')"
 

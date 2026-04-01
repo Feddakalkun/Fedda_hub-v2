@@ -16,6 +16,7 @@ import { ConsoleLogsPage } from './pages/ConsoleLogsPage';
 import { ToastProvider } from './components/ui/Toast';
 import { ComfyExecutionProvider } from './contexts/ComfyExecutionContext';
 import { ExecutionStatusBar } from './components/ExecutionStatusBar';
+import { TopSystemStrip } from './components/ui/TopSystemStrip';
 import { MODELS } from './config/api';
 import { addUiLog, getUiLogs, UI_LOG_EVENT } from './services/uiLogger';
 
@@ -355,6 +356,7 @@ function App() {
                 </h2>
               </div>
               <div className="flex items-center gap-2">
+                <TopSystemStrip />
                 <button
                   onClick={() => {
                     setShowLanding(false);

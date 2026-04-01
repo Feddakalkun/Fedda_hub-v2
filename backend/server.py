@@ -356,6 +356,25 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/system/comfy-status")
+async def comfy_status():
+    """Check whether local ComfyUI API is reachable."""
+    comfy_url = "http://127.0.0.1:8199/system_stats"
+    try:
+        resp = requests.get(comfy_url, timeout=1.5)
+        return {
+            "success": True,
+            "online": bool(resp.ok),
+            "status_code": resp.status_code,
+        }
+    except Exception as e:
+        return {
+            "success": True,
+            "online": False,
+            "error": str(e),
+        }
+
+
 @app.get("/api/ltx/catalog")
 async def get_ltx_catalog():
     try:

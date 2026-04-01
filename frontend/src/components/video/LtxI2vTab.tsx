@@ -11,6 +11,8 @@ import { BACKEND_API } from '../../config/api';
 type PresetTier = 'fast' | 'balanced' | 'quality';
 type ModelBackendType = 'safetensors' | 'gguf';
 type ImageDims = { width: number; height: number };
+type MotionPresetKey = 'hula-hoop' | 'jump-rope';
+type MotionUseCase = 'general' | 'talking' | 'action' | 'product' | 'cinematic';
 
 const PRESETS: Record<PresetTier, { label: string; description: string; steps: number; cfg: number; denoise: number; longEdge: number; fps: number }> = {
     fast: { label: 'Fast', description: 'Quick iterations, lower cost', steps: 12, cfg: 3.6, denoise: 0.65, longEdge: 768, fps: 16 },
@@ -18,9 +20,72 @@ const PRESETS: Record<PresetTier, { label: string; description: string; steps: n
     quality: { label: 'Quality', description: 'Best detail, slowest render', steps: 28, cfg: 4.0, denoise: 0.55, longEdge: 1408, fps: 24 },
 };
 
+const MOTION_PRESETS: Record<MotionPresetKey, { label: string; prompt: string; negativeSuffix: string; denoise: number; steps: number; cfg: number }> = {
+    'hula-hoop': {
+        label: 'Hula Hoop Motion',
+        prompt: 'Full-body performance, a person smoothly spins a hula hoop around the waist with rhythmic hip movement and natural arm balance. Keep anatomy stable, maintain subject identity, and keep camera mostly steady with subtle handheld micro-movement.',
+        negativeSuffix: 'warped hoop, broken hoop geometry, disconnected hoop, extra limbs, duplicated arms, deformed hands, jittery body motion, identity drift',
+        denoise: 0.62,
+        steps: 18,
+        cfg: 4.0,
+    },
+    'jump-rope': {
+        label: 'Jump Rope Motion',
+        prompt: 'Full-body athletic shot, a person performs jump rope with clear rope loops, synchronized foot hops, natural shoulder and wrist movement, realistic timing, and stable body proportions. Keep camera mostly fixed and subject centered.',
+        negativeSuffix: 'warped rope, disconnected rope, missing rope loops, extra legs, extra arms, deformed hands, flickering rope, identity drift',
+        denoise: 0.64,
+        steps: 20,
+        cfg: 4.1,
+    },
+};
+
+const USE_CASE_PROFILES: Record<MotionUseCase, { label: string; positiveBlock: string; negativeBlock: string; stepsBias: number; cfgBias: number; denoiseBias: number }> = {
+    general: {
+        label: 'General Motion',
+        positiveBlock: 'Keep motion natural and continuous, preserve subject identity and body proportions, keep temporal consistency frame-to-frame.',
+        negativeBlock: 'identity drift, temporal inconsistency, jitter flicker, unstable anatomy',
+        stepsBias: 0,
+        cfgBias: 0,
+        denoiseBias: 0,
+    },
+    talking: {
+        label: 'Talking / Presenter',
+        positiveBlock: 'Prioritize facial expression, lip articulation, subtle head nods, natural hand gestures, and stable torso movement.',
+        negativeBlock: 'frozen face, rubber mouth, lip desync, exaggerated gestures, unstable eyes',
+        stepsBias: 2,
+        cfgBias: 0.2,
+        denoiseBias: -0.04,
+    },
+    action: {
+        label: 'Action / Exercise',
+        positiveBlock: 'Prioritize full-body dynamics, clear limb trajectories, realistic momentum, and physically coherent movement arcs.',
+        negativeBlock: 'motion stutter, broken limbs, duplicated body parts, disconnected props, impossible physics',
+        stepsBias: 3,
+        cfgBias: 0.1,
+        denoiseBias: 0.06,
+    },
+    product: {
+        label: 'Product Demo',
+        positiveBlock: 'Keep object geometry locked and clean, emphasize controlled hand interaction, smooth pacing, and minimal camera drift.',
+        negativeBlock: 'warped product, label deformation, shape drift, object morphing, unstable edges',
+        stepsBias: 2,
+        cfgBias: 0.3,
+        denoiseBias: -0.06,
+    },
+    cinematic: {
+        label: 'Cinematic',
+        positiveBlock: 'Use intentional cinematic pacing, layered depth, controlled camera energy, and coherent lighting continuity.',
+        negativeBlock: 'random camera spikes, exposure flicker, chaotic framing, temporal noise buildup',
+        stepsBias: 4,
+        cfgBias: 0.2,
+        denoiseBias: 0.02,
+    },
+};
+
 const RES_MULTIPLE = 32;
 
 const snapToMultiple = (value: number, multiple: number) => Math.max(multiple, Math.round(value / multiple) * multiple);
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 const getAutoResolution = (dims: ImageDims | null, longEdge: number): ImageDims => {
     if (!dims || !dims.width || !dims.height) return { width: 960, height: 544 };
@@ -61,6 +126,7 @@ export const LtxI2vTab = () => {
     const [analysisSuggestions, setAnalysisSuggestions] = useState<string[]>([]);
     const [visionModels, setVisionModels] = useState<string[]>(['llava']);
     const [visionModel, setVisionModel] = usePersistentState('ltx_i2v_vision_model', 'llava');
+    const [motionUseCase, setMotionUseCase] = usePersistentState<MotionUseCase>('ltx_i2v_motion_use_case', 'general');
     const [prioritizeSubjectMotion, setPrioritizeSubjectMotion] = usePersistentState('ltx_i2v_prioritize_subject_motion', true);
     const [lockSeedAcrossRuns, setLockSeedAcrossRuns] = usePersistentState('ltx_i2v_lock_seed', true);
     const [safeModeCpuLoader, setSafeModeCpuLoader] = usePersistentState('ltx_i2v_safe_mode_cpu_loader', false);
@@ -132,6 +198,35 @@ export const LtxI2vTab = () => {
         setDenoise(PRESETS[tier].denoise);
     };
 
+    const applyMotionPreset = (key: MotionPresetKey) => {
+        const presetData = MOTION_PRESETS[key];
+        setMotionUseCase('action');
+        setPrompt(presetData.prompt);
+        setSteps(presetData.steps);
+        setCfg(presetData.cfg);
+        setDenoise(presetData.denoise);
+        if (!negativePrompt.toLowerCase().includes(presetData.negativeSuffix.toLowerCase())) {
+            const mergedNegative = negativePrompt.trim().length > 0
+                ? `${negativePrompt}, ${presetData.negativeSuffix}`
+                : presetData.negativeSuffix;
+            setNegativePrompt(mergedNegative);
+        }
+        toast(`Applied ${presetData.label} preset`, 'success');
+    };
+
+    const buildTunedParams = () => {
+        const profile = USE_CASE_PROFILES[motionUseCase];
+        const promptLower = prompt.toLowerCase();
+        const complexityHits = ['running', 'jump', 'dance', 'fight', 'spinning', 'hoop', 'rope', 'rapid', 'athletic']
+            .filter((k) => promptLower.includes(k)).length;
+        const durationBias = duration >= 10 ? 2 : duration >= 6 ? 1 : 0;
+        const complexityBias = complexityHits >= 3 ? 2 : complexityHits >= 1 ? 1 : 0;
+        const tunedSteps = clamp(Math.round(steps + profile.stepsBias + durationBias + complexityBias), 8, 50);
+        const tunedCfg = clamp(Number((cfg + profile.cfgBias).toFixed(1)), 1, 10);
+        const tunedDenoise = clamp(Number((denoise + profile.denoiseBias + (complexityBias > 0 ? 0.02 : 0)).toFixed(2)), 0.1, 1.0);
+        return { tunedSteps, tunedCfg, tunedDenoise, profile };
+    };
+
     const handleImageDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
@@ -154,7 +249,10 @@ export const LtxI2vTab = () => {
             // Upload source image
             let imageFilename = sourceImageName || 'source.png';
             if (sourceImage.startsWith('http') || sourceImage.startsWith('blob:')) {
-                const imgRes = await fetch(sourceImage);
+                const imgRes = await fetch(sourceImage).catch(() => null);
+                if (!imgRes) {
+                    throw new Error('Failed to fetch source image. Re-select the image and try again (connection or browser blob URL issue).');
+                }
                 const blob = await imgRes.blob();
                 const file = new File([blob], imageFilename, { type: blob.type });
                 const uploadRes = await comfyService.uploadImage(file);
@@ -190,10 +288,20 @@ export const LtxI2vTab = () => {
                 }
             }
 
-            const positivePrompt = prioritizeSubjectMotion
-                ? `${prompt}\n\nThe subject must actively move throughout the shot: natural body movement, posture shifts, head turns, eye movement, and hand/shoulder motion. Keep camera mostly steady.`
-                : prompt;
-            const negativeWithAntiZoom = `${negativePrompt}, no camera zoom, no dolly zoom, no static frozen subject, no random background-only motion`;
+            const { tunedSteps, tunedCfg, tunedDenoise, profile } = buildTunedParams();
+            if (tunedSteps !== steps) setSteps(tunedSteps);
+            if (tunedCfg !== cfg) setCfg(tunedCfg);
+            if (tunedDenoise !== denoise) setDenoise(tunedDenoise);
+
+            const positivePrompt = [
+                prompt,
+                profile.positiveBlock,
+                'Preserve identity, face, hairstyle, clothing, and scene geometry from the source image.',
+                prioritizeSubjectMotion
+                    ? 'The subject must actively move throughout the shot: natural body movement, posture shifts, head turns, eye movement, and hand/shoulder motion. Keep camera mostly steady.'
+                    : 'Keep camera movement controlled and avoid unnecessary reframing.',
+            ].join('\n\n');
+            const negativeWithAntiZoom = `${negativePrompt}, ${profile.negativeBlock}, no camera zoom, no dolly zoom, no static frozen subject, no random background-only motion, hard scene drift, major composition change`;
 
             // --- Inject parameters into LTX-2.3 workflow ---
 
@@ -239,13 +347,13 @@ export const LtxI2vTab = () => {
             if (workflow['4832']) workflow['4832'].inputs.noise_seed = activeSeed + 1;
 
             // Node 4964: GuiderParameters VIDEO (cfg)
-            if (workflow['4964']) workflow['4964'].inputs.cfg = cfg;
+            if (workflow['4964']) workflow['4964'].inputs.cfg = tunedCfg;
 
             // Node 4966: LTXVScheduler (steps)
-            if (workflow['4966']) workflow['4966'].inputs.steps = steps;
+            if (workflow['4966']) workflow['4966'].inputs.steps = tunedSteps;
 
             // Node 3159: LTXVImgToVideoConditionOnly (denoise strength)
-            if (workflow['3159']) workflow['3159'].inputs.strength = denoise;
+            if (workflow['3159']) workflow['3159'].inputs.strength = tunedDenoise;
 
             const runTag = Date.now().toString(36);
 
@@ -265,7 +373,12 @@ export const LtxI2vTab = () => {
 
         } catch (error: any) {
             console.error('LTX I2V generation failed:', error);
-            toast(error?.message || 'Generation failed', 'error');
+            const message = String(error?.message || 'Generation failed');
+            if (message.toLowerCase().includes('failed to fetch')) {
+                toast('Failed to fetch required resource. Check that Backend/ComfyUI are online and re-select the source image.', 'error');
+            } else {
+                toast(message, 'error');
+            }
         } finally {
             setIsGenerating(false);
         }
@@ -394,12 +507,39 @@ export const LtxI2vTab = () => {
                         </div>
                     </div>
                     <p className="text-[10px] text-slate-600 mb-1.5">Describe the motion and what happens next. Long, detailed prompts work best.</p>
+                    <div className="mb-2">
+                        <label className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">Motion Use-Case</label>
+                        <select
+                            value={motionUseCase}
+                            onChange={(e) => setMotionUseCase(e.target.value as MotionUseCase)}
+                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-md px-2 py-2 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-white/20"
+                        >
+                            {(Object.keys(USE_CASE_PROFILES) as MotionUseCase[]).map((key) => (
+                                <option key={key} value={key}>{USE_CASE_PROFILES[key].label}</option>
+                            ))}
+                        </select>
+                    </div>
                     <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         placeholder="Describe the motion, camera movement, and scene dynamics in detail..."
                         className="w-full h-24 bg-[#0a0a0f] border border-white/10 rounded-xl p-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-white/20 resize-none"
                     />
+                    <div className="mt-2">
+                        <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1.5">One-Click Motion Presets</div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(Object.keys(MOTION_PRESETS) as MotionPresetKey[]).map((key) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => applyMotionPreset(key)}
+                                    className="px-2 py-2 rounded-lg text-xs border bg-black text-slate-300 border-white/10 hover:border-white/30 hover:text-white transition-colors"
+                                >
+                                    {MOTION_PRESETS[key].label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     {(analysisDescription || analysisSuggestions.length > 0) && (
                         <div className="mt-3 space-y-2">
                             {analysisDescription && (

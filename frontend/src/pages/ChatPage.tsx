@@ -154,6 +154,20 @@ function isKnownCelebInput(text: string, celebList: CelebCatalogItem[]): boolean
     return celebList.some(c => c.name.toLowerCase() === t);
 }
 
+function findInstalledCelebLora(text: string, celebList: CelebCatalogItem[]): string | null {
+    const t = (text || '').toLowerCase();
+    if (!t || celebList.length === 0) return null;
+
+    const installed = celebList.filter(c => c.installed);
+    // Prefer exact match first
+    const exact = installed.find(c => c.name.toLowerCase() === t.trim());
+    if (exact) return exact.file;
+
+    // Then partial match in prompt
+    const partial = installed.find(c => t.includes(c.name.toLowerCase()));
+    return partial ? partial.file : null;
+}
+
 
 export const ChatPage = () => {
     const { toast } = useToast();
@@ -171,9 +185,7 @@ export const ChatPage = () => {
     const [generatingMsgId, setGeneratingMsgId] = useState<string | null>(null);
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [selectedModel, setSelectedModel] = useState<string>('');
-    const [availableLoras, setAvailableLoras] = useState<string[]>([]);
     const [celebCatalog, setCelebCatalog] = useState<CelebCatalogItem[]>([]);
-    const [selectedLora, setSelectedLora] = useState<string>('');
     const [executionStatus, setExecutionStatus] = useState('');
     const [progress, setProgress] = useState(0);
     const {
@@ -190,8 +202,13 @@ export const ChatPage = () => {
         generatingTtsId,
         voiceStyle,
         setVoiceStyle,
+        availableVoices,
+        isLoadingVoices,
         playTTS,
         stopTTS,
+        fetchAvailableVoices,
+        unloadAudioModels,
+        isUnloadingAudio,
     } = useChatAudio({
         setInput,
         appendMessage: (role, content) => {
@@ -254,14 +271,6 @@ export const ChatPage = () => {
                     setSelectedModel(defaultModel && models.includes(defaultModel) ? defaultModel : models[0]);
                 }
 
-                // LoRAs
-                const loras = await comfyService.getLoras();
-                setAvailableLoras(loras);
-
-                // Auto-sync celeb LoRA pack from Hugging Face in background.
-                // Safe to call repeatedly: backend returns "running" if already in progress.
-                fetch('/api/lora/sync-zimage-turbo', { method: 'POST' }).catch(() => { });
-
                 // Load celeb catalog for chat helpers.
                 try {
                     const celebResp = await fetch('/api/lora/zimage-turbo/celebs?limit=500');
@@ -280,23 +289,6 @@ export const ChatPage = () => {
             }
         };
         fetchData();
-
-        // Keep LoRA list fresh while background sync downloads new files.
-        const interval = setInterval(async () => {
-            try {
-                const loras = await comfyService.getLoras();
-                setAvailableLoras(prev => {
-                    const prevSorted = [...prev].sort();
-                    const nextSorted = [...loras].sort();
-                    if (JSON.stringify(prevSorted) === JSON.stringify(nextSorted)) return prev;
-                    return loras;
-                });
-            } catch {
-                // Ignore transient polling errors
-            }
-        }, 15000);
-
-        return () => clearInterval(interval);
     }, []);
 
     const scrollToBottom = () => {
@@ -578,15 +570,17 @@ export const ChatPage = () => {
                 workflow["30"].inputs.height = 1024;
             }
 
-            // Node 126: LoRA Injection
+            const autoLora = findInstalledCelebLora(sourceUserInput || prompt, celebCatalog);
+
+            // Node 126: LoRA Injection (auto only if celeb is detected + installed)
             if (workflow["126"]) {
-                if (selectedLora) {
+                if (autoLora) {
                     workflow["126"].inputs.lora_1 = {
                         "on": true,
-                        "lora": selectedLora,
+                        "lora": autoLora,
                         "strength": 1.0
                     };
-                    console.log('🎨 Applying LoRA:', selectedLora);
+                    console.log('🎨 Applying auto celeb LoRA:', autoLora);
                 } else {
                     // Disable LoRA if none selected
                     if (workflow["126"].inputs.lora_1) {
@@ -820,21 +814,6 @@ export const ChatPage = () => {
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-[#0a0a0f] border border-white/10 rounded-lg px-2 py-1">
-                            <span className="text-xs text-slate-500">LoRA</span>
-                            <select
-                                value={selectedLora}
-                                onChange={(e) => setSelectedLora(e.target.value)}
-                                className="bg-transparent text-xs text-white border-none focus:ring-0 cursor-pointer outline-none max-w-[140px]"
-                                disabled={availableLoras.length === 0}
-                            >
-                                <option value="">{availableLoras.length === 0 ? 'None' : 'None'}</option>
-                                {availableLoras.map(l => (
-                                    <option key={l} value={l} className="bg-[#121218]">{l.replace('.safetensors', '').replace('.pt', '')}</option>
-                                ))}
-                            </select>
-                        </div>
-
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setTtsEnabled(!ttsEnabled)}
@@ -846,16 +825,39 @@ export const ChatPage = () => {
                             </button>
 
                             {ttsEnabled && (
-                                <select
-                                    value={voiceStyle}
-                                    onChange={(e) => setVoiceStyle(e.target.value)}
-                                    className="px-2 py-1 rounded-lg bg-[#121218] border border-white/10 text-xs text-white"
-                                >
-                                    <option value="female, clear voice">Female</option>
-                                    <option value="man with low pitch tembre">Male Deep</option>
-                                    <option value="cheerful woman">Cheerful</option>
-                                    <option value="professional male narrator">Professional</option>
-                                </select>
+                                <>
+                                    <select
+                                        value={voiceStyle}
+                                        onChange={(e) => setVoiceStyle(e.target.value)}
+                                        className="px-2 py-1 rounded-lg bg-[#121218] border border-white/10 text-xs text-white min-w-[170px]"
+                                        disabled={isLoadingVoices}
+                                        title="Voice engine/style"
+                                    >
+                                        {availableVoices.map(v => (
+                                            <option key={v.id} value={v.id}>
+                                                {v.name}{v.engine ? ` (${v.engine})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    <button
+                                        onClick={fetchAvailableVoices}
+                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-200"
+                                        disabled={isLoadingVoices}
+                                        title="Refresh available voices"
+                                    >
+                                        {isLoadingVoices ? 'Refreshing...' : 'Refresh Voices'}
+                                    </button>
+
+                                    <button
+                                        onClick={unloadAudioModels}
+                                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-200"
+                                        disabled={isUnloadingAudio}
+                                        title="Unload voice models from VRAM"
+                                    >
+                                        {isUnloadingAudio ? 'Unloading...' : 'Free Voice VRAM'}
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

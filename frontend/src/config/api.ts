@@ -91,10 +91,8 @@ export const MODELS = {
         { id: 'ltx-presets-scene-builder', label: 'Scene Builder', icon: 'Film', category: 'PRESETS', source: 'WAN', mapsTo: 'scene-builder' },
     ],
     VIDEO: [
-        { id: 'ltx-i2v', label: 'Image to Video', icon: 'ImagePlay', category: 'LTX 2.3' },
-        { id: 'ltx-t2v', label: 'Text to Video', icon: 'Type', category: 'LTX 2.3' },
-        { id: 'ltx2-i2v-sound', label: 'I2V + Sound', icon: 'Volume2', category: 'LTX 2' },
-        { id: 'ltx2-lipsync', label: 'Lipsync', icon: 'Mic2', category: 'LTX 2' },
+        // Keep Video menu focused on WAN utilities.
+        // LTX entries live in MODELS.LTXHUB to avoid duplicated navigation paths.
         { id: 'lipsync', label: 'Lipsync', icon: 'Mic2', category: 'WAN' },
         { id: 'scene-builder', label: 'Scene Builder', icon: 'Film', category: 'WAN' },
     ],

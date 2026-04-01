@@ -387,6 +387,7 @@ def _tts_kokoro(text: str, voice: str = "af_heart") -> Path:
 def _tts_edge(text: str, voice_style: str = "Female") -> Path:
     """Generate speech using Edge TTS (cloud fallback)."""
     import edge_tts
+    import concurrent.futures
 
     edge_voice = EDGE_VOICES.get(voice_style, "en-US-AriaNeural")
     output_path = TEMP_AUDIO_DIR / f"tts_{int(time.time() * 1000)}.mp3"
@@ -397,7 +398,14 @@ def _tts_edge(text: str, voice_style: str = "Female") -> Path:
         communicate = edge_tts.Communicate(text, edge_voice)
         await communicate.save(str(output_path))
 
-    asyncio.run(_generate())
+    # FastAPI runs inside an active event loop. If we're already in one,
+    # run Edge-TTS in a dedicated thread with its own loop.
+    try:
+        asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(lambda: asyncio.run(_generate())).result()
+    except RuntimeError:
+        asyncio.run(_generate())
 
     elapsed = time.time() - start
     print(f"[OK] Edge TTS: {elapsed:.2f}s, voice={edge_voice}")

@@ -328,6 +328,14 @@ if (Test-Path $ComfyRequirements) {
     }
 }
 
+# Ensure backend voice fallback dependency exists after update
+try {
+    & $PyExe -m pip install edge-tts --no-warn-script-location 2>&1 | Out-Null
+    Write-Host "  edge-tts synced." -ForegroundColor Green
+} catch {
+    Write-Host "  [WARNING] edge-tts sync failed (non-fatal): $_" -ForegroundColor Yellow
+}
+
 $CleanedCount = 0
 foreach ($file in $LegacyFiles) {
     $path = Join-Path $RootPath $file

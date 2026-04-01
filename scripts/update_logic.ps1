@@ -90,6 +90,22 @@ $UpdatedCount = 0
 $SkippedCount = 0
 $FailedCount = 0
 
+function Sync-NodeSubmodules {
+    param([string]$NodeDir)
+    $GitmodulesFile = Join-Path $NodeDir ".gitmodules"
+    if (Test-Path $GitmodulesFile) {
+        try {
+            Set-Location $NodeDir
+            $ErrorActionPreference = "Continue"
+            & $GitExe submodule update --init --recursive 2>&1 | Out-Null
+            $ErrorActionPreference = "Stop"
+            Set-Location $RootPath
+        } catch {
+            Set-Location $RootPath
+        }
+    }
+}
+
 # Always check for missing nodes
 $HasMissing = $false
 foreach ($Node in $NodesConfig) {
@@ -109,6 +125,7 @@ foreach ($CritNode in $CriticalNodes) {
             & $GitExe pull 2>&1 | Out-Null
             $ErrorActionPreference = "Stop"
             Set-Location $RootPath
+            Sync-NodeSubmodules -NodeDir $CritDir
         } catch {
             Set-Location $RootPath
         }
@@ -140,6 +157,7 @@ if ($NeedNodeUpdate -or $HasMissing) {
                 if ($LASTEXITCODE -eq 0) {
                     $InstalledCount++
                     Write-Host "  [$($Node.name)] Installed OK" -ForegroundColor Green
+                    Sync-NodeSubmodules -NodeDir $NodeDir_Install
 
                     $ReqFile = Join-Path $NodeDir_Install "requirements.txt"
                     if (Test-Path $ReqFile) {
@@ -169,6 +187,7 @@ if ($NeedNodeUpdate -or $HasMissing) {
                 }
                 $UpdatedCount++
                 Set-Location $RootPath
+                Sync-NodeSubmodules -NodeDir $NodeDir_Install
             }
             catch {
                 Write-Host "  [$($Node.name)] Update failed (non-fatal): $_" -ForegroundColor Yellow

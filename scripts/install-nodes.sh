@@ -89,6 +89,12 @@ for node in candidates:
         print(f"    WARNING: Failed to clone {name}")
         continue
 
+    gitmodules_path = os.path.join(dest, ".gitmodules")
+    if os.path.exists(gitmodules_path):
+        print(f"    Initializing submodules for {name}...")
+        sys.stdout.flush()
+        subprocess.run(["git", "-C", dest, "submodule", "update", "--init", "--recursive"])
+
     req_path = os.path.join(dest, "requirements.txt")
     if os.path.exists(req_path):
         print(f"    Installing requirements for {name}...")

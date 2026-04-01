@@ -674,6 +674,17 @@ foreach ($Node in $NodesConfig) {
             Write-Log "[$($Node.name)] - Installed successfully"
             $InstalledCount++
 
+            # Initialize git submodules for nodes that depend on vendored repos
+            $NodeGitmodules = Join-Path $NodeInstallDir ".gitmodules"
+            if (Test-Path $NodeGitmodules) {
+                Write-Log "[$($Node.name)] - Initializing git submodules..."
+                Push-Location $NodeInstallDir
+                $ErrorActionPreference = "Continue"
+                & $GitExe submodule update --init --recursive 2>&1 | Out-Null
+                $ErrorActionPreference = "Stop"
+                Pop-Location
+            }
+
             # Install node requirements if requirements.txt exists
             $NodeReqFile = Join-Path $NodeInstallDir "requirements.txt"
             if (Test-Path $NodeReqFile) {

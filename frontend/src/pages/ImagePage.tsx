@@ -52,6 +52,8 @@ export const ImagePage = ({ modelId }: ImagePageProps) => {
         <WorkbenchShell
             leftWidthClassName="w-[520px]"
             leftPaneClassName="p-4"
+            collapsible
+            collapseKey="image_preview_collapsed"
             leftPane={
                 <>
                     <ModelDownloader modelGroup="z-image" />

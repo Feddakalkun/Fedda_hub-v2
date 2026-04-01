@@ -112,6 +112,7 @@ export const GenerateTab = ({ isGenerating, setIsGenerating }: GenerateTabProps)
                 negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
                 isGenerating={isGenerating} onGenerate={handleGenerate}
                 showNegative={false}
+                loraNames={selectedLoras.map(l => l.name)}
             />
 
             {/* Advanced Settings */}

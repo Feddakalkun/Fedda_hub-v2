@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Sparkles, Eye, Upload, Loader2, BookOpen } from 'lucide-react';
+import { Sparkles, Eye, Upload, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { ollamaService } from '../../services/ollamaService';
 import { assistantService } from '../../services/assistantService';
 import { useToast } from '../ui/Toast';
-import { PromptLibrary } from '../PromptLibrary';
 
 interface PromptInputProps {
     prompt: string;
@@ -14,14 +13,14 @@ interface PromptInputProps {
     isGenerating: boolean;
     onGenerate: () => void;
     showNegative?: boolean;
+    loraNames?: string[];
 }
 
-export const PromptInput = ({ prompt, setPrompt, negativePrompt, setNegativePrompt, isGenerating, onGenerate, showNegative = true }: PromptInputProps) => {
+export const PromptInput = ({ prompt, setPrompt, negativePrompt, setNegativePrompt, isGenerating, onGenerate, showNegative = true, loraNames = [] }: PromptInputProps) => {
     const { toast } = useToast();
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [, setIsDescribing] = useState(false);
-    const [showPromptLibrary, setShowPromptLibrary] = useState(false);
 
     const enhancePrompt = async () => {
         if (!prompt.trim() || isEnhancing) return;
@@ -30,7 +29,14 @@ export const PromptInput = ({ prompt, setPrompt, negativePrompt, setNegativeProm
             const models = await ollamaService.getModels();
             const model = models.find(m => m.name.includes('qwen') || m.name.includes('goonsai'))?.name || models[0]?.name;
             if (!model) { toast('No Ollama model available for prompt enhancement', 'error'); return; }
-            const enhanced = await assistantService.enhancePrompt(model, prompt);
+            // If character LoRAs are selected, prefix context so the LLM preserves the character
+            const characterNames = loraNames
+                .map(n => n.split(/[\\/]/).pop()?.replace(/\.(safetensors|pt|ckpt)$/i, '') || '')
+                .filter(Boolean);
+            const contextPrefix = characterNames.length > 0
+                ? `[Character LoRA active: ${characterNames.join(', ')}. Preserve this character's appearance.] `
+                : '';
+            const enhanced = await assistantService.enhancePrompt(model, contextPrefix + prompt);
             if (enhanced) setPrompt(enhanced);
             await ollamaService.unloadModel(model);
         } catch (err) {
@@ -101,9 +107,6 @@ export const PromptInput = ({ prompt, setPrompt, negativePrompt, setNegativeProm
                         <span>Tip: Drag an image to auto-generate a prompt</span>
                     </p>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setShowPromptLibrary(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/15 transition-all">
-                            <BookOpen className="w-3 h-3" /> Library
-                        </button>
                         <button onClick={enhancePrompt} disabled={isEnhancing || !prompt.trim()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-black hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                             {isEnhancing ? (<><Loader2 className="w-3 h-3 animate-spin" /> Enhancing...</>) : (<><Sparkles className="w-3 h-3" /> Enhance Prompt</>)}
                         </button>
@@ -136,11 +139,6 @@ export const PromptInput = ({ prompt, setPrompt, negativePrompt, setNegativeProm
                 </div>
             </div>
 
-            <PromptLibrary
-                isOpen={showPromptLibrary}
-                onClose={() => setShowPromptLibrary(false)}
-                onSelect={(positive, negative) => { setPrompt(positive); if (negative) setNegativePrompt(negative); }}
-            />
         </>
     );
 };

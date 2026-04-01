@@ -72,3 +72,27 @@ Bring clean repo to parity with install. Commit Codex's unstaged changes.
 ### Open
 - LTX T2V: PENDING user running `update.bat`
 - UI menu review: next task
+
+---
+
+## [2026-04-01 19:55 Europe/Oslo] Claude — Z-Image Generate fixes
+
+### Goal
+Fix 3 issues in Z-Image Generate tab per user review.
+
+### Changes
+1. **PromptInput.tsx** — Removed `Library` button + `PromptLibrary` import/state/JSX. Added `loraNames?: string[]` prop. Enhance prompt now prefixes LLM input with active character LoRA names to preserve character identity.
+2. **GenerateTab.tsx** — Passes `selectedLoras.map(l => l.name)` as `loraNames` to PromptInput.
+3. **ImagePage.tsx** — Added `collapsible` + `collapseKey="image_preview_collapsed"` to WorkbenchShell. Gallery panel now toggles; left pane expands to full width when hidden.
+
+### Verification
+- **VERIFIED**: `tsc --noEmit` passes, no type errors
+- **VERIFIED**: Files synced to install folder
+- **VERIFIED**: Committed `3aa6aed`
+- **PENDING VALIDATION**: Runtime behavior (LoRA context in enhance prompt, gallery collapse toggle)
+
+### Note on LoRA
+The LoRA IS being injected into the workflow correctly (node 126, Power Lora Loader). The enhance prompt issue was the LLM not knowing the character — now fixed by passing character name as context prefix.
+
+### Next
+Continue menu review: HQ Image tab.

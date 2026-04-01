@@ -30,6 +30,18 @@
     "note": "FaceDetailer, SAMLoader, UltralyticsDetectorProvider, mask tools"
   },
   {
+    "name": "ComfyUI_UltimateSDUpscale",
+    "url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git",
+    "folder": "ComfyUI_UltimateSDUpscale",
+    "note": "UltimateSDUpscale node used in HQ and dedicated upscale workflows"
+  },
+  {
+    "name": "ComfyUI_IPAdapter_plus",
+    "url": "https://github.com/cubiq/ComfyUI_IPAdapter_plus.git",
+    "folder": "ComfyUI_IPAdapter_plus",
+    "note": "IPAdapterModelLoader and IPAdapterAdvanced nodes used in IPAdapter workflows"
+  },
+  {
     "name": "ComfyUI-Impact-Subpack",
     "url": "https://github.com/comfyorg/comfyui-impact-subpack.git",
     "folder": "ComfyUI-Impact-Subpack",
@@ -41,6 +53,12 @@
     "url": "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git",
     "folder": "ComfyUI-Inpaint-CropAndStitch",
     "note": "InpaintCropImproved, InpaintStitchImproved — inpaint workflow"
+  },
+  {
+    "name": "comfyui-inpaint-nodes",
+    "url": "https://github.com/Acly/comfyui-inpaint-nodes.git",
+    "folder": "comfyui-inpaint-nodes",
+    "note": "INPAINT_ExpandMask and related inpaint helper nodes for mask growth/blur workflows"
   },
   {
     "name": "ComfyUI_LayerStyle",

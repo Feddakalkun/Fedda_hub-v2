@@ -11,7 +11,20 @@ export const useComfyStatus = (pollInterval: number = 3000) => {
 
         const checkStatus = async () => {
             try {
-                const alive = await comfyService.isAlive();
+                // Keep this aligned with LandingPage so topbar and landing never disagree.
+                // Primary check via local Vite proxy route to ComfyUI.
+                let alive = false;
+                try {
+                    const proxied = await fetch('/comfy/system_stats', { cache: 'no-store' });
+                    alive = proxied.ok;
+                } catch {
+                    alive = false;
+                }
+
+                // Fallback to service probe (covers runpod/direct modes).
+                if (!alive) {
+                    alive = await comfyService.isAlive();
+                }
                 setIsConnected(alive);
             } catch (error) {
                 setIsConnected(false);

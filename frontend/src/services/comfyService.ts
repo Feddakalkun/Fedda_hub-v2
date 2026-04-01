@@ -2,6 +2,7 @@
 import { COMFY_API, BACKEND_API } from '../config/api';
 import type { ComfyPrompt, ComfyQueueItem, ComfyHistoryItem } from '../types/comfy';
 import { addUiLog } from './uiLogger';
+import { assertPreviewAllowed } from '../config/preview';
 
 class ComfyUIService {
     private clientId: string;
@@ -119,6 +120,17 @@ class ComfyUIService {
                 method: 'GET',
                 headers: this.getAuthHeaders(),
             });
+            if (response.ok) return true;
+        } catch {
+            // fall through to proxy fallback
+        }
+
+        // Fallback to local proxy route (keeps behavior aligned with landing checks).
+        try {
+            const response = await fetch(`/comfy${COMFY_API.ENDPOINTS.SYSTEM_STATS}`, {
+                method: 'GET',
+                cache: 'no-store',
+            });
             return response.ok;
         } catch {
             // Silently fail - ComfyUI may be starting up or offline
@@ -131,14 +143,22 @@ class ComfyUIService {
      * Get system statistics (CPU, RAM, VRAM)
      */
     async getSystemStats(): Promise<any> {
-        const response = await fetch(`${this.getComfyBaseUrl()}${COMFY_API.ENDPOINTS.SYSTEM_STATS}`, {
-            headers: this.getAuthHeaders(),
-        });
-        if (!response.ok) {
-            // Silently fail - status indicator already shows offline state
+        try {
+            const response = await fetch(`${this.getComfyBaseUrl()}${COMFY_API.ENDPOINTS.SYSTEM_STATS}`, {
+                headers: this.getAuthHeaders(),
+            });
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch {
+            // fall through to proxy fallback
+        }
+
+        const fallback = await fetch(`/comfy${COMFY_API.ENDPOINTS.SYSTEM_STATS}`, { cache: 'no-store' });
+        if (!fallback.ok) {
             throw new Error('Failed to fetch system stats');
         }
-        return await response.json();
+        return await fallback.json();
     }
 
     async getHardwareStats(): Promise<any> {
@@ -156,6 +176,7 @@ class ComfyUIService {
      * Queue a prompt for generation
      */
     async queuePrompt(workflow: any): Promise<{ prompt_id: string }> {
+        assertPreviewAllowed('queue_prompt');
         // Wait for WebSocket to be ready before queueing to prevent first-batch failures
         await this.waitForWebSocket();
         await this.normalizeWorkflowForCurrentComfy(workflow);
@@ -416,6 +437,7 @@ class ComfyUIService {
      * Interrupt the currently running workflow execution
      */
     async interrupt(): Promise<void> {
+        assertPreviewAllowed('interrupt');
         const response = await fetch(`${this.getComfyBaseUrl()}/interrupt`, {
             method: 'POST',
             headers: this.getAuthHeaders(),
@@ -474,6 +496,7 @@ class ComfyUIService {
      * Upload an image to ComfyUI
      */
     async uploadImage(file: File): Promise<{ name: string; subfolder: string }> {
+        assertPreviewAllowed('upload_image');
         const formData = new FormData();
         formData.append('image', file);
 
@@ -731,6 +754,7 @@ class ComfyUIService {
      * Upload an audio file to ComfyUI
      */
     async uploadAudio(file: File): Promise<{ name: string; subfolder: string }> {
+        assertPreviewAllowed('upload_audio');
         const formData = new FormData();
         formData.append('image', file); // ComfyUI uses 'image' field even for audio in the upload endpoint usually, or check API. 
         // Standard ComfyUI /upload/image endpoint accepts audio files too.
@@ -774,6 +798,7 @@ class ComfyUIService {
     }
 
     async freeMemory(unloadModels: boolean = true, freeCache: boolean = true): Promise<void> {
+        assertPreviewAllowed('free_memory');
         try {
             await fetch(`${this.getComfyBaseUrl()}/free`, {
                 method: 'POST',
@@ -791,4 +816,5 @@ class ComfyUIService {
 }
 
 export const comfyService = new ComfyUIService();
+
 

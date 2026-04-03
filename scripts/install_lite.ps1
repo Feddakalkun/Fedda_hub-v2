@@ -172,85 +172,14 @@ Write-Header "SYSTEM CHECK"
 
 $AllGood = $true
 
-# Python - check presence AND minimum version (3.10+ required by ComfyUI)
-$PY_MIN_MAJOR = 3
-$PY_MIN_MINOR = 10
-$PY_REC_MINOR = 11   # Recommended (what portable installer ships)
-$PyVersionOK = $false
-$PyVersionWarning = $false
-
+# Python - informational only, we always embed Python 3.11.9 regardless of system version
 if (Test-Command "python") {
-    $PyVersion = & python --version 2>&1       # e.g. "Python 3.10.11"
-    $PyExe = (Get-Command python).Source
-
-    # Parse major.minor
-    if ($PyVersion -match "Python (\d+)\.(\d+)\.(\d+)") {
-        $PyMajor = [int]$Matches[1]
-        $PyMinor = [int]$Matches[2]
-        $PyPatch = [int]$Matches[3]
-
-        if ($PyMajor -lt $PY_MIN_MAJOR -or ($PyMajor -eq $PY_MIN_MAJOR -and $PyMinor -lt $PY_MIN_MINOR)) {
-            # Hard fail — below 3.10
-            Write-Step "Python:  $PyVersion  <<  INCOMPATIBLE (need 3.10+)" "Red"
-            Write-Host ""
-            Write-Host "  ============================================================" -ForegroundColor Red
-            Write-Host "  INCOMPATIBLE PYTHON VERSION DETECTED" -ForegroundColor Red
-            Write-Host "  ============================================================" -ForegroundColor Red
-            Write-Host ""
-            Write-Host "  Your Python: $PyVersion" -ForegroundColor Red
-            Write-Host "  Required:    Python 3.10 or newer" -ForegroundColor Yellow
-            Write-Host "  Recommended: Python 3.11 or 3.12" -ForegroundColor Yellow
-            Write-Host ""
-            Write-Host "  WHY: ComfyUI and several nodes use Python 3.10+ syntax" -ForegroundColor Gray
-            Write-Host "  (type union operators like 'str | None') that cause" -ForegroundColor Gray
-            Write-Host "  immediate SyntaxErrors on older Python versions." -ForegroundColor Gray
-            Write-Host ""
-            Write-Host "  WHAT TO DO:" -ForegroundColor Cyan
-            Write-Host "    Option A: Download Python 3.11 from https://python.org" -ForegroundColor White
-            Write-Host "              and re-run this installer." -ForegroundColor White
-            Write-Host "    Option B: Go back and choose FULL INSTALL instead." -ForegroundColor White
-            Write-Host "              It includes its own portable Python 3.11.9" -ForegroundColor White
-            Write-Host "              and doesn't use your system Python at all." -ForegroundColor White
-            Write-Host ""
-            $AllGood = $false
-        } elseif ($PyMinor -lt $PY_REC_MINOR) {
-            # Soft warning — 3.10.x works but 3.11+ is better
-            Write-Step "Python:  $PyVersion  ($PyExe)  [OK - but 3.11+ recommended]" "Yellow"
-            Write-Host ""
-            Write-Host "  [!] PYTHON VERSION NOTE" -ForegroundColor Yellow
-            Write-Host "      Your version ($PyVersion) is supported but not optimal." -ForegroundColor Yellow
-            Write-Host "      Python 3.11 or 3.12 is recommended for best compatibility" -ForegroundColor Yellow
-            Write-Host "      with all nodes (insightface, numba, WanVideoWrapper)." -ForegroundColor Yellow
-            Write-Host "      Installation will continue, but some advanced features" -ForegroundColor Yellow
-            Write-Host "      may not work correctly." -ForegroundColor Yellow
-            Write-Host ""
-            $PyVersionWarning = $true
-            $PyVersionOK = $true
-        } elseif ($PyMajor -eq 3 -and $PyMinor -ge 13) {
-            # Future warning — 3.13+ may break C-extension nodes
-            Write-Step "Python:  $PyVersion  ($PyExe)  [newer than tested]" "Yellow"
-            Write-Host ""
-            Write-Host "  [!] PYTHON VERSION NOTE" -ForegroundColor Yellow
-            Write-Host "      Python $PyMajor.$PyMinor is newer than the tested version." -ForegroundColor Yellow
-            Write-Host "      Most features will work, but some C-extension nodes" -ForegroundColor Yellow
-            Write-Host "      (insightface, numba) may not have wheels for 3.13+ yet." -ForegroundColor Yellow
-            Write-Host "      If you hit install errors, try Python 3.11 or 3.12 instead." -ForegroundColor Yellow
-            Write-Host ""
-            $PyVersionWarning = $true
-            $PyVersionOK = $true
-        } else {
-            # 3.11 or 3.12 — perfect
-            Write-Step "Python:  $PyVersion  ($PyExe)" "Green"
-            $PyVersionOK = $true
-        }
-    } else {
-        Write-Step "Python:  $PyVersion  (could not parse version)" "Yellow"
-        $PyVersionOK = $true
-    }
+    $PyVersion = & python --version 2>&1
+    Write-Step "Python:  $PyVersion (system - will use embedded 3.11.9 instead)" "Gray"
 } else {
-    Write-Step "Python:  NOT FOUND - install from python.org" "Red"
-    $AllGood = $false
+    Write-Step "Python:  not installed on system (embedded 3.11.9 will be downloaded)" "Gray"
 }
+# No $AllGood = $false here - system Python is never required in Lite anymore
 
 # Git
 if (Test-Command "git") {
@@ -425,6 +354,62 @@ if ($Confirm -eq "N" -or $Confirm -eq "n") { exit 0 }
 $StopWatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 # ============================================================================
+# 0. EMBED PYTHON 3.11.9 (always - eliminates version compatibility issues)
+# Lite still uses system Git + Node, but Python is always our known-good version
+# ============================================================================
+Write-Header "STEP 0/7 - Embedded Python 3.11.9 (guaranteed compatible)"
+
+$PyEmbedDir = Join-Path $RootPath "python_embeded"
+$PyEmbedExe = Join-Path $PyEmbedDir "python.exe"
+
+if (-not (Test-Path $PyEmbedExe)) {
+    Write-Step "Downloading Python 3.11.9 portable (~8 MB)..." "Yellow"
+    $PyZip = Join-Path $RootPath "python_embed.zip"
+    try {
+        & curl.exe -L -o "$PyZip" "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip" --progress-bar --retry 3 --retry-delay 2
+        if ($LASTEXITCODE -ne 0) { throw "Download failed" }
+
+        Write-Step "Extracting Python 3.11.9..." "Yellow"
+        New-Item -ItemType Directory -Path $PyEmbedDir -Force | Out-Null
+        Expand-Archive -Path $PyZip -DestinationPath $PyEmbedDir -Force
+        Remove-Item $PyZip -Force
+
+        # Enable site-packages and add ComfyUI to path
+        $PthFile = Join-Path $PyEmbedDir "python311._pth"
+        if (Test-Path $PthFile) {
+            $Content = Get-Content $PthFile
+            $Content = $Content -replace "#import site", "import site"
+            if ($Content -notcontains "../ComfyUI") { $Content += "../ComfyUI" }
+            Set-Content -Path $PthFile -Value $Content
+        }
+
+        # Install pip into embedded Python
+        Write-Step "Installing pip into embedded Python..." "Yellow"
+        $GetPip = Join-Path $RootPath "get-pip.py"
+        & curl.exe -L -o "$GetPip" "https://bootstrap.pypa.io/get-pip.py" --retry 3 --retry-delay 2
+        & $PyEmbedExe $GetPip
+        Remove-Item $GetPip -Force
+
+        Write-Step "Python 3.11.9 embedded and configured." "Green"
+    } catch {
+        Write-Step "WARNING: Could not download embedded Python. Falling back to system Python." "Yellow"
+        # Fall back gracefully - remove partial dir
+        if (Test-Path $PyEmbedDir) { Remove-Item $PyEmbedDir -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+} else {
+    Write-Step "Embedded Python 3.11.9 already present." "Green"
+}
+
+# Determine which Python to use for venv creation
+$SystemPyForVenv = "python"
+if (Test-Path $PyEmbedExe) {
+    $SystemPyForVenv = $PyEmbedExe
+    Write-Step "Using embedded Python 3.11.9 for venv." "Green"
+} else {
+    Write-Step "Using system Python for venv (embedded download failed)." "Yellow"
+}
+
+# ============================================================================
 # 1. PYTHON VENV
 # ============================================================================
 Write-Header "STEP 1/7 - Python Virtual Environment"
@@ -434,8 +419,8 @@ $VenvPy = Join-Path $VenvDir "Scripts\python.exe"
 $VenvPip = Join-Path $VenvDir "Scripts\pip.exe"
 
 if (-not (Test-Path $VenvPy)) {
-    Write-Step "Creating venv..."
-    & python -m venv "$VenvDir"
+    Write-Step "Creating venv from Python 3.11.9..."
+    & $SystemPyForVenv -m venv "$VenvDir"
     Write-Step "Upgrading pip..."
     & $VenvPy -m pip install --upgrade pip wheel setuptools --quiet
     Write-Step "venv created." "Green"

@@ -690,19 +690,38 @@ foreach ($Node in $NodesConfig) {
             if (Test-Path $NodeReqFile) {
                 Write-Log "[$($Node.name)] - Installing node requirements..."
 
-                # Create a filtered requirements file (skip insightface - installed globally)
+                # Filter requirements: skip packages known to be problematic or installed globally
+                # - insightface: installed globally with --prefer-binary earlier
+                # - byaldi/nano-graphrag/kaleido/qwen-vl-utils/fastparquet: exotic IF_AI_tools
+                #   extras that frequently fail and are not needed for core functionality
+                $SkipPatterns = @(
+                    '^\s*insightface',
+                    '^\s*byaldi',
+                    '^\s*nano-graphrag',
+                    '^\s*kaleido',
+                    '^\s*qwen-vl-utils',
+                    '^\s*fastparquet'
+                )
                 $RequirementsContent = Get-Content $NodeReqFile
-                $FilteredRequirements = $RequirementsContent | Where-Object { $_ -notmatch '^\s*insightface' }
+                $FilteredRequirements = $RequirementsContent
+                $SkippedPkgs = @()
+                foreach ($Pattern in $SkipPatterns) {
+                    $Before = $FilteredRequirements.Count
+                    $FilteredRequirements = $FilteredRequirements | Where-Object { $_ -notmatch $Pattern }
+                    if ($FilteredRequirements.Count -lt $Before) {
+                        $SkippedPkgs += ($Pattern -replace '\\s\*|\\^|\^\s*', '').Trim()
+                    }
+                }
 
-                if ($FilteredRequirements.Count -lt $RequirementsContent.Count) {
-                    Write-Log "[$($Node.name)] - Skipping insightface (already installed globally)"
+                if ($SkippedPkgs.Count -gt 0) {
+                    Write-Log "[$($Node.name)] - Skipping known-problematic packages: $($SkippedPkgs -join ', ')"
+                }
+
+                if ($FilteredRequirements.Count -gt 0) {
                     $TempReqFile = Join-Path $NodeInstallDir "requirements_filtered.txt"
                     Set-Content -Path $TempReqFile -Value $FilteredRequirements
                     Run-Pip "install -r `"$TempReqFile`" --no-warn-script-location"
                     Remove-Item $TempReqFile -Force
-                }
-                else {
-                    Run-Pip "install -r `"$NodeReqFile`" --no-warn-script-location"
                 }
             }
 
@@ -1019,9 +1038,21 @@ try {
     $SummaryReport += "Git:             $GitVer"
 } catch { $SummaryReport += "Git:             UNKNOWN" }
 
-# PyTorch + CUDA
+# PyTorch + CUDA - use temp script to avoid PowerShell quote escaping issues
 try {
-    $TorchInfo = & $PyExe -c "import torch; print(f'PyTorch {torch.__version__} | CUDA: {torch.cuda.is_available()} | Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')" 2>&1
+    $TorchScript = Join-Path $env:TEMP "fedda_torch_check.py"
+    Set-Content -Path $TorchScript -Value @'
+import sys
+try:
+    import torch
+    cuda = torch.cuda.is_available()
+    dev = torch.cuda.get_device_name(0) if cuda else "N/A"
+    print(f"PyTorch {torch.__version__} | CUDA: {cuda} | Device: {dev}")
+except Exception as e:
+    print(f"PyTorch check failed: {e}")
+'@
+    $TorchInfo = & $PyExe $TorchScript 2>&1
+    Remove-Item $TorchScript -Force -ErrorAction SilentlyContinue
     $SummaryReport += "PyTorch:         $TorchInfo"
 } catch { $SummaryReport += "PyTorch:         UNKNOWN" }
 

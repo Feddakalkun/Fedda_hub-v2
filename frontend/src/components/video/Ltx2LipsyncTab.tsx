@@ -23,11 +23,13 @@ const PRESETS: Record<PresetTier, { label: string; description: string; strength
     quality:  { label: 'Quality',  description: 'Best lipsync',      strength: 0.95 },
 };
 
-// Width presets — aspect ratio is automatically preserved from the uploaded face image
-const WIDTH_OPTIONS = [
-    { label: '512px', width: 512 },
-    { label: '720px', width: 720 },
-    { label: '1024px', width: 1024 },
+// Resolution presets — both width AND height enforced via ImageResizeKJv2 (center-crop to aspect ratio)
+// LTX-2.3 was trained on landscape video, so 16:9 gives best lipsync quality
+const RESOLUTION_OPTIONS = [
+    { label: '16:9', sublabel: '720×416', width: 720, height: 416, note: 'Best quality' },
+    { label: '1:1',  sublabel: '512×512', width: 512, height: 512, note: 'Square' },
+    { label: '9:16', sublabel: '416×736', width: 416, height: 736, note: 'Portrait' },
+    { label: '4:3',  sublabel: '576×448', width: 576, height: 448, note: '' },
 ];
 
 export const Ltx2LipsyncTab = () => {
@@ -52,12 +54,14 @@ export const Ltx2LipsyncTab = () => {
     const [preset, setPreset] = usePersistentState<PresetTier>('ltx2_lipsync_preset', 'balanced');
     const [audioDuration, setAudioDuration] = usePersistentState('ltx2_lipsync_duration', 4);
     const [audioStart, setAudioStart] = usePersistentState('ltx2_lipsync_audio_start', 0);
-    const [targetWidth, setTargetWidth] = usePersistentState('ltx2_lipsync_width', 720);
+    const [resolutionLabel, setResolutionLabel] = usePersistentState('ltx2_lipsync_resolution', '16:9');
     const [strength, setStrength] = usePersistentState('ltx2_lipsync_strength', PRESETS.balanced.strength);
     const [cfg, setCfg] = usePersistentState('ltx2_lipsync_cfg', 1);
     const [seed, setSeed] = usePersistentState('ltx2_lipsync_seed', -1);
     const [showAdvanced, setShowAdvanced] = usePersistentState('ltx2_lipsync_show_advanced', false);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    const selectedRes = RESOLUTION_OPTIONS.find(r => r.label === resolutionLabel) || RESOLUTION_OPTIONS[0];
 
     const applyPreset = (tier: PresetTier) => {
         setPreset(tier);
@@ -154,8 +158,15 @@ export const Ltx2LipsyncTab = () => {
             // Node 5286: ManualSigmas (quality preset → sigma schedule)
             if (workflow['5286']) workflow['5286'].inputs.sigmas = PRESET_SIGMAS[preset];
 
-            // Node 5311: ResizeImageMaskNode (target width — aspect ratio auto-preserved)
-            if (workflow['5311']) workflow['5311'].inputs['resize_type.width'] = targetWidth;
+            // Node 5311: ResizeImageMaskNode — scale to target width first (maintains proportions)
+            if (workflow['5311']) workflow['5311'].inputs['resize_type.width'] = selectedRes.width;
+
+            // Node 5289: ImageResizeKJv2 — center-crop to exact aspect ratio (divisible_by:32 auto-rounds)
+            // This forces the output to the chosen aspect ratio regardless of input image shape
+            if (workflow['5289']) {
+                workflow['5289'].inputs.width = selectedRes.width;
+                workflow['5289'].inputs.height = selectedRes.height;
+            }
 
             // Node 5296: VHS_VideoCombine (output filename)
             if (workflow['5296']) workflow['5296'].inputs.filename_prefix = `VIDEO/LTX2/LIPSYNC_${runTag}`;
@@ -352,23 +363,30 @@ export const Ltx2LipsyncTab = () => {
                         <p className="text-[9px] text-slate-600 mt-1">~{Math.round(audioDuration * 24 + 1)} frames at 24fps</p>
                     </div>
                     <div>
-                        <label className="block text-xs text-slate-400 mb-2">Output Width <span className="text-slate-600">(aspect ratio auto from image)</span></label>
+                        <label className="block text-xs text-slate-400 mb-2">
+                            Aspect Ratio
+                            <span className="text-slate-600 ml-1">(center-crops input to this shape)</span>
+                        </label>
                         <div className="flex gap-1.5">
-                            {WIDTH_OPTIONS.map((opt) => (
+                            {RESOLUTION_OPTIONS.map((opt) => (
                                 <button
-                                    key={opt.width}
-                                    onClick={() => setTargetWidth(opt.width)}
-                                    className={`flex-1 px-2 py-1.5 rounded-md text-[10px] font-medium transition-all border ${
-                                        targetWidth === opt.width
+                                    key={opt.label}
+                                    onClick={() => setResolutionLabel(opt.label)}
+                                    className={`flex-1 px-2 py-2 rounded-md text-[10px] font-medium transition-all border ${
+                                        resolutionLabel === opt.label
                                             ? 'bg-white text-black border-white'
                                             : 'text-slate-500 hover:text-white border-white/5 hover:border-white/20'
                                     }`}
                                 >
-                                    {opt.label}
+                                    <div>{opt.label}</div>
+                                    <div className={`text-[9px] mt-0.5 ${resolutionLabel === opt.label ? 'text-black/50' : 'text-slate-700'}`}>{opt.sublabel}</div>
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[9px] text-slate-600 mt-1">Output upscaled 1.5× → {Math.round(targetWidth * 1.5)}px wide</p>
+                        <p className="text-[9px] text-slate-600 mt-1">
+                            Output: {selectedRes.width}×{selectedRes.height}px → upscaled 1.5× → {Math.round(selectedRes.width * 1.5)}×{Math.round(selectedRes.height * 1.5)}px
+                            {selectedRes.note ? ` · ${selectedRes.note}` : ''}
+                        </p>
                     </div>
                 </div>
 

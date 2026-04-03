@@ -237,5 +237,24 @@
     "url": "https://github.com/if-ai/ComfyUI-IF_AI_tools.git",
     "folder": "ComfyUI-IF_AI_tools",
     "note": "LLM nodes (Qwen, Llama, etc.) — replaces Ollama for chat functionality"
+  },
+
+  {
+    "name": "comfy-mtb",
+    "url": "https://github.com/melMass/comfy_mtb.git",
+    "folder": "comfy_mtb",
+    "note": "FishS2MultiSpeakerTTS, FishS2TTS, Audio To Text (mtb), Load Whisper (mtb) - required for FishAudio TTS workflow"
+  },
+  {
+    "name": "CRT-Nodes",
+    "url": "https://github.com/PGCRT/CRT-Nodes.git",
+    "folder": "CRT-Nodes",
+    "note": "CRT custom nodes collection - required for FishAudio workflow"
+  },
+  {
+    "name": "ComfyUI-FishAudioS2",
+    "url": "https://github.com/Saganaki22/ComfyUI-FishAudioS2.git",
+    "folder": "ComfyUI-FishAudioS2",
+    "note": "Fish Audio S2 TTS nodes (FishS2TTS, FishS2MultiSpeakerTTS) - voice clone and multi-speaker TTS"
   }
 ]

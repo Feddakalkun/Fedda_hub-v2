@@ -22,7 +22,7 @@ echo.
 :: SYSTEM SCAN
 :: ============================================================================
 
-:: GPU Check — nvidia-smi -L gives clean output on all driver versions
+:: GPU Check - nvidia-smi -L gives clean output on all driver versions
 set "GPU_OK=0"
 set "GPU_NAME=Not detected"
 for /f "tokens=1,* delims=:" %%a in ('nvidia-smi -L 2^>nul') do (
@@ -43,13 +43,20 @@ if "!GPU_OK!"=="1" (
     echo   GPU:      No NVIDIA GPU found
 )
 
-:: Check for system Python
+:: Check for system Python + parse version
 set "HAS_PYTHON=0"
 set "PY_VERSION="
+set "PY_MINOR=0"
+set "PY_VERSION_OK=0"
+set "PY_VERSION_WARN=0"
 where python >nul 2>nul
 if %errorlevel% equ 0 (
     set "HAS_PYTHON=1"
     for /f "tokens=*" %%v in ('python --version 2^>^&1') do set "PY_VERSION=%%v"
+    :: Parse minor version - "Python 3.10.11" -> extract 10
+    for /f "tokens=2 delims=." %%m in ('python --version 2^>^&1') do set "PY_MINOR=%%m"
+    if !PY_MINOR! GEQ 10 set "PY_VERSION_OK=1"
+    if !PY_MINOR! EQU 10 set "PY_VERSION_WARN=1"
 )
 
 :: Check for system Git
@@ -80,7 +87,15 @@ if %errorlevel% equ 0 (
 echo.
 echo   System Tools Found:
 if "%HAS_PYTHON%"=="1" (
-    echo     Python:   %PY_VERSION%
+    if "!PY_VERSION_OK!"=="1" (
+        if "!PY_VERSION_WARN!"=="1" (
+            echo     Python:   %PY_VERSION%  [OK - 3.11+ recommended for best compatibility]
+        ) else (
+            echo     Python:   %PY_VERSION%  [OK]
+        )
+    ) else (
+        echo     Python:   %PY_VERSION%  [INCOMPATIBLE - 3.10+ required, see note below]
+    )
 ) else (
     echo     Python:   not installed
 )
@@ -144,21 +159,40 @@ echo.
 echo   Choose installation type:
 echo.
 echo   [1] FULL INSTALL  (Recommended^)
-echo       Downloads Python, Node, Git, Ollama — everything included.
+echo       Downloads Python, Node, Git, Ollama - everything included.
 echo       Nothing else needed. Fully portable.
 echo       ~15 GB total, takes longer.
 echo.
 
 if "%HAS_PYTHON%"=="1" if "%HAS_GIT%"=="1" if "%HAS_NODE%"=="1" (
-    echo   [2] LITE INSTALL  (Faster^)
-    echo       Uses your existing Python, Git, Node.
-    echo       Smaller download, faster install.
-    echo       Creates a venv for Python packages.
-    echo.
-    set "LITE_AVAILABLE=1"
+    if "!PY_VERSION_OK!"=="0" (
+        echo   [2] LITE INSTALL  (NOT RECOMMENDED - Python version incompatible^)
+        echo       Your Python %PY_VERSION% is below the required 3.10 minimum.
+        echo       ComfyUI will fail to start with your current Python.
+        echo       Use FULL INSTALL instead, or upgrade Python to 3.11/3.12 first.
+        echo.
+        set "LITE_AVAILABLE=1"
+        set "LITE_PYTHON_WARN=1"
+    ) else if "!PY_VERSION_WARN!"=="1" (
+        echo   [2] LITE INSTALL  (Faster - Python version OK but not optimal^)
+        echo       Uses your existing Python %PY_VERSION%, Git, Node.
+        echo       Works, but Python 3.11+ is recommended for best node compatibility.
+        echo       Smaller download, faster install.
+        echo.
+        set "LITE_AVAILABLE=1"
+        set "LITE_PYTHON_WARN=0"
+    ) else (
+        echo   [2] LITE INSTALL  (Faster^)
+        echo       Uses your existing Python %PY_VERSION%, Git, Node.
+        echo       Smaller download, faster install.
+        echo       Creates a venv for Python packages.
+        echo.
+        set "LITE_AVAILABLE=1"
+        set "LITE_PYTHON_WARN=0"
+    )
 ) else (
-    echo   [2] LITE INSTALL  (Unavailable — missing system tools^)
-    echo       Requires Python, Git, and Node.js installed on your system.
+    echo   [2] LITE INSTALL  (Unavailable - missing system tools^)
+    echo       Requires Python 3.10+, Git, and Node.js 18+ installed.
     echo.
     set "LITE_AVAILABLE=0"
 )
@@ -258,4 +292,15 @@ echo ===========================================================================
 echo.
 echo   To start FEDDA, run:  RUN.bat
 echo.
+echo   Log files saved to: %BASE_DIR%\logs\
+echo     - install_report.txt      Quick summary of what was installed
+echo     - install_full_log.txt    Full transcript of every command
+echo     - install_log.txt         Step-by-step progress log
+echo.
+if exist "%BASE_DIR%\logs\install_report.txt" (
+    echo   --- INSTALL REPORT ---
+    type "%BASE_DIR%\logs\install_report.txt"
+    echo   --- END REPORT ---
+    echo.
+)
 pause

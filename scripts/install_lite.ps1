@@ -172,11 +172,81 @@ Write-Header "SYSTEM CHECK"
 
 $AllGood = $true
 
-# Python
+# Python - check presence AND minimum version (3.10+ required by ComfyUI)
+$PY_MIN_MAJOR = 3
+$PY_MIN_MINOR = 10
+$PY_REC_MINOR = 11   # Recommended (what portable installer ships)
+$PyVersionOK = $false
+$PyVersionWarning = $false
+
 if (Test-Command "python") {
-    $PyVersion = & python --version 2>&1
+    $PyVersion = & python --version 2>&1       # e.g. "Python 3.10.11"
     $PyExe = (Get-Command python).Source
-    Write-Step "Python:  $PyVersion  ($PyExe)" "Green"
+
+    # Parse major.minor
+    if ($PyVersion -match "Python (\d+)\.(\d+)\.(\d+)") {
+        $PyMajor = [int]$Matches[1]
+        $PyMinor = [int]$Matches[2]
+        $PyPatch = [int]$Matches[3]
+
+        if ($PyMajor -lt $PY_MIN_MAJOR -or ($PyMajor -eq $PY_MIN_MAJOR -and $PyMinor -lt $PY_MIN_MINOR)) {
+            # Hard fail — below 3.10
+            Write-Step "Python:  $PyVersion  <<  INCOMPATIBLE (need 3.10+)" "Red"
+            Write-Host ""
+            Write-Host "  ============================================================" -ForegroundColor Red
+            Write-Host "  INCOMPATIBLE PYTHON VERSION DETECTED" -ForegroundColor Red
+            Write-Host "  ============================================================" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "  Your Python: $PyVersion" -ForegroundColor Red
+            Write-Host "  Required:    Python 3.10 or newer" -ForegroundColor Yellow
+            Write-Host "  Recommended: Python 3.11 or 3.12" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "  WHY: ComfyUI and several nodes use Python 3.10+ syntax" -ForegroundColor Gray
+            Write-Host "  (type union operators like 'str | None') that cause" -ForegroundColor Gray
+            Write-Host "  immediate SyntaxErrors on older Python versions." -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "  WHAT TO DO:" -ForegroundColor Cyan
+            Write-Host "    Option A: Download Python 3.11 from https://python.org" -ForegroundColor White
+            Write-Host "              and re-run this installer." -ForegroundColor White
+            Write-Host "    Option B: Go back and choose FULL INSTALL instead." -ForegroundColor White
+            Write-Host "              It includes its own portable Python 3.11.9" -ForegroundColor White
+            Write-Host "              and doesn't use your system Python at all." -ForegroundColor White
+            Write-Host ""
+            $AllGood = $false
+        } elseif ($PyMinor -lt $PY_REC_MINOR) {
+            # Soft warning — 3.10.x works but 3.11+ is better
+            Write-Step "Python:  $PyVersion  ($PyExe)  [OK - but 3.11+ recommended]" "Yellow"
+            Write-Host ""
+            Write-Host "  [!] PYTHON VERSION NOTE" -ForegroundColor Yellow
+            Write-Host "      Your version ($PyVersion) is supported but not optimal." -ForegroundColor Yellow
+            Write-Host "      Python 3.11 or 3.12 is recommended for best compatibility" -ForegroundColor Yellow
+            Write-Host "      with all nodes (insightface, numba, WanVideoWrapper)." -ForegroundColor Yellow
+            Write-Host "      Installation will continue, but some advanced features" -ForegroundColor Yellow
+            Write-Host "      may not work correctly." -ForegroundColor Yellow
+            Write-Host ""
+            $PyVersionWarning = $true
+            $PyVersionOK = $true
+        } elseif ($PyMajor -eq 3 -and $PyMinor -ge 13) {
+            # Future warning — 3.13+ may break C-extension nodes
+            Write-Step "Python:  $PyVersion  ($PyExe)  [newer than tested]" "Yellow"
+            Write-Host ""
+            Write-Host "  [!] PYTHON VERSION NOTE" -ForegroundColor Yellow
+            Write-Host "      Python $PyMajor.$PyMinor is newer than the tested version." -ForegroundColor Yellow
+            Write-Host "      Most features will work, but some C-extension nodes" -ForegroundColor Yellow
+            Write-Host "      (insightface, numba) may not have wheels for 3.13+ yet." -ForegroundColor Yellow
+            Write-Host "      If you hit install errors, try Python 3.11 or 3.12 instead." -ForegroundColor Yellow
+            Write-Host ""
+            $PyVersionWarning = $true
+            $PyVersionOK = $true
+        } else {
+            # 3.11 or 3.12 — perfect
+            Write-Step "Python:  $PyVersion  ($PyExe)" "Green"
+            $PyVersionOK = $true
+        }
+    } else {
+        Write-Step "Python:  $PyVersion  (could not parse version)" "Yellow"
+        $PyVersionOK = $true
+    }
 } else {
     Write-Step "Python:  NOT FOUND - install from python.org" "Red"
     $AllGood = $false
@@ -191,10 +261,27 @@ if (Test-Command "git") {
     $AllGood = $false
 }
 
-# Node.js
+# Node.js - check presence AND minimum version (18+ required for Vite 7 / React 19)
+$NODE_MIN = 18
 if (Test-Command "node") {
-    $NodeVersion = & node --version 2>&1
-    Write-Step "Node.js: $NodeVersion" "Green"
+    $NodeVersion = & node --version 2>&1    # e.g. "v20.11.0"
+    if ($NodeVersion -match "v(\d+)\.") {
+        $NodeMajor = [int]$Matches[1]
+        if ($NodeMajor -lt $NODE_MIN) {
+            Write-Step "Node.js: $NodeVersion  <<  INCOMPATIBLE (need v18+)" "Red"
+            Write-Host ""
+            Write-Host "  [!] NODE.JS TOO OLD" -ForegroundColor Red
+            Write-Host "      Your version: $NodeVersion" -ForegroundColor Red
+            Write-Host "      Required: v18 or newer (for Vite 7 + React 19)" -ForegroundColor Yellow
+            Write-Host "      Download: https://nodejs.org  (choose LTS)" -ForegroundColor Cyan
+            Write-Host ""
+            $AllGood = $false
+        } else {
+            Write-Step "Node.js: $NodeVersion" "Green"
+        }
+    } else {
+        Write-Step "Node.js: $NodeVersion" "Green"
+    }
 } else {
     Write-Step "Node.js: NOT FOUND - install from nodejs.org" "Red"
     $AllGood = $false
@@ -602,16 +689,52 @@ if ($SmokeResult.ExitCode -eq 0) {
     Write-Step "Some imports failed - check output above." "Yellow"
 }
 
-# Done
+# ============================================================================
+# INSTALL SUMMARY REPORT (Lite)
+# ============================================================================
 $StopWatch.Stop()
 $Elapsed = $StopWatch.Elapsed
 $TimeStr = "{0:mm}m {0:ss}s" -f $Elapsed
+
+$LiteReport = @()
+$LiteReport += "Install Date:    $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$LiteReport += "Install Mode:    Lite (System Python + venv)"
+$LiteReport += "Install Path:    $RootPath"
+$LiteReport += "Install Time:    $TimeStr"
+$LiteReport += ""
+
+try { $PyVer = & $VenvPy --version 2>&1; $LiteReport += "Python:          $PyVer" } catch { $LiteReport += "Python:          UNKNOWN" }
+try { $PipVer = & $VenvPy -m pip --version 2>&1; $LiteReport += "Pip:             $($PipVer -replace ' from .*','')" } catch {}
+try { $NodeVer = & node --version 2>&1; $LiteReport += "Node.js:         $NodeVer" } catch {}
+try { $GitVer = & git --version 2>&1; $LiteReport += "Git:             $GitVer" } catch {}
+
+try {
+    $TorchInfo = & $VenvPy -c "import torch; print(f'PyTorch {torch.__version__} | CUDA: {torch.cuda.is_available()} | Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else ""N/A""}')" 2>&1
+    $LiteReport += "PyTorch:         $TorchInfo"
+} catch {}
+
+$LiteReport += ""
+if ($SmokeResult.ExitCode -eq 0) { $LiteReport += "Smoke Test:      PASSED" } else { $LiteReport += "Smoke Test:      FAILED" }
+
+$LiteReport += ""
+$LiteReport += "Log Files:"
+$LiteReport += "  Report:  $(Join-Path $LogsDir 'install_report.txt')"
+$LiteReport += "  Full:    $(Join-Path $LogsDir 'install_fast_log.txt')"
+
+# Write report
+$LogsDir = Join-Path $RootPath "logs"
+if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-Null }
+$ReportFile = Join-Path $LogsDir "install_report.txt"
+$LiteReport | Set-Content -Path $ReportFile -Encoding UTF8
+
+Write-Host ""
+foreach ($Line in $LiteReport) { Write-Host "  $Line" }
+
 Write-Host ""
 Write-Host "  ========================================================" -ForegroundColor Green
-Write-Host "                                                          " -ForegroundColor Green
 Write-Host "         INSTALLATION COMPLETE!                           " -ForegroundColor Green
 Write-Host "         Time: $TimeStr                                   " -ForegroundColor Green
-Write-Host "         Run: RUN.bat" -ForegroundColor Green
-Write-Host "                                                          " -ForegroundColor Green
+Write-Host "         Report: $ReportFile                              " -ForegroundColor Green
+Write-Host "         Run: RUN.bat                                     " -ForegroundColor Green
 Write-Host "  ========================================================" -ForegroundColor Green
 Write-Host ""

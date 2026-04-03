@@ -826,7 +826,7 @@ Pause-Step
 
 # 8.6 Z-Image Turbo celeb LoRA pack is now UI-only (no auto-download in installer)
 Write-Log "Skipping automatic Z-Image Turbo celeb pack download (available in UI on demand)."
-Download-LoraPackPreviewImages -PythonExe $PortablePythonExe -ComfyDir $ComfyDir
+Download-LoraPackPreviewImages -PythonExe $PyExe -ComfyDir $ComfyDir
 Pause-Step
 
 # 9. Configure ComfyUI-Manager Security (Weak Mode)
@@ -981,6 +981,93 @@ else {
 }
 
 Pause-Step
+
+# ============================================================================
+# INSTALL SUMMARY REPORT
+# ============================================================================
+Write-Log "`n================================================"
+Write-Log " INSTALLATION SUMMARY REPORT"
+Write-Log "================================================"
+
+$SummaryReport = @()
+$SummaryReport += "Install Date:    $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$SummaryReport += "Install Mode:    Full (Portable)"
+$SummaryReport += "Install Path:    $RootPath"
+$SummaryReport += ""
+
+# Python version
+try {
+    $PyVer = & $PyExe --version 2>&1
+    $SummaryReport += "Python:          $PyVer"
+} catch { $SummaryReport += "Python:          UNKNOWN" }
+
+# Pip version
+try {
+    $PipVer = & $PyExe -m pip --version 2>&1
+    $SummaryReport += "Pip:             $($PipVer -replace ' from .*','')"
+} catch { $SummaryReport += "Pip:             UNKNOWN" }
+
+# Node version
+try {
+    $NodeVer = & $NodeExe --version 2>&1
+    $SummaryReport += "Node.js:         $NodeVer"
+} catch { $SummaryReport += "Node.js:         UNKNOWN" }
+
+# Git version
+try {
+    $GitVer = & $GitExe --version 2>&1
+    $SummaryReport += "Git:             $GitVer"
+} catch { $SummaryReport += "Git:             UNKNOWN" }
+
+# PyTorch + CUDA
+try {
+    $TorchInfo = & $PyExe -c "import torch; print(f'PyTorch {torch.__version__} | CUDA: {torch.cuda.is_available()} | Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')" 2>&1
+    $SummaryReport += "PyTorch:         $TorchInfo"
+} catch { $SummaryReport += "PyTorch:         UNKNOWN" }
+
+# Ollama
+$OllamaExePath = Join-Path $RootPath "ollama_embeded\ollama.exe"
+if (Test-Path $OllamaExePath) {
+    try {
+        $OllamaVer = & $OllamaExePath --version 2>&1
+        $SummaryReport += "Ollama:          $OllamaVer"
+    } catch { $SummaryReport += "Ollama:          installed (version unknown)" }
+} else { $SummaryReport += "Ollama:          NOT INSTALLED" }
+
+$SummaryReport += ""
+$SummaryReport += "Custom Nodes:    Installed=$InstalledCount | Skipped=$SkippedCount | Failed=$FailedCount"
+$SummaryReport += ""
+
+# Disk usage
+try {
+    $InstallSize = (Get-ChildItem -Path $RootPath -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+    $SizeGB = [math]::Round($InstallSize / 1GB, 2)
+    $SummaryReport += "Install Size:    $SizeGB GB"
+} catch { $SummaryReport += "Install Size:    UNKNOWN" }
+
+# Smoke test result
+if ($SmokeResult.ExitCode -eq 0) {
+    $SummaryReport += "Smoke Test:      PASSED"
+} else {
+    $SummaryReport += "Smoke Test:      FAILED (check log)"
+}
+
+$SummaryReport += ""
+$SummaryReport += "Log Files:"
+$SummaryReport += "  Summary:     $LogFile"
+$SummaryReport += "  Full:        $TranscriptFile"
+$SummaryReport += "  Report:      $(Join-Path $LogsDir 'install_report.txt')"
+
+# Write summary to console
+Write-Host ""
+foreach ($Line in $SummaryReport) {
+    Write-Log $Line
+}
+
+# Write summary report file
+$ReportFile = Join-Path $LogsDir "install_report.txt"
+$SummaryReport | Set-Content -Path $ReportFile -Encoding UTF8
+Write-Log "`nInstall report saved to: $ReportFile"
 
 Write-Log "`n================================================"
 Write-Log " ComfyUI Setup Complete!"

@@ -169,13 +169,19 @@ function findInstalledCelebLora(text: string, celebList: CelebCatalogItem[]): st
 }
 
 
+// Voice engine and language selector state
+
 export const ChatPage = () => {
+    const [voiceEngine, setVoiceEngine] = useState<'fish' | 'clone' | 'edge'>('fish');
+    const [language, setLanguage] = useState('auto');
+    // Suppress unused-setter warnings — these will be wired to UI controls
+    void setVoiceEngine; void setLanguage;
     const { toast } = useToast();
     const [messages, setMessages] = useState<Message[]>([
         {
             id: 'welcome',
             role: 'assistant',
-            content: "Hey! I'm your creative AI assistant. I can help you brainstorm ideas, answer questions, and generate images when you need them. How can I help you?",
+            content: "Hey, I'm Aria. [pause] Your creative partner inside FEDDA. I can help you craft prompts, brainstorm ideas, generate images and video, and I actually remember things between sessions. What are we making today?",
             timestamp: Date.now(),
             type: 'text'
         }
@@ -186,8 +192,26 @@ export const ChatPage = () => {
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [celebCatalog, setCelebCatalog] = useState<CelebCatalogItem[]>([]);
+    const [systemMemories, setSystemMemories] = useState<any[]>([]);
     const [executionStatus, setExecutionStatus] = useState('');
     const [progress, setProgress] = useState(0);
+    // FishAudio additions
+    const [ttsModel, setTtsModel] = useState('s2-pro');
+    const [referenceAudio, setReferenceAudio] = useState<File | null>(null);
+    // Advanced FishAudio parameters
+    const [temperature, setTemperature] = useState(0.7);
+    const [topP, setTopP] = useState(0.7);
+    const [chunkLength, setChunkLength] = useState(200);
+    const [maxNewTokens, setMaxNewTokens] = useState(192);
+    const [repetitionPenalty, setRepetitionPenalty] = useState(1.2);
+    const [seed, setSeed] = useState(42);
+    // Tag helper
+    const fishTags = [
+        'pause', 'emphasis', 'laughing', 'inhale', 'chuckle', 'tsk', 'singing', 'excited', 'interrupting', 'chuckling', 'excited tone',
+        'volume up', 'echo', 'angry', 'low volume', 'sigh', 'low voice', 'whisper', 'screaming', 'shouting', 'loud', 'surprised',
+        'short pause', 'exhale', 'delight', 'panting', 'audience laughter', 'with strong accent', 'volume down', 'clearing throat', 'sad', 'moaning', 'shocked'
+    ];
+
     const {
         isRecording,
         isTranscribing,
@@ -211,7 +235,7 @@ export const ChatPage = () => {
         isUnloadingAudio,
     } = useChatAudio({
         setInput,
-        appendMessage: (role, content) => {
+        appendMessage: (role: 'assistant' | 'user', content: string) => {
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role,
@@ -220,7 +244,17 @@ export const ChatPage = () => {
                 type: 'text'
             }]);
         },
-        autoPlayTTSMsg: messages.length > 0 ? messages[messages.length - 1] : null
+        autoPlayTTSMsg: messages.length > 0 ? messages[messages.length - 1] : null,
+        ttsModel,
+        referenceAudio,
+        temperature,
+        topP,
+        chunkLength,
+        maxNewTokens,
+        repetitionPenalty,
+        seed,
+        language,
+        voiceEngine,
     });
 
     // Drag & Drop / Vision State
@@ -282,6 +316,19 @@ export const ChatPage = () => {
                     }
                 } catch {
                     // Ignore catalog load failure.
+                }
+
+                // Load system memories
+                try {
+                    const memResp = await fetch('/api/brain/memory');
+                    if (memResp.ok) {
+                        const memData = await memResp.json();
+                        if (memData?.success && Array.isArray(memData.memories)) {
+                            setSystemMemories(memData.memories);
+                        }
+                    }
+                } catch {
+                    // Ignore memory load failure.
                 }
 
             } catch (error) {
@@ -397,11 +444,52 @@ export const ChatPage = () => {
             });
 
             // Add system prompt at the start
-            const fullHistory = [{ role: 'system', content: AGENT_SYSTEM_PROMPT }, ...history];
+            const memoryText = systemMemories.length > 0
+                ? "CURRENT BRAIN MEMORY: " + systemMemories.map(m => `[${m.kind}] ${m.content}`).join(" | ")
+                : "CURRENT BRAIN MEMORY: None yet.";
+            const fullHistory = [{ role: 'system', content: AGENT_SYSTEM_PROMPT + "\n\n" + memoryText }, ...history];
 
             // Use Ollama to chat
             // Use Ollama to chat with selected model
-            const responseText = await assistantService.chat(selectedModel, fullHistory);
+            let responseText = await assistantService.chat(selectedModel, fullHistory);
+
+            // Check for STORE_MEMORY block
+            const memoryMatch = responseText.match(/<<STORE_MEMORY>>([\s\S]*?)<<\/STORE_MEMORY>>/i);
+            if (memoryMatch) {
+                responseText = responseText.replace(/<<STORE_MEMORY>>[\s\S]*?<<\/STORE_MEMORY>>/i, '').trim();
+                const memBlock = memoryMatch[1];
+                let kind = 'note';
+                let content = '';
+                let tags: string[] = [];
+
+                const kindMatch = memBlock.match(/Kind:\s*(.+)/i);
+                if (kindMatch) kind = kindMatch[1].trim().toLowerCase();
+
+                const contentMatch = memBlock.match(/Content:\s*(.+)/i);
+                if (contentMatch) content = contentMatch[1].trim();
+
+                const tagsMatch = memBlock.match(/Tags:\s*(.+)/i);
+                if (tagsMatch) tags = tagsMatch[1].split(',').map(t => t.trim()).filter(Boolean);
+
+                if (content) {
+                    try {
+                        const postResp = await fetch('/api/brain/memory', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ kind, content, tags })
+                        });
+                        if (postResp.ok) {
+                            const newMem = await postResp.json();
+                            if (newMem.memory) {
+                                setSystemMemories(prev => [newMem.memory, ...prev]);
+                                toast('Memory stored!', 'success');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to store memory', e);
+                    }
+                }
+            }
 
             // Determine if the user actually intended to generate something
             // (Prevents model from hallucinating cards on "Hi" or small talk)
@@ -814,7 +902,78 @@ export const ChatPage = () => {
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
+                                                        {/* FishAudio Tag Picker */}
+                                                        {ttsEnabled && (
+                                                            <div className="flex flex-wrap gap-1 items-center">
+                                                                <span className="text-xs text-slate-400">Tags:</span>
+                                                                {fishTags.map(tag => (
+                                                                    <button
+                                                                        key={tag}
+                                                                        type="button"
+                                                                        className="px-2 py-0.5 rounded bg-white/10 text-xs text-white hover:bg-white/20 border border-white/10"
+                                                                        style={{marginBottom: 2}}
+                                                                        onClick={() => setInput(prev => prev + (prev.endsWith(' ') ? '' : ' ') + `[${tag}] `)}
+                                                                        tabIndex={-1}
+                                                                    >
+                                                                        [{tag}]
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {/* Advanced FishAudio Controls */}
+                                                        {ttsEnabled && (
+                                                            <div className="flex flex-wrap gap-2 items-center mt-2">
+                                                                <label className="flex flex-col text-xs text-slate-400">
+                                                                    Temp
+                                                                    <input type="number" step="0.01" min="0" max="2" value={temperature} onChange={e => setTemperature(Number(e.target.value))} className="w-16 px-1 py-0.5 rounded bg-[#121218] border border-white/10 text-xs text-white" />
+                                                                </label>
+                                                                <label className="flex flex-col text-xs text-slate-400">
+                                                                    Top-p
+                                                                    <input type="number" step="0.01" min="0" max="1" value={topP} onChange={e => setTopP(Number(e.target.value))} className="w-16 px-1 py-0.5 rounded bg-[#121218] border border-white/10 text-xs text-white" />
+                                                                </label>
+                                                                <label className="flex flex-col text-xs text-slate-400">
+                                                                    Chunk
+                                                                    <input type="number" step="1" min="1" max="1000" value={chunkLength} onChange={e => setChunkLength(Number(e.target.value))} className="w-16 px-1 py-0.5 rounded bg-[#121218] border border-white/10 text-xs text-white" />
+                                                                </label>
+                                                                <label className="flex flex-col text-xs text-slate-400">
+                                                                    Tokens
+                                                                    <input type="number" step="1" min="1" max="2048" value={maxNewTokens} onChange={e => setMaxNewTokens(Number(e.target.value))} className="w-16 px-1 py-0.5 rounded bg-[#121218] border border-white/10 text-xs text-white" />
+                                                                </label>
+                                                                <label className="flex flex-col text-xs text-slate-400">
+                                                                    Repeat
+                                                                    <input type="number" step="0.01" min="0.1" max="2" value={repetitionPenalty} onChange={e => setRepetitionPenalty(Number(e.target.value))} className="w-16 px-1 py-0.5 rounded bg-[#121218] border border-white/10 text-xs text-white" />
+                                                                </label>
+                                                                <label className="flex flex-col text-xs text-slate-400">
+                                                                    Seed
+                                                                    <input type="number" step="1" min="0" max="999999" value={seed} onChange={e => setSeed(Number(e.target.value))} className="w-20 px-1 py-0.5 rounded bg-[#121218] border border-white/10 text-xs text-white" />
+                                                                </label>
+                                                            </div>
+                                                        )}
+                            {/* FishAudio Model Selection */}
+                            {ttsEnabled && (
+                                <select
+                                    value={ttsModel}
+                                    onChange={e => setTtsModel(e.target.value)}
+                                    className="px-2 py-1 rounded-lg bg-[#121218] border border-white/10 text-xs text-white min-w-[120px]"
+                                    title="FishAudio Model"
+                                >
+                                    <option value="s2-pro">Fish S2 Pro</option>
+                                    <option value="s2-pro-fp8">Fish S2 Pro FP8</option>
+                                    <option value="s2-pro-bnb-int8">Fish S2 Pro INT8</option>
+                                    <option value="s2-pro-bnb-nf4">Fish S2 Pro NF4</option>
+                                </select>
+                            )}
+                            {/* Reference Audio Upload (for voice clone) */}
+                            {ttsEnabled && (
+                                <input
+                                    type="file"
+                                    accept="audio/*"
+                                    onChange={e => setReferenceAudio(e.target.files?.[0] || null)}
+                                    className="text-xs text-white"
+                                    title="Reference Audio (optional for voice clone)"
+                                />
+                            )}
                             <button
                                 onClick={() => setTtsEnabled(!ttsEnabled)}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${ttsEnabled ? 'bg-white/10 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}
@@ -1132,5 +1291,3 @@ export const ChatPage = () => {
         </div>
     );
 };
-
-

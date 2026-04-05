@@ -24,6 +24,7 @@ import { HFTokenSettings } from './components/HFTokenSettings';
 import { UserPreferencesProvider, useUserPreferences } from './contexts/UserPreferencesContext';
 import { NsfwConfirmationModal } from './components/nsfw/NsfwConfirmationModal';
 import { NsfwStudioPage } from './components/nsfw/NsfwStudioPage';
+import MemoryPanel from './components/MemoryPanel';
 
 const UI_STATE_KEY = 'fedda_ui_state_v1';
 const VALID_TABS = new Set([
@@ -357,6 +358,8 @@ function FeddaApp() {
           />
 
           <main className="flex-1 flex flex-col overflow-hidden relative theme-bg-main">
+            {activeTab === 'memory' && <MemoryPanel />}
+
             <header className="h-20 border-b border-white/5 flex items-center px-8 z-10 justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">

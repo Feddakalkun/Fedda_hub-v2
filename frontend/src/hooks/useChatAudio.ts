@@ -1,16 +1,32 @@
-import { useState, useRef, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
-interface PlayableMessage {
+// Automated expressive tag insertion
+function autoTagText(text: string): string {
+    let tagged = text;
+    // Add [laughing] after sentences with "haha", "lol", or "funny"
+    tagged = tagged.replace(/([.!?])\s*(ha(ha)+|lol|funny)/gi, '$1 [laughing] $2');
+    // Add [excited] after exclamations
+    tagged = tagged.replace(/!+/g, '! [excited]');
+    // Add [pause] at long sentence breaks
+    tagged = tagged.replace(/([.!?])\s+/g, '$1 [pause] ');
+    // Add [sad] if text contains "sorry" or "sad"
+    tagged = tagged.replace(/\b(sorry|sad|unfortunately)\b/gi, '[sad] $1');
+    // Add [surprised] for "wow"
+    tagged = tagged.replace(/\b(wow|amazing|unbelievable)\b/gi, '[surprised] $1');
+    // Add [delight] for "great", "awesome"
+    tagged = tagged.replace(/\b(great|awesome|fantastic|wonderful)\b/gi, '[delight] $1');
+    // Add [sigh] for "oh well"
+    tagged = tagged.replace(/oh well/gi, '[sigh] oh well');
+    // Add [shocked] for "what?!"
+    tagged = tagged.replace(/what\s*\?!/gi, 'what?! [shocked]');
+    return tagged;
+}
+
+export interface PlayableMessage {
     id: string;
     role: string;
     type?: string;
     content: string;
-}
-
-interface UseChatAudioProps {
-    setInput: Dispatch<SetStateAction<string>>;
-    appendMessage: (role: 'user' | 'assistant', content: string) => void;
-    autoPlayTTSMsg?: PlayableMessage | null;
 }
 
 export interface VoiceOption {
@@ -26,7 +42,7 @@ const FALLBACK_VOICES: VoiceOption[] = [
     { id: 'professional male narrator', name: 'Professional' },
 ];
 
-export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseChatAudioProps) => {
+export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg, ttsModel, referenceAudio, temperature = 0.7, topP = 0.7, chunkLength = 200, maxNewTokens = 192, repetitionPenalty = 1.2, seed = 42, language = 'auto', voiceEngine = 'fish' }: any) => {
     // Mic state
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
@@ -119,7 +135,7 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
             const transcribedText = data.text || '';
 
             if (transcribedText.trim()) {
-                setInput(prev => prev + (prev ? ' ' : '') + transcribedText);
+                setInput((prev: string) => prev + (prev ? ' ' : '') + transcribedText);
             } else {
                 throw new Error('No speech detected');
             }
@@ -161,14 +177,28 @@ export const useChatAudio = ({ setInput, appendMessage, autoPlayTTSMsg }: UseCha
             if (!text?.trim()) return;
             setGeneratingTtsId(messageId);
 
-            // Generate TTS
+            // Automated expressive tag insertion
+            const expressiveText = autoTagText(text);
+
+            // FishAudio/Clone/Edge: send as FormData
+            const formData = new FormData();
+            formData.append('text', expressiveText);
+            if (ttsModel) formData.append('model', ttsModel);
+            if (voiceStyle) formData.append('voice_style', voiceStyle);
+            if (referenceAudio) formData.append('reference_audio', referenceAudio);
+            // Advanced FishAudio params
+            formData.append('temperature', String(temperature));
+            formData.append('top_p', String(topP));
+            formData.append('chunk_length', String(chunkLength));
+            formData.append('max_new_tokens', String(maxNewTokens));
+            formData.append('repetition_penalty', String(repetitionPenalty));
+            formData.append('seed', String(seed));
+            formData.append('language', language);
+            formData.append('engine', voiceEngine);
+
             const response = await fetch('/api/audio/tts', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text,
-                    voice_style: voiceStyle
-                })
+                body: formData
             });
 
             if (!response.ok) {

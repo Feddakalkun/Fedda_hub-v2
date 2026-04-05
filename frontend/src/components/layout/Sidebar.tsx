@@ -1,253 +1,125 @@
-// Sidebar Navigation Component
-import { useState } from 'react';
+// Sidebar Navigation Component — clean flat layout, no submenus
 import {
-    Video,
-    Music,
-    Sparkles,
-    Box,
-    Settings,
-    Terminal,
-    ChevronRight,
-    MessageSquare,
-    Images,
-    Film,
-    Wand2,
-    Download,
-    Flame,
+  Video,
+  Music,
+  Sparkles,
+  Settings,
+  Terminal,
+  MessageSquare,
+  Images,
+  Film,
+  Wand2,
+  LayoutDashboard,
+  type LucideIcon,
 } from 'lucide-react';
-import { APP_CONFIG, MODELS } from '../../config/api';
-import { NsfwToggle } from '../nsfw/NsfwToggle';
-import { useUserPreferences } from '../../contexts/UserPreferencesContext';
+import { APP_CONFIG } from '../../config/api';
 
 interface SidebarProps {
-    activeTab: string;
-    activeSubTab: string | null;
-    onTabChange: (tab: string, subTab?: string) => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
 }
 
-type ModelEntry = { id: string; label: string; icon: string; category?: string; source?: string; mapsTo?: string };
-type SidebarItem = {
-    id: string;
-    label: string;
-    icon: any;
-    models?: ModelEntry[];
-    targetTab?: string;
-    targetSubTab?: string;
-};
-
-function groupByCategory(models: ModelEntry[]): { category: string | null; items: ModelEntry[] }[] {
-    const groups: { category: string | null; items: ModelEntry[] }[] = [];
-    let currentCategory: string | null | undefined = undefined;
-    for (const model of models) {
-        const cat = model.category ?? null;
-        if (cat !== currentCategory) {
-            groups.push({ category: cat, items: [model] });
-            currentCategory = cat;
-        } else {
-            groups[groups.length - 1].items.push(model);
-        }
-    }
-    return groups;
+interface NavItem {
+  id: string;
+  label: string;
+  icon: LucideIcon;
 }
 
-export const Sidebar = ({ activeTab, activeSubTab, onTabChange }: SidebarProps) => {
-    const [collapsedMenus, setCollapsedMenus] = useState<Record<string, boolean>>({});
-    const { nsfwEnabled } = useUserPreferences();
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
 
-    const NSFW_MODELS = [
-        { id: 'nsfw-generate', label: 'BJ VIDEO', icon: 'Flame', category: 'VIDEO' },
-        { id: 'nsfw-sdxl', label: 'SDXL IMAGE', icon: 'Sparkles', category: 'IMAGE' },
-    ];
+const SECTIONS: NavSection[] = [
+  {
+    label: 'CREATE',
+    items: [
+      { id: 'chat',      label: 'Agent Chat',   icon: MessageSquare },
+      { id: 'image',     label: 'Image Studio', icon: Sparkles },
+      { id: 'video',     label: 'Video Studio', icon: Video },
+      { id: 'audio',     label: 'Audio / SFX',  icon: Music },
+    ],
+  },
+  {
+    label: 'EXPLORE',
+    items: [
+      { id: 'gallery',   label: 'Gallery',      icon: Images },
+      { id: 'videos',    label: 'Videos',       icon: Film },
+      { id: 'library',   label: 'LoRA Library', icon: LayoutDashboard },
+      { id: 'workflows', label: 'Workflows',    icon: Wand2 },
+    ],
+  },
+  {
+    label: 'SYSTEM',
+    items: [
+      { id: 'logs',      label: 'Console Logs', icon: Terminal },
+      { id: 'settings',  label: 'Settings',     icon: Settings },
+    ],
+  },
+];
 
-    const unlockedSection = nsfwEnabled ? {
-        label: 'NSFW',
-        items: [
-            { id: 'nsfw-studio', label: 'Studio Base', icon: Flame, models: NSFW_MODELS },
-        ] as SidebarItem[],
-    } : null;
+export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
+  return (
+    <aside className="w-64 theme-bg-sidebar border-r border-white/5 flex flex-col shadow-2xl z-10 relative">
+      {/* Top accent line */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-    // Alt+N shortcut hints for fast navigation
-    const SHORTCUT_MAP: Record<string, string> = {
-        chat: '1', image: '2', video: '3', audio: '4', ltxhub: '5',
-        gallery: '6', tiktok: '7', library: '8', settings: '9',
-    };
+      {/* Logo / Header */}
+      <div className="px-6 py-8">
+        <h1 className="text-3xl font-bold bg-gradient-to-br from-white via-slate-200 to-slate-400 bg-clip-text text-transparent tracking-tighter leading-none">
+          {APP_CONFIG.NAME}<span className="text-white">.</span>
+        </h1>
+        <p className="text-[10px] text-slate-600 font-bold tracking-[0.18em] mt-2 uppercase">
+          {APP_CONFIG.DESCRIPTION}
+        </p>
+      </div>
 
-    const baseSections = [
-        {
-            label: 'CREATE',
-            items: [
-                { id: 'chat', label: 'Agent Chat', icon: MessageSquare },
-                { id: 'image', label: 'Z-Image', icon: Sparkles, models: MODELS.IMAGE },
-                { id: 'qwen', label: 'QWEN', icon: Box, models: MODELS.QWEN },
-                { id: 'flux2klein', label: 'FLUX2KLEIN', icon: Sparkles, models: MODELS.FLUX2KLEIN },
-                { id: 'ltxhub', label: 'LTX Hub', icon: Video, models: MODELS.LTXHUB },
-                { id: 'ponyxl', label: 'PonyXL', icon: Wand2, models: MODELS.PONYXL },
-                { id: 'audio', label: 'Audio/SFX', icon: Music, models: MODELS.AUDIO },
-            ] as SidebarItem[],
-        },
-        {
-            label: 'MANAGE',
-            items: [
-                { id: 'gallery', label: 'Gallery', icon: Images },
-                { id: 'tiktok', label: 'TikTok Studio', icon: Download },
-                { id: 'videos', label: 'Videos', icon: Film },
-            ] as SidebarItem[],
-        },
-        {
-            label: 'SYSTEM',
-            items: [
-                { id: 'logs', label: 'Console Logs', icon: Terminal },
-                { id: 'settings', label: 'Settings', icon: Settings },
-            ] as SidebarItem[],
-        },
-    ];
-
-    const sections = unlockedSection ? [unlockedSection, ...baseSections] : baseSections;
-
-    return (
-        <aside className="w-72 theme-bg-sidebar border-r border-white/5 flex flex-col shadow-2xl z-10 relative">
-            {/* Subtle top accent line */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
-            {/* Header / Logo */}
-            <div className="p-8 pb-10 relative">
-                <h1 className="text-3xl font-bold bg-gradient-to-br from-white via-slate-200 to-slate-400 bg-clip-text text-transparent tracking-tighter">
-                    {APP_CONFIG.NAME}<span className="text-white">.</span>
-                </h1>
-                <p className="text-[10px] text-slate-500 font-bold tracking-widest mt-1 uppercase">
-                    {APP_CONFIG.DESCRIPTION}
-                </p>
-                {nsfwEnabled && (
-                    <div className="absolute top-8 right-8 flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-fuchsia-500" />
-                        <span className="text-[8px] text-fuchsia-400 font-bold tracking-widest uppercase">Unlocked</span>
-                    </div>
-                )}
+      {/* Nav */}
+      <nav className="flex-1 px-3 pb-4 overflow-y-auto custom-scrollbar">
+        {SECTIONS.map((section, idx) => (
+          <div key={section.label} className={idx > 0 ? 'mt-6' : ''}>
+            {/* Section label */}
+            <div className="px-3 mb-2">
+              <span className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.22em]">
+                {section.label}
+              </span>
             </div>
 
-            {/* Navigation */}
-            <nav className="flex-1 px-4 overflow-y-auto">
-                {sections.map((section, idx) => (
-                    <div key={section.label} className={idx > 0 ? 'mt-6' : ''}>
-                        <div className="px-4 mb-2">
-                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em]">
-                                {section.label}
-                            </span>
-                        </div>
-                        <div className="space-y-1">
-                            {section.items.map((item) => (
-                                <div key={item.id}>
-                                    {(() => {
-                                        const isActive = activeTab === item.id;
-                                        const isCollapsed = !!collapsedMenus[item.id];
-                                        const isExpanded = isActive && !isCollapsed;
-
-                                        return (
-                                    <button
-                                        onClick={() => {
-                                            if (item.targetTab) {
-                                                onTabChange(item.targetTab, item.targetSubTab);
-                                                return;
-                                            }
-
-                                            if (item.models) {
-                                                if (isActive && !isCollapsed) {
-                                                    setCollapsedMenus((prev) => ({ ...prev, [item.id]: true }));
-                                                    return;
-                                                }
-
-                                                setCollapsedMenus((prev) => ({ ...prev, [item.id]: false }));
-                                                const targetSubTab = isActive && activeSubTab
-                                                    ? activeSubTab
-                                                    : item.models[0]?.id;
-                                                onTabChange(item.id, targetSubTab);
-                                                return;
-                                            }
-
-                                            onTabChange(item.id);
-                                        }}
-                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group relative z-50 ${isActive
-                                            ? 'theme-active-tab shadow-lg'
-                                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <item.icon
-                                                className={`w-5 h-5 relative z-50 ${isActive
-                                                    ? '' // Handled by CSS
-                                                    : 'text-slate-500 group-hover:text-slate-300'
-                                                    } transition-colors`}
-                                            />
-                                            <span className="font-medium text-sm tracking-tight">{item.label}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {SHORTCUT_MAP[item.id] && !isActive && (
-                                                <span className="text-[9px] font-mono text-slate-700 group-hover:text-slate-500 transition-colors hidden xl:block">
-                                                    alt+{SHORTCUT_MAP[item.id]}
-                                                </span>
-                                            )}
-                                            {item.models && (
-                                                <ChevronRight
-                                                    className={`w-4 h-4 text-slate-600 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-black' : ''
-                                                        }`}
-                                                />
-                                            )}
-                                        </div>
-                                    </button>
-                                        );
-                                    })()}
-
-                                    {/* Sub-menu (grouped by category when available) */}
-                                    {activeTab === item.id && item.models && !collapsedMenus[item.id] && (
-                                        <div className="pl-8 pr-2 py-2 animate-in slide-in-from-top-2 fade-in duration-200">
-                                            {groupByCategory(item.models).map((group) => (
-                                                <div key={group.category ?? '__ungrouped'}>
-                                                    {group.category && (
-                                                        <div className="px-3 pt-2 pb-1">
-                                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-[0.15em]">
-                                                                {group.category}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    <div className="space-y-0.5">
-                                                        {group.items.map((model) => (
-                                                            <button
-                                                                key={model.id}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    onTabChange(item.id, model.id);
-                                                                }}
-                                                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                                                    activeSubTab === model.id
-                                                                        ? 'bg-white/10 text-white'
-                                                                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                                                                }`}
-                                                            >
-                                                                <span className={`text-[8px] ${activeSubTab === model.id ? 'text-white' : 'text-slate-600'}`}>●</span>
-                                                                <span className="font-medium">{model.label}</span>
-                                                                {model.source && (
-                                                                    <span className="ml-auto text-[9px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border border-white/10 text-slate-400">
-                                                                        {model.source}
-                                                                    </span>
-                                                                )}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </nav>
-
-            {/* Footer / Toggle */}
-            <div className="p-4 border-t border-white/5 bg-[#050508]/50 relative z-50">
-                <NsfwToggle />
+            {/* Items */}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    id={`nav-${item.id}`}
+                    onClick={() => onTabChange(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? 'theme-active-tab shadow-md'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <item.icon
+                      className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                        isActive ? '' : 'text-slate-600 group-hover:text-slate-300'
+                      }`}
+                    />
+                    <span className="tracking-tight">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
-        </aside>
-    );
+          </div>
+        ))}
+      </nav>
+
+      {/* Footer version tag */}
+      <div className="px-6 py-4 border-t border-white/5">
+        <span className="text-[9px] font-mono text-slate-700 tracking-widest">
+          v{APP_CONFIG.VERSION}
+        </span>
+      </div>
+    </aside>
+  );
 };

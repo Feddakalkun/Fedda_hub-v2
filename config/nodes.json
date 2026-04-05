@@ -2,205 +2,14 @@
   {
     "name": "ComfyUI-Manager",
     "url": "https://github.com/Comfy-Org/ComfyUI-Manager.git",
-    "folder": "ComfyUI-Manager"
+    "folder": "ComfyUI-Manager",
+    "note": "Essential: Node manager, auto-install, model downloader"
   },
-  {
-    "name": "AutoModelFetcher",
-    "url": "local",
-    "folder": "none",
-    "local": true
-  },
-
   {
     "name": "rgthree-comfy",
     "url": "https://github.com/rgthree/rgthree-comfy.git",
     "folder": "rgthree-comfy",
-    "note": "Power Lora Loader, Image Comparer — used in all z-image + wan22 workflows"
-  },
-  {
-    "name": "ComfyUI-Studio-nodes",
-    "url": "https://github.com/comfyuistudio/ComfyUI-Studio-nodes.git",
-    "folder": "ComfyUI-Studio-nodes",
-    "note": "HuggingFace Model Downloader — used in 6/7 workflows"
-  },
-  {
-    "name": "ComfyUI-Impact-Pack",
-    "url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git",
-    "folder": "ComfyUI-Impact-Pack",
-    "note": "FaceDetailer, SAMLoader, UltralyticsDetectorProvider, mask tools"
-  },
-  {
-    "name": "ComfyUI_UltimateSDUpscale",
-    "url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git",
-    "folder": "ComfyUI_UltimateSDUpscale",
-    "note": "UltimateSDUpscale node used in HQ and dedicated upscale workflows"
-  },
-  {
-    "name": "ComfyUI_IPAdapter_plus",
-    "url": "https://github.com/cubiq/ComfyUI_IPAdapter_plus.git",
-    "folder": "ComfyUI_IPAdapter_plus",
-    "note": "IPAdapterModelLoader and IPAdapterAdvanced nodes used in IPAdapter workflows"
-  },
-  {
-    "name": "ComfyUI_InstantID",
-    "url": "https://github.com/cubiq/ComfyUI_InstantID.git",
-    "folder": "ComfyUI_InstantID",
-    "note": "InstantIDAnalysis, InstantIDModelLoader, ApplyInstantID nodes for identity-preserving workflows (requires insightface and onnxruntime)"
-  },
-  {
-    "name": "ComfyUI-Lotus",
-    "url": "https://github.com/kijai/ComfyUI-Lotus.git",
-    "folder": "ComfyUI-Lotus",
-    "note": "LotusSampler, LoadLotusModel — Lotus depth/normal prediction workflows"
-  },
-  {
-    "name": "comfyui_controlnet_aux",
-    "url": "https://github.com/Fannovel16/comfyui_controlnet_aux.git",
-    "folder": "comfyui_controlnet_aux",
-    "note": "CannyEdgePreprocessor, DWPreprocessor and other ControlNet preprocessors"
-  },
-  {
-    "name": "ComfyUI-Impact-Subpack",
-    "url": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git",
-    "folder": "ComfyUI-Impact-Subpack",
-    "note": "MaskFix+, DetailerForEach — needed for HQ detailer workflow"
-  },
-  {
-    "name": "ComfyUI-AutoCropFaces",
-    "url": "https://github.com/liusida/ComfyUI-AutoCropFaces.git",
-    "folder": "ComfyUI-AutoCropFaces",
-    "note": "AutoCropFaces node for automatic face crop workflows"
-  },
-
-  {
-    "name": "ComfyUI-Inpaint-CropAndStitch",
-    "url": "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git",
-    "folder": "ComfyUI-Inpaint-CropAndStitch",
-    "note": "InpaintCropImproved, InpaintStitchImproved — inpaint workflow"
-  },
-  {
-    "name": "comfyui-inpaint-nodes",
-    "url": "https://github.com/Acly/comfyui-inpaint-nodes.git",
-    "folder": "comfyui-inpaint-nodes",
-    "note": "INPAINT_ExpandMask and related inpaint helper nodes for mask growth/blur workflows"
-  },
-  {
-    "name": "ComfyUI_LayerStyle",
-    "url": "https://github.com/chflame163/ComfyUI_LayerStyle.git",
-    "folder": "ComfyUI_LayerStyle",
-    "note": "LayerMask: PersonMaskUltra, PurgeVRAM — inpaint + video workflows"
-  },
-  {
-    "name": "ComfyUI-Easy-Use",
-    "url": "https://github.com/yolain/ComfyUI-Easy-Use.git",
-    "folder": "ComfyUI-Easy-Use",
-    "note": "easy showAnything, easy int — UI helpers"
-  },
-  {
-    "name": "ComfyUI-Custom-Scripts",
-    "url": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git",
-    "folder": "ComfyUI-Custom-Scripts",
-    "note": "ShowText|pysssss — debug display"
-  },
-  {
-    "name": "comfy-image-saver",
-    "url": "https://github.com/giriss/comfy-image-saver.git",
-    "folder": "comfy-image-saver",
-    "note": "String Literal and enhanced image saver nodes used by FLUX2KLEIN workflows"
-  },
-
-  {
-    "name": "ComfyUI-Florence2",
-    "url": "https://github.com/kijai/ComfyUI-Florence2.git",
-    "folder": "ComfyUI-Florence2",
-    "note": "Florence2 model loader + run — HQ detailer workflow"
-  },
-  {
-    "name": "ComfyUI-segment-anything-2",
-    "url": "https://github.com/kijai/ComfyUI-segment-anything-2.git",
-    "folder": "ComfyUI-segment-anything-2",
-    "note": "SAM2 segmentation — HQ detailer workflow"
-  },
-  {
-    "name": "ComfyUI-Styles-CSV-Loader",
-    "url": "https://github.com/theUpsider/ComfyUI-Styles_CSV_Loader.git",
-    "folder": "ComfyUI-Styles_CSV_Loader",
-    "note": "Load Styles CSV — prompt style selector"
-  },
-
-  {
-    "name": "ComfyUI-LTXVideo",
-    "url": "https://github.com/Lightricks/ComfyUI-LTXVideo.git",
-    "folder": "ComfyUI-LTXVideo",
-    "note": "LTX-2/2.3 video nodes — ClownSampler_Beta, MultimodalGuider, GuiderParameters, LTXAVTextEncoderLoader, SaveVideo, upscalers"
-  },
-  {
-    "name": "ComfyUI-GGUF",
-    "url": "https://github.com/city96/ComfyUI-GGUF.git",
-    "folder": "ComfyUI-GGUF",
-    "note": "GGUF loaders and nodes for optional quantized-model workflows"
-  },
-  {
-    "name": "ComfyMath",
-    "url": "https://github.com/evanspearman/ComfyMath.git",
-    "folder": "ComfyMath",
-    "note": "CM_FloatToInt — type conversion used in LTX-2.3 workflow"
-  },
-  {
-    "name": "RES4LYF",
-    "url": "https://github.com/ClownsharkBatwing/RES4LYF.git",
-    "folder": "RES4LYF",
-    "note": "ClownSampler_Beta — advanced sampler used in LTX-2.3 distilled workflows"
-  },
-  {
-    "name": "ComfyUI-KJNodes",
-    "url": "https://github.com/kijai/ComfyUI-KJNodes.git",
-    "folder": "ComfyUI-KJNodes",
-    "note": "VAELoaderKJ, ImageResizeKJv2 — used in LTX-2 lipsync workflow"
-  },
-  {
-    "name": "ComfyUI-MelBandRoFormer",
-    "url": "https://github.com/kijai/ComfyUI-MelBandRoFormer.git",
-    "folder": "ComfyUI-MelBandRoFormer",
-    "note": "Audio vocal separation — MelBandRoFormerModelLoader, MelBandRoFormerSampler for LTX-2 lipsync"
-  },
-{
-    "name": "ComfyUI_Comfyroll_CustomNodes",
-    "url": "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git",
-    "folder": "ComfyUI_Comfyroll_CustomNodes",
-    "note": "CR Prompt Text — text input node used in LTX-2 lipsync workflow"
-  },
-  {
-    "name": "ComfyUI-Image-Selector",
-    "url": "https://github.com/SLAPaper/ComfyUI-Image-Selector.git",
-    "folder": "ComfyUI-Image-Selector",
-    "note": "ImageSelector — frame selection in LTX-2 workflows"
-  },
-  {
-    "name": "comfyui-various",
-    "url": "https://github.com/jamesWalker55/comfyui-various.git",
-    "folder": "comfyui-various",
-    "note": "JWFloatToInteger — type conversion used in LTX-2 lipsync workflow"
-  },
-
-  {
-    "name": "audio-separation-nodes-comfyui",
-    "url": "https://github.com/christian-byrne/audio-separation-nodes-comfyui.git",
-    "folder": "audio-separation-nodes-comfyui",
-    "note": "AudioCrop — audio cropping used in wan-infinite-talk lipsync workflow"
-  },
-
-  {
-    "name": "ComfyUI-WanVideoWrapper",
-    "url": "https://github.com/kijai/ComfyUI-WanVideoWrapper.git",
-    "folder": "ComfyUI-WanVideoWrapper",
-    "note": "Core Wan video nodes — img2vid, 6frames, basic InfiniteTalk"
-  },
-  {
-    "name": "ComfyUI-WanVideoWrapper-MultiTalk",
-    "url": "https://github.com/MaTeZZ/ComfyUI-WanVideoWrapper-MultiTalk.git",
-    "folder": "ComfyUI-WanVideoWrapper-MultiTalk",
-    "note": "MultiTalk extension — WanVideoImageToVideoMultiTalk, MultiTalkWav2VecEmbeds"
+    "note": "Power Lora Loader, Image Comparer — used in all z-image workflows"
   },
   {
     "name": "ComfyUI-VideoHelperSuite",
@@ -209,52 +18,27 @@
     "note": "VHS_VideoCombine, ImageBatch — all video workflows"
   },
   {
-    "name": "ComfyUI-Frame-Interpolation",
-    "url": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git",
-    "folder": "ComfyUI-Frame-Interpolation",
-    "note": "RIFE VFI — frame interpolation for smooth video"
+    "name": "was-node-suite-comfyui",
+    "url": "https://github.com/WASasquatch/was-node-suite-comfyui.git",
+    "folder": "was-node-suite-comfyui",
+    "note": "Text Concatenate, Text Multiline, image utilities — widely used"
   },
   {
     "name": "ComfyUI_essentials",
     "url": "https://github.com/cubiq/ComfyUI_essentials.git",
     "folder": "ComfyUI_essentials",
-    "note": "Essential image utilities"
+    "note": "Essential image resize, mask, utility nodes"
   },
   {
-    "name": "was-node-suite-comfyui",
-    "url": "https://github.com/WASasquatch/was-node-suite-comfyui.git",
-    "folder": "was-node-suite-comfyui",
-    "note": "Text Concatenate, Text Multiline, image utilities — widely used in workflows"
+    "name": "ComfyUI-Easy-Use",
+    "url": "https://github.com/yolain/ComfyUI-Easy-Use.git",
+    "folder": "ComfyUI-Easy-Use",
+    "note": "easy showAnything, easy int — common UI helpers"
   },
   {
-    "name": "ComfyUI-qwenmultiangle",
-    "url": "https://github.com/jtydhr88/ComfyUI-qwenmultiangle.git",
-    "folder": "comfyui-qwenmultiangle",
-    "note": "QwenMultiangleCameraNode — multi-angle camera control for qwen-multiangle workflow"
-  },
-  {
-    "name": "ComfyUI-IF_AI_tools",
-    "url": "https://github.com/if-ai/ComfyUI-IF_AI_tools.git",
-    "folder": "ComfyUI-IF_AI_tools",
-    "note": "LLM nodes (Qwen, Llama, etc.) — replaces Ollama for chat functionality"
-  },
-
-  {
-    "name": "comfy-mtb",
-    "url": "https://github.com/melMass/comfy_mtb.git",
-    "folder": "comfy_mtb",
-    "note": "FishS2MultiSpeakerTTS, FishS2TTS, Audio To Text (mtb), Load Whisper (mtb) - required for FishAudio TTS workflow"
-  },
-  {
-    "name": "CRT-Nodes",
-    "url": "https://github.com/PGCRT/CRT-Nodes.git",
-    "folder": "CRT-Nodes",
-    "note": "CRT custom nodes collection - required for FishAudio workflow"
-  },
-  {
-    "name": "ComfyUI-FishAudioS2",
-    "url": "https://github.com/Saganaki22/ComfyUI-FishAudioS2.git",
-    "folder": "ComfyUI-FishAudioS2",
-    "note": "Fish Audio S2 TTS nodes (FishS2TTS, FishS2MultiSpeakerTTS) - voice clone and multi-speaker TTS"
+    "name": "ComfyUI-Custom-Scripts",
+    "url": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git",
+    "folder": "ComfyUI-Custom-Scripts",
+    "note": "ShowText|pysssss — debug display, workflow utilities"
   }
 ]

@@ -1,55 +1,67 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────
+   Design Tokens
+────────────────────────────────────────── */
 :root {
   --accent-primary: #ffffff;
-  --bg-app: #0a0a0f;
-  --bg-main: #050508;
-  --bg-sidebar: #0a0a0f;
+  --bg-app:     #08080e;
+  --bg-main:    #050508;
+  --bg-sidebar: #09090f;
 }
 
-html.nsfw-active {
-  --accent-primary: #d946ef;
-  --bg-app: #120516;
-  --bg-main: #0a020d;
-  --bg-sidebar: #100414;
-}
-
-.theme-bg-app { background-color: var(--bg-app); transition: background-color 0.5s ease; }
-.theme-bg-main { background-color: var(--bg-main); transition: background-color 0.5s ease; }
+/* ──────────────────────────────────────────
+   Theme utility classes
+────────────────────────────────────────── */
+.theme-bg-app     { background-color: var(--bg-app);     transition: background-color 0.5s ease; }
+.theme-bg-main    { background-color: var(--bg-main);    transition: background-color 0.5s ease; }
 .theme-bg-sidebar { background-color: var(--bg-sidebar); transition: background-color 0.5s ease; }
 
+/* Active sidebar item */
 .theme-active-tab {
-    background: white;
-    color: black;
+  background: #ffffff;
+  color: #000000;
+  position: relative;
+  overflow: hidden;
 }
 
-html.nsfw-active .theme-active-tab {
-    background: linear-gradient(135deg, #d946ef 0%, #e11d48 100%);
-    color: white;
-    box-shadow: 0 0 15px rgba(217, 70, 239, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+/* Shine sweep on active tab */
+.theme-active-tab::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  animation: tab-shine 3.5s ease-in-out infinite;
 }
 
-html.nsfw-active body::after {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: radial-gradient(circle at 50% 0%, rgba(217, 70, 239, 0.12) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 40; /* High enough to overlay panels but not modals */
+@keyframes tab-shine {
+  0%   { left: -100%; }
+  30%  { left: 120%; }
+  100% { left: 120%; }
 }
 
-* {
+/* ──────────────────────────────────────────
+   Reset
+────────────────────────────────────────── */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
 }
 
 body {
@@ -57,7 +69,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-app);
-  color: white;
+  color: #ffffff;
   overflow: hidden;
 }
 
@@ -66,134 +78,85 @@ body {
   height: 100vh;
 }
 
-/* Premium Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+/* ──────────────────────────────────────────
+   Custom scrollbar
+────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+.custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* Soft Animations */
+/* ──────────────────────────────────────────
+   Animations
+────────────────────────────────────────── */
 @keyframes fade-in {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 
 @keyframes slide-up {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
 @keyframes slide-in-left {
-  from { transform: translateX(-8px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateX(-10px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(217, 70, 239, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(217, 70, 239, 0.6); }
+  0%, 100% { box-shadow: 0 0 8px rgba(200,200,255,0.2); }
+  50%       { box-shadow: 0 0 22px rgba(200,200,255,0.45); }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 
 @keyframes progress-pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  50%       { opacity: 0.55; }
 }
 
-.animate-fade-in { animation: fade-in 0.3s ease-out; }
-.animate-slide-up { animation: slide-up 0.4s ease-out; }
-.animate-slide-in-left { animation: slide-in-left 0.2s ease-out; }
-.animate-glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
+.animate-fade-in        { animation: fade-in        0.3s ease-out; }
+.animate-slide-up       { animation: slide-up       0.4s ease-out; }
+.animate-slide-in-left  { animation: slide-in-left  0.25s ease-out; }
+.animate-glow-pulse     { animation: glow-pulse     2s ease-in-out infinite; }
 .animate-progress-pulse { animation: progress-pulse 1.5s ease-in-out infinite; }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%);
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
   background-size: 200% auto;
-  animation: shimmer 1.5s linear infinite;
+  animation: shimmer 1.8s linear infinite;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Fixed glass-panel (typo was 'border' instead of 'solid') */
+/* ──────────────────────────────────────────
+   Glassmorphism utility
+────────────────────────────────────────── */
 .glass-panel {
-  background: rgba(18, 18, 24, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background:     rgba(14, 14, 22, 0.75);
+  backdrop-filter: blur(14px);
+  border:         1px solid rgba(255,255,255,0.06);
 }
 
-/* VRAM meter fill */
-.vram-bar-fill {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.8s ease-out;
-}
-
-/* Sidebar nav hover glow */
-.sidebar-item-hover:hover {
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-}
-
-/* Active tab shine effect */
-.theme-active-tab {
-  position: relative;
-  overflow: hidden;
-}
-
-.theme-active-tab::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-  animation: tab-shine 3s ease-in-out infinite;
-}
-
-@keyframes tab-shine {
-  0% { left: -100%; }
-  30% { left: 120%; }
-  100% { left: 120%; }
-}
-
-/* Tooltip utility */
+/* ──────────────────────────────────────────
+   Tooltip
+────────────────────────────────────────── */
 .tooltip-trigger { position: relative; }
 
 .tooltip-trigger:hover .tooltip-content {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
   pointer-events: auto;
 }
 
@@ -202,12 +165,12 @@ body {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%) translateY(4px);
-  background: rgba(10, 10, 20, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #d1d5db;
+  background: rgba(8, 8, 16, 0.96);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #cbd5e1;
   font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 5px 9px;
+  border-radius: 7px;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.15s ease, transform 0.15s ease;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Video, Upload, Hash, RefreshCw, Settings2, ChevronLeft, ChevronRight, Film, Loader2, Maximize2 } from 'lucide-react';
+import { Video, Upload, RefreshCw, Settings2, ChevronLeft, ChevronRight, Film, Loader2, Maximize2 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';

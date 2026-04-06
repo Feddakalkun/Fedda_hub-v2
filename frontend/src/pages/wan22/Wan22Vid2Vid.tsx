@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Video, Upload, Hash, RefreshCw, Settings2, ChevronLeft, ChevronRight, Film, Loader2 } from 'lucide-react';
+import { Video, Upload, RefreshCw, Settings2, ChevronLeft, ChevronRight, Film, Loader2 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
-import { BACKEND_API, COMFY_API } from '../../config/api';
+import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { comfyService } from '../../services/comfyService';

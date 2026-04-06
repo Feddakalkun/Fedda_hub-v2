@@ -329,7 +329,7 @@ async def generate(req: GenerateRequest):
 
 @app.get("/api/generate/status/{prompt_id}")
 async def get_generation_status(prompt_id: str):
-    """Check status of a specific generation job."""
+    """Check status of a specific generation job. Returns all output files."""
     try:
         # Check history first
         resp = requests.get(f"{COMFY_URL}/history/{prompt_id}", timeout=2)
@@ -339,15 +339,30 @@ async def get_generation_status(prompt_id: str):
                 history = data[prompt_id]
                 outputs = history.get("outputs", {})
                 images = []
+                videos = []
                 for node_id, output in outputs.items():
-                    if "images" in output:
-                        for img in output["images"]:
-                            images.append({
-                                "filename": img["filename"],
-                                "subfolder": img.get("subfolder", ""),
-                                "type": img.get("type", "output")
-                            })
-                return {"success": True, "status": "completed", "images": images}
+                    # Still images
+                    for img in output.get("images", []):
+                        images.append({
+                            "filename": img["filename"],
+                            "subfolder": img.get("subfolder", ""),
+                            "type": img.get("type", "output")
+                        })
+                    # VHS_VideoCombine outputs as 'gifs' (mp4/webp)
+                    for vid in output.get("gifs", []):
+                        videos.append({
+                            "filename": vid["filename"],
+                            "subfolder": vid.get("subfolder", ""),
+                            "type": vid.get("type", "output")
+                        })
+                    # Some nodes output 'videos'
+                    for vid in output.get("videos", []):
+                        videos.append({
+                            "filename": vid["filename"],
+                            "subfolder": vid.get("subfolder", ""),
+                            "type": vid.get("type", "output")
+                        })
+                return {"success": True, "status": "completed", "images": images, "videos": videos}
 
         # Check queue
         q_resp = requests.get(f"{COMFY_URL}/queue", timeout=2)
@@ -355,13 +370,12 @@ async def get_generation_status(prompt_id: str):
             q_data = q_resp.json()
             running = q_data.get("queue_running", [])
             pending = q_data.get("queue_pending", [])
-            
             if any(j[1] == prompt_id for j in running):
-                return {"success": True, "status": "running"}
+                return {"success": True, "status": "running", "images": [], "videos": []}
             if any(j[1] == prompt_id for j in pending):
-                return {"success": True, "status": "pending"}
+                return {"success": True, "status": "pending", "images": [], "videos": []}
 
-        return {"success": True, "status": "not_found"}
+        return {"success": True, "status": "not_found", "images": [], "videos": []}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

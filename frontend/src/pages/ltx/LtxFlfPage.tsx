@@ -83,7 +83,8 @@ export const LtxFlfPage = () => {
   const [isGenerating, setIsGenerating]       = useState(false);
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
   const [currentVideo,    setCurrentVideo]    = useState<string | null>(null);
-  const [history,         setHistory]         = useState<string[]>([]);
+  // Persistent history — survives tab switches
+  const [history, setHistory] = usePersistentState<string[]>('ltx_flf_history', []);
 
   const sessionRef   = useRef<string[]>([]);
   const prevCountRef = useRef(0);
@@ -134,21 +135,42 @@ export const LtxFlfPage = () => {
     setHistory(prev => [...urls, ...prev].slice(0, 40));
   }, [outputReadyCount, lastOutputVideos, isGenerating, pendingPromptId]);
 
-  // ── Completion: use execState 'done' (fires when ALL nodes finish) ──────────
-  // Don't use lastCompletedPromptId — it fires on every node, causing premature
-  // completion before VHS output nodes have had a chance to emit their videos.
+  // ── Completion: use execState 'done' + history fallback ─────────────────────
+  const completingPromptRef = useRef<string | null>(null);
   useEffect(() => {
     if (!pendingPromptId) return;
-    if (execState === 'done') {
-      setIsGenerating(false);
-      setPendingPromptId(null);
-      toast('Video ready', 'success');
-    }
     if (execState === 'error') {
       setIsGenerating(false);
       setPendingPromptId(null);
+      return;
     }
-  }, [execState, pendingPromptId, toast]);
+    if (execState === 'done') {
+      const pid = pendingPromptId;
+      completingPromptRef.current = pid;
+      setIsGenerating(false);
+      setPendingPromptId(null);
+
+      // Always fetch history as authoritative source — WS events can be missed
+      fetch(`${BACKEND_API.BASE_URL}/api/generate/status/${pid}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.status === 'completed' && d.videos?.length) {
+            const urls = d.videos.map((v: any) =>
+              `/comfy/view?filename=${encodeURIComponent(v.filename)}&subfolder=${encodeURIComponent(v.subfolder)}&type=${v.type}`
+            );
+            setCurrentVideo(urls[0]);
+            setHistory(prev => [...urls, ...prev.filter(u => !urls.includes(u))].slice(0, 40));
+            toast('Video ready', 'success');
+          } else {
+            // No videos in history yet — rely on WS-streamed currentVideo
+            if (sessionRef.current.length > 0) toast('Video ready', 'success');
+          }
+        })
+        .catch(() => {
+          if (sessionRef.current.length > 0) toast('Video ready', 'success');
+        });
+    }
+  }, [execState, pendingPromptId, toast, setHistory]);
 
   // ── Generate ────────────────────────────────────────────────────────────────
   const handleGenerate = async () => {

@@ -66,6 +66,22 @@ if (-not (Test-Path $ComfyDir)) {
 }
 
 # ============================================================================
+# 0. UPDATE COMFYUI CORE
+# ============================================================================
+Write-Host "`n[0/3] Updating ComfyUI core..." -ForegroundColor Yellow
+try {
+    Set-Location $ComfyDir
+    $ErrorActionPreference = "Continue"
+    & $GitExe pull 2>&1 | Out-Null
+    $ErrorActionPreference = "Stop"
+    Set-Location $RootPath
+    Write-Host "  ComfyUI core updated." -ForegroundColor Green
+} catch {
+    Set-Location $RootPath
+    Write-Host "  [WARNING] ComfyUI core update failed (non-fatal): $_" -ForegroundColor Yellow
+}
+
+# ============================================================================
 # 1. CUSTOM NODES - install missing / update existing (from nodes.json)
 # ============================================================================
 $NodesConfigFile = Join-Path $RootPath "config\nodes.json"

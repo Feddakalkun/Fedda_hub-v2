@@ -1,9 +1,9 @@
 {
   "3": {
     "inputs": {
-      "seed": 578871965745355,
-      "steps": 9,
-      "cfg": 1,
+      "seed": 409521766835581,
+      "steps": 8,
+      "cfg": 1.5,
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 1,
@@ -94,7 +94,7 @@
     "inputs": {
       "shift": 3,
       "model": [
-        "126",
+        "185",
         0
       ]
     },
@@ -182,8 +182,8 @@
   },
   "30": {
     "inputs": {
-      "width": 1920,
-      "height": 1088,
+      "width": 1024,
+      "height": 1024,
       "aspect_ratio": "3:2",
       "direction": "Vertical"
     },
@@ -222,7 +222,7 @@
   },
   "33": {
     "inputs": {
-      "string": "Breathtaking Award-winningreliastic woman on a horse in leather viking clothes acnient ruins, hills, cinematic"
+      "string": "a young woman"
     },
     "class_type": "String Literal",
     "_meta": {
@@ -231,7 +231,7 @@
   },
   "34": {
     "inputs": {
-      "string": ""
+      "string": "blurry, ugly, bad proportions, low quality, artifacts"
     },
     "class_type": "String Literal",
     "_meta": {
@@ -254,26 +254,6 @@
     "class_type": "Text Concatenate",
     "_meta": {
       "title": "Text Concatenate"
-    }
-  },
-  "126": {
-    "inputs": {
-      "PowerLoraLoaderHeaderWidget": {
-        "type": "PowerLoraLoaderHeaderWidget"
-      },
-      "➕ Add Lora": "",
-      "model": [
-        "16",
-        0
-      ],
-      "clip": [
-        "18",
-        0
-      ]
-    },
-    "class_type": "Power Lora Loader (rgthree)",
-    "_meta": {
-      "title": "Power Lora Loader (rgthree)"
     }
   },
   "179": {
@@ -300,14 +280,14 @@
       "guide_size": 1152,
       "guide_size_for": true,
       "max_size": 1152,
-      "seed": 314,
+      "seed": 1125126954706113,
       "steps": 9,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
-      "denoise": 0.44000000000000006,
+      "denoise": 0.44,
       "feather": 4,
-      "noise_mask": "enabled",
+      "noise_mask": true,
       "force_inpaint": false,
       "bbox_threshold": 0.5,
       "bbox_dilation": 8,
@@ -370,12 +350,12 @@
           {
             "name": "A",
             "selected": true,
-            "url": "/api/view?filename=rgthree.compare._temp_mkbcm_00001_.png&type=temp&subfolder=&rand=0.3274435830107928"
+            "url": "/api/view?filename=rgthree.compare._temp_oavcy_00005_.png&type=temp&subfolder=&rand=0.8146163011343875"
           },
           {
             "name": "B",
             "selected": true,
-            "url": "/api/view?filename=rgthree.compare._temp_mkbcm_00002_.png&type=temp&subfolder=&rand=0.5142533390683615"
+            "url": "/api/view?filename=rgthree.compare._temp_oavcy_00006_.png&type=temp&subfolder=&rand=0.6389419488143951"
           }
         ]
       },
@@ -391,6 +371,20 @@
     "class_type": "Image Comparer (rgthree)",
     "_meta": {
       "title": "Image Comparer (rgthree)"
+    }
+  },
+  "185": {
+    "inputs": {
+      "lora_name": "zimage_turbo\\Angela_Sun_PMv1a_ZImage.safetensors",
+      "strength_model": 1,
+      "model": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
     }
   }
 }

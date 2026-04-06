@@ -10,6 +10,7 @@ import {
   Film,
   Wand2,
   LayoutDashboard,
+  Clapperboard,
   type LucideIcon,
 } from 'lucide-react';
 import { APP_CONFIG } from '../../config/api';
@@ -54,6 +55,14 @@ const SECTIONS: NavSection[] = [
         subitems: [
           { id: 'wan22-vid2vid', label: 'WAN 2.2 Vid2Vid' },
           { id: 'wan22-img2vid', label: 'WAN 2.2 Img2Vid' },
+        ]
+      },
+      {
+        id: 'ltx',
+        label: 'LTX Video',
+        icon: Clapperboard,
+        subitems: [
+          { id: 'ltx-flf', label: 'First / Last Frame' },
         ]
       },
       { id: 'audio',     label: 'Audio / SFX',  icon: Music },

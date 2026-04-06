@@ -22,6 +22,7 @@ import {
 const VALID_TABS = new Set([
   'chat', 'image', 'z-image', 'flux', 'qwen', 'image-other',
   'video', 'wan22-vid2vid', 'wan22-img2vid',
+  'ltx', 'ltx-flf',
   'audio', 'gallery', 'videos', 'library', 'workflows',
   'logs', 'settings',
 ]);
@@ -36,6 +37,8 @@ const PAGE_META: Record<string, { label: string; description: string; Icon: any 
   video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
   'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
   'wan22-img2vid': { label: 'WAN 2.2 Img2Vid', description: 'Animate a still image into video with WAN 2.2.',      Icon: Video           },
+  'ltx':           { label: 'LTX Video',        description: 'LTX Video 2.3 — cinematic AI video generation.',      Icon: Film            },
+  'ltx-flf':       { label: 'LTX — First / Last Frame', description: 'Generate video between two keyframes with LTX 2.3.', Icon: Film     },
   audio:       { label: 'Audio / SFX',   description: 'Generate music, voice, and sound effects.',           Icon: Music           },
   gallery:     { label: 'Gallery',       description: 'Browse and manage your generated images.',             Icon: Images          },
   videos:      { label: 'Videos',        description: 'View and manage your generated video files.',          Icon: Film            },
@@ -58,6 +61,7 @@ function readActiveTab(): string {
 
 import { ImageStudioPage } from './pages/ImageStudioPage';
 import { VideoStudioPage } from './pages/VideoStudioPage';
+import { LtxStudioPage } from './pages/LtxStudioPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -92,6 +96,9 @@ function FeddaApp() {
       case 'wan22-vid2vid':
       case 'wan22-img2vid':
         return <VideoStudioPage activeTab={activeTab} />;
+      case 'ltx':
+      case 'ltx-flf':
+        return <LtxStudioPage activeTab={activeTab} />;
       case 'library':
         return <LibraryPage />;
       case 'settings':

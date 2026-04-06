@@ -164,5 +164,21 @@
         "label": "Seed"
       }
     }
+  },
+  "ltx-flf": {
+    "name": "LTX 2.3 — First/Last Frame",
+    "filename": "ltx/LTX-23-flf.json",
+    "description": "Generate video from first and last frame images using LTX Video 2.3",
+    "inputs": {
+      "image_first":          { "node_id": "5613", "input_key": "image",        "type": "string", "label": "First Frame" },
+      "image_last":           { "node_id": "5614", "input_key": "image",        "type": "string", "label": "Last Frame"  },
+      "prompt":               { "node_id": "5644", "input_key": "text",         "type": "string", "label": "Prompt"      },
+      "aspect_ratio":         { "node_id": "5645", "input_key": "aspect_ratio", "type": "string", "label": "Aspect Ratio" },
+      "direction":            { "node_id": "5645", "input_key": "direction",    "type": "string", "label": "Direction"   },
+      "length_seconds":       { "node_id": "5646", "input_key": "value",        "type": "number", "label": "Length (s)"  },
+      "seed":                 { "node_id": "5650", "input_key": "noise_seed",   "type": "number", "label": "Seed"        },
+      "guide_strength_first": { "node_id": "5630", "input_key": "strength",     "type": "number", "label": "First Frame Strength" },
+      "guide_strength_last":  { "node_id": "5634", "input_key": "strength",     "type": "number", "label": "Last Frame Strength"  }
+    }
   }
 }

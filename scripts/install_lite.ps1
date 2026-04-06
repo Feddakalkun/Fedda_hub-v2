@@ -436,7 +436,7 @@ Write-Step "pip is ready in embedded Python." "Green"
 # Helper to run pip
 function Venv-Pip {
     param([string]$PipArgs)
-    $cmd = "& '$VenvPy' -m pip $PipArgs"
+    $cmd = "& '$VenvPy' -m pip $PipArgs --no-warn-script-location"
     Invoke-Expression $cmd
     if ($LASTEXITCODE -ne 0) {
         Write-Step "WARNING: pip command had issues: $PipArgs" "Yellow"

@@ -154,5 +154,17 @@
     "url": "https://github.com/SLAPaper/ComfyUI-Image-Selector.git",
     "folder": "ComfyUI-Image-Selector",
     "note": "Image selector node — pick one image from a batch"
+  },
+  {
+    "name": "ComfyUI-LTXVideo",
+    "url": "https://github.com/Lightricks/ComfyUI-LTXVideo.git",
+    "folder": "ComfyUI-LTXVideo",
+    "note": "LTX Video nodes — LTXVImgToVideoConditionOnly, LTXICLoRALoaderModelOnly, LTXAddVideoICLoRAGuide"
+  },
+  {
+    "name": "ComfyMath",
+    "url": "https://github.com/evanspearman/ComfyMath.git",
+    "folder": "ComfyMath",
+    "note": "Math expression nodes — ComfyMathExpression, CM_FloatToInt"
   }
 ]

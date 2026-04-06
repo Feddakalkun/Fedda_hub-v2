@@ -343,7 +343,7 @@ export const LoRADownloader = ({ family = 'z-image' }: LoRADownloaderProps) => {
                             iconClassName={busy ? 'animate-spin text-emerald-500' : ''}
                             actionLabel={done ? 'Ready' : (busy ? 'Syncing...' : 'Sync All')}
                             onAction={done || busy ? undefined : () => handleSyncPack(pack.key)}
-                            secondaryActionLabel="Browse"
+                            secondaryActionLabel="Preview"
                             onSecondaryAction={() => openPackPreview(pack)}
                             progress={cat.total > 0 ? (cat.installed / cat.total) * 100 : undefined}
                         />

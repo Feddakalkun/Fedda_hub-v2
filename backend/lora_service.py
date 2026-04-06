@@ -27,27 +27,27 @@ PACKS: Dict[str, Dict[str, str]] = {
     },
     "flux2klein": {
         "hf_repo":  "pmczip/FLUX.2-klein-9B_Models",
-        "hf_type":  "dataset",
+        "hf_type":  "model",
         "dest":     "flux2klein",
     },
     "flux1dev": {
         "hf_repo":  "pmczip/FLUX.1-dev_Models",
-        "hf_type":  "dataset",
+        "hf_type":  "model",
         "dest":     "flux1dev",
     },
     "sd15": {
         "hf_repo":  "pmczip/SD1.5_LoRa_Models",
-        "hf_type":  "dataset",
+        "hf_type":  "model",
         "dest":     "sd15",
     },
     "sd15_lycoris": {
         "hf_repo":  "pmczip/SD1.5_LyCORIS_Models",
-        "hf_type":  "dataset",
+        "hf_type":  "model",
         "dest":     "sd15-lycoris",
     },
     "sdxl": {
         "hf_repo":  "pmczip/SDXL_Models",
-        "hf_type":  "dataset",
+        "hf_type":  "model",
         "dest":     "sdxl",
     },
 }
@@ -172,8 +172,8 @@ class LoRAService:
         return result
 
     def list_lora_names(self) -> List[str]:
-        """Return stem names of installed LoRAs for use in the Z-Image picker."""
-        return [Path(info["path"]).stem for info in self.get_installed().values()]
+        """Return relative paths of installed LoRAs for use in ComfyUI (relative to loras dir)."""
+        return [info["path"] for info in self.get_installed().values()]
 
     # ─── Pack catalog & status ──────────────────────────────────────────────
 

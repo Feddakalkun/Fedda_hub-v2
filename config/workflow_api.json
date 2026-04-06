@@ -51,6 +51,11 @@
         "input_key": "denoise",
         "type": "number",
         "label": "Denoise"
+      },
+      "loras": {
+        "node_id": "126",
+        "type": "loras",
+        "label": "LoRA Stack"
       }
     }
   }

@@ -13,18 +13,29 @@ interface LoraStackProps {
     availableLoras: string[];
 }
 
+/** Convert a lora path like "zimage-turbo/Alex_Kingston_PMv1a_ZImage.safetensors" to "Alex Kingston" */
+function loraDisplayName(path: string): string {
+    const stem = path.split('/').pop()?.replace(/\.safetensors$/i, '') ?? path;
+    return stem.replace(/_PMv\d+[ab]_ZImage$/i, '').replace(/_/g, ' ');
+}
+
 export const LoraStack = ({ selectedLoras, setSelectedLoras, availableLoras }: LoraStackProps) => {
+    const [searchText, setSearchText] = useState('');
     const [currentLora, setCurrentLora] = useState('');
     const [currentLoraStrength, setCurrentLoraStrength] = useState(1.0);
     const [showLoraList, setShowLoraList] = useState(false);
 
-    const filteredLoras = availableLoras.filter(l => l.toLowerCase().includes(currentLora.toLowerCase()));
+    const filteredLoras = availableLoras.filter(l =>
+        loraDisplayName(l).toLowerCase().includes(searchText.toLowerCase()) ||
+        l.toLowerCase().includes(searchText.toLowerCase())
+    );
 
     const addLora = () => {
         if (!currentLora) return;
         if (selectedLoras.some(l => l.name === currentLora)) return;
         setSelectedLoras([...selectedLoras, { name: currentLora, strength: currentLoraStrength }]);
         setCurrentLora('');
+        setSearchText('');
         setCurrentLoraStrength(1.0);
         setShowLoraList(false);
     };
@@ -40,8 +51,8 @@ export const LoraStack = ({ selectedLoras, setSelectedLoras, availableLoras }: L
                 <div className="relative">
                     <input
                         type="text"
-                        value={currentLora}
-                        onChange={(e) => { setCurrentLora(e.target.value); setShowLoraList(true); }}
+                        value={currentLora ? loraDisplayName(currentLora) : searchText}
+                        onChange={(e) => { setSearchText(e.target.value); setCurrentLora(''); setShowLoraList(true); }}
                         onFocus={() => setShowLoraList(true)}
                         onBlur={() => setTimeout(() => setShowLoraList(false), 200)}
                         placeholder="Search LoRAs..."
@@ -50,8 +61,8 @@ export const LoraStack = ({ selectedLoras, setSelectedLoras, availableLoras }: L
                     {showLoraList && filteredLoras.length > 0 && (
                         <div className="absolute z-50 w-full mt-2 bg-[#121218] border border-white/10 rounded-2xl shadow-2xl max-h-60 overflow-y-auto custom-scrollbar">
                             {filteredLoras.map((l, idx) => (
-                                <button key={idx} onClick={() => { setCurrentLora(l); setShowLoraList(false); }}
-                                    className="w-full text-left px-5 py-3 text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors border-b border-white/[0.02] last:border-0">{l}</button>
+                                <button key={idx} onClick={() => { setCurrentLora(l); setSearchText(''); setShowLoraList(false); }}
+                                    className="w-full text-left px-5 py-3 text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors border-b border-white/[0.02] last:border-0">{loraDisplayName(l)}</button>
                             ))}
                         </div>
                     )}
@@ -75,7 +86,7 @@ export const LoraStack = ({ selectedLoras, setSelectedLoras, availableLoras }: L
                     {selectedLoras.map((l, idx) => (
                         <div key={idx} className="flex items-center justify-between bg-white/[0.03] px-4 py-3 rounded-xl text-xs border border-white/5 group hover:border-white/10 transition-all">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-white/80 font-bold truncate max-w-[180px]" title={l.name}>{l.name}</span>
+                                <span className="text-white/80 font-bold truncate max-w-[180px]" title={l.name}>{loraDisplayName(l.name)}</span>
                                 <span className="text-[10px] text-emerald-500/60 font-mono">Weight: {l.strength}</span>
                             </div>
                             <button onClick={() => removeLora(idx)} className="p-2 text-slate-500 hover:text-red-400 transition-colors bg-white/5 rounded-lg opacity-0 group-hover:opacity-100">

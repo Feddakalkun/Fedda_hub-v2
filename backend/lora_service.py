@@ -17,11 +17,13 @@ import requests
 
 # ─── Pack Registry ─────────────────────────────────────────────────────────────
 # hf_type: "dataset" or "model" — determines which HF API endpoint to use
+# img_subfolder: optional subfolder within the HF repo where preview .jpg images live
 PACKS: Dict[str, Dict[str, str]] = {
     "zimage_turbo": {
-        "hf_repo":  "pmczip/Z-Image-Turbo_Models",
-        "hf_type":  "dataset",
-        "dest":     "zimage-turbo",
+        "hf_repo":        "pmczip/Z-Image-Turbo_Models",
+        "hf_type":        "dataset",
+        "dest":           "zimage-turbo",
+        "img_subfolder":  "ZIT_Images",
     },
     "flux2klein": {
         "hf_repo":  "pmczip/FLUX.2-klein-9B_Models",
@@ -101,7 +103,7 @@ class LoRAService:
     def _preview_url(self, pack_key: str, basename: str) -> Optional[str]:
         """
         Returns the best available preview URL.
-        Priority: GitHub-stored static image > HuggingFace image > None.
+        Priority: GitHub-stored static image > HuggingFace subfolder > HuggingFace root > None.
         """
         static = self.preview_dir / pack_key / f"{basename}.jpg"
         if static.exists():
@@ -111,9 +113,11 @@ class LoRAService:
         if not pack:
             return None
         repo = pack["hf_repo"]
+        img_subfolder = pack.get("img_subfolder", "")
+        img_path = f"{img_subfolder}/{basename}.jpg" if img_subfolder else f"{basename}.jpg"
         if pack["hf_type"] == "dataset":
-            return f"https://huggingface.co/datasets/{repo}/resolve/main/{basename}.jpg"
-        return f"https://huggingface.co/{repo}/resolve/main/{basename}.jpg"
+            return f"https://huggingface.co/datasets/{repo}/resolve/main/{img_path}"
+        return f"https://huggingface.co/{repo}/resolve/main/{img_path}"
 
     def _fetch_hf_catalog(self, pack_key: str) -> List[Dict[str, Any]]:
         """Fetch file listing from HuggingFace with cache."""

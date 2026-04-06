@@ -264,6 +264,33 @@ async def list_workflows():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/api/workflow/node-map/{workflow_id}")
+async def get_workflow_node_map(workflow_id: str):
+    """Return nodeId -> {name, classType} map for a workflow (used to show human-readable node names during execution)."""
+    try:
+        mappings = workflow_service.load_mapping()
+        if workflow_id not in mappings:
+            raise HTTPException(status_code=404, detail=f"Unknown workflow '{workflow_id}'")
+        mapping = mappings[workflow_id]
+        path = workflow_service.get_workflow_path(mapping.get("filename", ""))
+        if not path:
+            raise HTTPException(status_code=404, detail="Workflow file not found")
+        with open(path, "r", encoding="utf-8") as f:
+            workflow = json.load(f)
+        node_map = {}
+        for node_id, node in workflow.items():
+            if not isinstance(node, dict):
+                continue
+            class_type = node.get("class_type", "Unknown")
+            title = node.get("_meta", {}).get("title") or class_type
+            node_map[node_id] = {"name": title, "classType": class_type}
+        return {"success": True, "node_map": node_map}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/generate")
 async def generate(req: GenerateRequest):
     """

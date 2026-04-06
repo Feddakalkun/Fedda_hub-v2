@@ -35,6 +35,8 @@ interface ComfyExecutionContextType {
     overallProgress: number; // 0-100 workflow-level progress
     // Queue a workflow: builds node map, sends to ComfyUI, returns prompt_id
     queueWorkflow: (workflow: Record<string, any>) => Promise<string>;
+    // Register a pre-built node map (used when submitting via /api/generate instead of queueWorkflow)
+    registerNodeMap: (nodeMap: Record<string, { name: string; classType: string }>) => void;
     cancelExecution: () => Promise<void>;
     clearOutputs: () => void;
 }
@@ -356,6 +358,7 @@ export const ComfyExecutionProvider = ({ children }: { children: React.ReactNode
             previewUrl,
             overallProgress,
             queueWorkflow,
+            registerNodeMap: (nm) => { nodeMapRef.current = nm; },
             cancelExecution,
             clearOutputs,
         }}>

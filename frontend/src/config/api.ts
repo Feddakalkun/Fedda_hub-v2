@@ -52,6 +52,9 @@ export const BACKEND_API = {
         VIDEO_ANALYZE_PROMPT: '/api/video/analyze-image-prompt',
         OLLAMA_VISION_MODELS: '/api/ollama/vision-models',
         HARDWARE_STATS: '/api/hardware/stats',
+        WORKFLOW_LIST: '/api/workflow/list',
+        GENERATE: '/api/generate',
+        GENERATE_STATUS: '/api/generate/status',
     },
 };
 

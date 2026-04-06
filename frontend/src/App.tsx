@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { LandingPage } from './pages/LandingPage';
+import { TopSystemStrip } from './components/ui/TopSystemStrip';
 import { ToastProvider } from './components/ui/Toast';
 import {
   MessageSquare,
@@ -15,71 +17,107 @@ import {
   Settings,
 } from 'lucide-react';
 
+// ─── Tab registry ──────────────────────────────────────────────────────────
 const VALID_TABS = new Set([
-  'chat',
-  'image',
-  'video',
-  'audio',
-  'gallery',
-  'videos',
-  'library',
-  'workflows',
-  'logs',
-  'settings',
+  'chat', 'image', 'z-image', 'flux', 'qwen', 'image-other', 'video', 'audio',
+  'gallery', 'videos', 'library', 'workflows',
+  'logs', 'settings',
 ]);
 
 const PAGE_META: Record<string, { label: string; description: string; Icon: any }> = {
-  chat:      { label: 'Agent Chat',    description: 'Your AI assistant and creative collaborator.',         Icon: MessageSquare  },
-  image:     { label: 'Image Studio',  description: 'Generate and edit images with advanced AI models.',    Icon: Sparkles       },
-  video:     { label: 'Video Studio',  description: 'Create and animate video sequences with LTX & WAN.',  Icon: Video          },
-  audio:     { label: 'Audio / SFX',   description: 'Generate music, voice, and sound effects.',           Icon: Music          },
-  gallery:   { label: 'Gallery',       description: 'Browse and manage your generated images.',             Icon: Images         },
-  videos:    { label: 'Videos',        description: 'View and manage your generated video files.',          Icon: Film           },
-  library:   { label: 'LoRA Library',  description: 'Manage your installed LoRA models.',                  Icon: LayoutDashboard },
-  workflows: { label: 'Workflows',     description: 'Build and run custom ComfyUI generation pipelines.',  Icon: Wand2          },
-  logs:      { label: 'Console Logs',  description: 'Monitor backend logs and debug information.',          Icon: Terminal       },
-  settings:  { label: 'Settings',      description: 'Configure models, API keys, and system preferences.', Icon: Settings       },
+  chat:        { label: 'Agent Chat',    description: 'Your AI assistant and creative collaborator.',         Icon: MessageSquare   },
+  image:       { label: 'Image Studio',  description: 'Generate and edit images with advanced AI models.',    Icon: Sparkles        },
+  'z-image':   { label: 'Z-Image (Txt2Img)', description: 'Premium text to image generation using z-image workflow.', Icon: Sparkles },
+  flux:        { label: 'Flux Studio',   description: 'Flux based operations and tools.', Icon: Sparkles },
+  qwen:        { label: 'Qwen Studio',   description: 'Qwen based structural operations.', Icon: Sparkles },
+  'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
+  video:       { label: 'Video Studio',  description: 'Create and animate video sequences with LTX & WAN.',  Icon: Video           },
+  audio:       { label: 'Audio / SFX',   description: 'Generate music, voice, and sound effects.',           Icon: Music           },
+  gallery:     { label: 'Gallery',       description: 'Browse and manage your generated images.',             Icon: Images          },
+  videos:      { label: 'Videos',        description: 'View and manage your generated video files.',          Icon: Film            },
+  library:     { label: 'LoRA Library',  description: 'Manage your installed LoRA models.',                  Icon: LayoutDashboard },
+  workflows:   { label: 'Workflows',     description: 'Build and run custom ComfyUI generation pipelines.',  Icon: Wand2           },
+  logs:        { label: 'Console Logs',  description: 'Monitor backend logs and debug information.',          Icon: Terminal        },
+  settings:    { label: 'Settings',      description: 'Configure models, API keys, and system preferences.', Icon: Settings        },
 };
+
+// ─── Persistence ───────────────────────────────────────────────────────────
+const TAB_KEY = 'fedda_active_tab_v2';
 
 function readActiveTab(): string {
   try {
-    const raw = localStorage.getItem('fedda_active_tab');
+    const raw = localStorage.getItem(TAB_KEY);
     if (raw && VALID_TABS.has(raw)) return raw;
   } catch {}
   return 'chat';
 }
 
+import { ImageStudioPage } from './pages/ImageStudioPage';
+
+import { SettingsPage } from './pages/SettingsPage';
+
+// ─── App ───────────────────────────────────────────────────────────────────
 function FeddaApp() {
+  // Show landing only on fresh page load (not when deep-linking via hash)
+  const [showLanding, setShowLanding] = useState(true);
   const [activeTab, setActiveTab] = useState<string>(readActiveTab);
+
+  // Persist tab selection across sessions
+  useEffect(() => {
+    try { localStorage.setItem(TAB_KEY, activeTab); } catch {}
+  }, [activeTab]);
 
   const handleTabChange = (tab: string) => {
     if (!VALID_TABS.has(tab)) return;
     setActiveTab(tab);
-    try { localStorage.setItem('fedda_active_tab', tab); } catch {}
   };
 
   const meta = PAGE_META[activeTab] ?? PAGE_META['chat'];
 
-  return (
-    <div className="flex h-screen theme-bg-app text-white overflow-hidden font-sans selection:bg-white/20">
-      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
-
-      <main className="flex-1 flex flex-col overflow-hidden theme-bg-main">
-        {/* Top header bar */}
-        <header className="h-16 border-b border-white/5 flex items-center px-8 shrink-0 z-10">
-          <div className="flex items-center gap-3">
-            <meta.Icon className="w-5 h-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-white tracking-tight">{meta.label}</h2>
-          </div>
-        </header>
-
-        {/* Page content */}
-        <div className="flex-1 overflow-auto">
+  // Route determining component
+  const renderPage = () => {
+    switch (activeTab) {
+      case 'image':
+      case 'z-image':
+      case 'flux':
+      case 'qwen':
+      case 'image-other':
+        return <ImageStudioPage activeTab={activeTab} />;
+      case 'settings':
+        return <SettingsPage />;
+      default:
+        return (
           <PlaceholderPage
             label={meta.label}
             description={meta.description}
             icon={<meta.Icon className="w-8 h-8" />}
           />
+        );
+    }
+  };
+
+  return (
+    <div className="flex h-screen theme-bg-app text-white overflow-hidden font-sans selection:bg-white/20">
+      {/* Intro landing screen — fixed overlay until ComfyUI is ready */}
+      {showLanding && <LandingPage onEnter={() => setShowLanding(false)} />}
+
+      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
+
+      <main className="flex-1 flex flex-col overflow-hidden theme-bg-main">
+        {/* Top header */}
+        <header className="h-14 border-b border-white/5 flex items-center px-6 shrink-0 z-10 justify-between backdrop-blur-sm bg-black/20">
+          <div className="flex items-center gap-3">
+            <meta.Icon className="w-4 h-4 text-slate-500" />
+            <h2 className="text-sm font-semibold text-white tracking-tight">{meta.label}</h2>
+          </div>
+
+          {/* Right side: system monitor */}
+          <TopSystemStrip />
+        </header>
+
+        {/* Page content */}
+        <div className="flex-1 overflow-hidden">
+          {renderPage()}
         </div>
       </main>
     </div>

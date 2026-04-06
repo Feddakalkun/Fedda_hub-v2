@@ -1,141 +1,154 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, BrainCircuit, Loader2, Trash2, Zap } from 'lucide-react';
-import { comfyService } from '../../services/comfyService';
 import { useComfyStatus } from '../../hooks/useComfyStatus';
 import { useOllamaStatus } from '../../hooks/useOllamaStatus';
-import { IS_RUNPOD } from '../../config/api';
+import { COMFY_API } from '../../config/api';
 
 export const TopSystemStrip = () => {
-    const comfy = useComfyStatus(3000);
-    const ollama = useOllamaStatus();
-    const [stats, setStats] = useState<any>(null);
-    const [gpuStats, setGpuStats] = useState<any>(null);
-    const [purging, setPurging] = useState(false);
+  const comfy = useComfyStatus(3000);
+  const ollama = useOllamaStatus();
+  const [comfyStats, setComfyStats] = useState<any>(null);
+  const [gpuStats, setGpuStats] = useState<any>(null);
+  const [purging, setPurging] = useState(false);
 
-    useEffect(() => {
-        let mounted = true;
-        const update = async () => {
-            try {
-                const hwData = await comfyService.getHardwareStats();
-                if (!mounted) return;
-                if (hwData) setGpuStats(hwData);
+  // Poll hardware + comfy system stats
+  useEffect(() => {
+    let mounted = true;
 
-                // Only query Comfy system stats when Comfy is reported online.
-                if (comfy.isConnected) {
-                    const sysData = await comfyService.getSystemStats();
-                    if (!mounted) return;
-                    if (sysData) setStats(sysData);
-                } else {
-                    setStats(null);
-                }
-            } catch {
-                // Keep UI quiet during startup/offline
-            }
-        };
+    const update = async () => {
+      // GPU stats from our backend
+      try {
+        const r = await fetch('/api/hardware/stats', { cache: 'no-store' });
+        if (r.ok && mounted) setGpuStats(await r.json());
+      } catch {}
 
-        update();
-        const interval = setInterval(update, 3000);
-        return () => {
-            mounted = false;
-            clearInterval(interval);
-        };
-    }, [comfy.isConnected]);
-
-    const gpu = useMemo(() => {
-        if (!stats?.devices?.length) return null;
-        const device = stats.devices[0];
-        const total = Number(device.vram_total || 0);
-        const free = Number(device.vram_free || 0);
-        const used = Math.max(0, total - free);
-        const percent = total > 0 ? Math.round((used / total) * 100) : 0;
-        return {
-            name: String(device.name || '').replace('NVIDIA GeForce ', ''),
-            usedGiB: (used / (1024 ** 3)).toFixed(1),
-            totalGiB: (total / (1024 ** 3)).toFixed(1),
-            percent,
-            temp: gpuStats?.gpu?.temperature ?? null,
-            load: gpuStats?.gpu?.utilization ?? percent,
-        };
-    }, [stats, gpuStats]);
-
-    const handlePurge = async () => {
-        if (purging) return;
-        const ok = confirm('Purge VRAM now? This stops active generation and unloads models from GPU.');
-        if (!ok) return;
-        setPurging(true);
+      // ComfyUI VRAM stats — only when online
+      if (comfy.isConnected) {
         try {
-            await comfyService.freeMemory();
-        } finally {
-            setPurging(false);
-        }
+          const r = await fetch(`${COMFY_API.BASE_URL}/system_stats`, { cache: 'no-store' });
+          if (r.ok && mounted) setComfyStats(await r.json());
+        } catch {}
+      } else {
+        if (mounted) setComfyStats(null);
+      }
     };
 
-    const comfyOnline = comfy.isConnected;
-    const ollamaOnline = IS_RUNPOD ? true : ollama.isConnected;
-    const comfyLabel = comfy.isLoading ? 'Checking ComfyUI' : (comfyOnline ? 'ComfyUI Online' : 'ComfyUI Starting');
+    update();
+    const id = setInterval(update, 3000);
+    return () => { mounted = false; clearInterval(id); };
+  }, [comfy.isConnected]);
 
-    return (
-        <div className="hidden xl:flex items-center gap-2">
-            <div className="h-9 px-3 rounded-lg border border-white/10 bg-white/5 flex items-center gap-2 text-xs">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                {gpu ? (
-                    <>
-                        <span className="text-slate-200 font-medium">{gpu.name}</span>
-                        {gpu.temp !== null && (
-                            <span className={`font-semibold ${gpu.temp > 80 ? 'text-red-400' : gpu.temp > 70 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                {gpu.temp}°C
-                            </span>
-                        )}
-                        {/* VRAM mini bar */}
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-14 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                <div
-                                    className="vram-bar-fill"
-                                    style={{
-                                        width: `${gpu.percent}%`,
-                                        background: gpu.percent > 90
-                                            ? 'linear-gradient(90deg, #ef4444, #dc2626)'
-                                            : gpu.percent > 75
-                                            ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                                            : 'linear-gradient(90deg, #34d399, #10b981)',
-                                    }}
-                                />
-                            </div>
-                            <span className="text-slate-400 font-mono">{gpu.usedGiB}/{gpu.totalGiB}GB</span>
-                        </div>
-                    </>
-                ) : (
-                    <span className="text-slate-400">GPU loading…</span>
-                )}
+  const gpu = useMemo(() => {
+    if (!comfyStats?.devices?.length) return null;
+    const d = comfyStats.devices[0];
+    const total = Number(d.vram_total || 0);
+    const free = Number(d.vram_free || 0);
+    const used = Math.max(0, total - free);
+    const pct = total > 0 ? Math.round((used / total) * 100) : 0;
+    return {
+      name: String(d.name || '').replace('NVIDIA GeForce ', ''),
+      usedGiB: (used / 1024 ** 3).toFixed(1),
+      totalGiB: (total / 1024 ** 3).toFixed(1),
+      pct,
+      temp: gpuStats?.gpu?.temperature ?? null,
+    };
+  }, [comfyStats, gpuStats]);
+
+  const handlePurge = async () => {
+    if (purging) return;
+    if (!confirm('Purge VRAM? This stops active generation and unloads all models.')) return;
+    setPurging(true);
+    try {
+      await fetch(`${COMFY_API.BASE_URL}/free`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unload_models: true, free_memory: true }),
+      });
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const comfyLabel = comfy.isLoading
+    ? 'Checking...'
+    : comfy.isConnected ? 'ComfyUI Online' : 'ComfyUI Offline';
+
+  const ollamaLabel = ollama.isLoading
+    ? 'Checking...'
+    : ollama.isConnected ? 'Ollama Online' : 'Ollama Offline';
+
+  return (
+    <div className="hidden xl:flex items-center gap-2">
+
+      {/* GPU VRAM pill */}
+      <div className="h-8 px-3 rounded-lg border border-white/10 bg-white/5 flex items-center gap-2 text-xs">
+        <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+        {gpu ? (
+          <>
+            <span className="text-slate-200 font-medium">{gpu.name}</span>
+            {gpu.temp !== null && (
+              <span className={`font-semibold ${gpu.temp > 80 ? 'text-red-400' : gpu.temp > 70 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {gpu.temp}°C
+              </span>
+            )}
+            <div className="flex items-center gap-1.5">
+              <div className="w-14 h-1.5 bg-white/8 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${gpu.pct}%`,
+                    background: gpu.pct > 90
+                      ? 'linear-gradient(90deg,#ef4444,#dc2626)'
+                      : gpu.pct > 75
+                        ? 'linear-gradient(90deg,#f59e0b,#d97706)'
+                        : 'linear-gradient(90deg,#34d399,#10b981)',
+                  }}
+                />
+              </div>
+              <span className="text-slate-400 font-mono text-[11px]">{gpu.usedGiB}/{gpu.totalGiB}GB</span>
             </div>
+          </>
+        ) : (
+          <span className="text-slate-500 text-[11px]">GPU loading…</span>
+        )}
+      </div>
 
-            <button
-                onClick={handlePurge}
-                disabled={purging}
-                className="h-9 px-3 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold transition-all disabled:opacity-60 flex items-center gap-1.5"
-                title="Purge VRAM"
-            >
-                {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                {purging ? 'Purging' : 'Purge VRAM'}
-            </button>
+      {/* Purge VRAM button */}
+      <button
+        id="purge-vram-btn"
+        onClick={handlePurge}
+        disabled={purging || !comfy.isConnected}
+        title="Purge VRAM — unload all models"
+        className="h-8 px-3 rounded-lg border border-red-500/25 bg-red-500/8 hover:bg-red-500/18 text-red-300 text-xs font-semibold transition-all disabled:opacity-40 flex items-center gap-1.5"
+      >
+        {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+        {purging ? 'Purging' : 'Purge VRAM'}
+      </button>
 
-            <div className={`h-9 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
-                comfyOnline ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400'
-            }`}>
-                <Activity className="w-3.5 h-3.5" />
-                {comfyLabel}
-            </div>
+      {/* ComfyUI status */}
+      <div className={`h-8 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+        comfy.isConnected
+          ? 'border-emerald-500/30 bg-emerald-500/8 text-emerald-300'
+          : 'border-white/10 bg-white/5 text-slate-500'
+      }`}>
+        {comfy.isLoading
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          : <Activity className="w-3.5 h-3.5" />
+        }
+        {comfyLabel}
+      </div>
 
-            <div className={`h-9 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
-                ollamaOnline ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400'
-            }`}>
-                {ollama.isLoading && !IS_RUNPOD ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                    <BrainCircuit className="w-3.5 h-3.5" />
-                )}
-                {IS_RUNPOD ? 'IF_AI_tools' : ollamaOnline ? 'Ollama Online' : 'Ollama Starting'}
-            </div>
-        </div>
-    );
+      {/* Ollama status */}
+      <div className={`h-8 px-3 rounded-lg border text-xs font-medium flex items-center gap-1.5 ${
+        ollama.isConnected
+          ? 'border-emerald-500/30 bg-emerald-500/8 text-emerald-300'
+          : 'border-white/10 bg-white/5 text-slate-500'
+      }`}>
+        {ollama.isLoading
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          : <BrainCircuit className="w-3.5 h-3.5" />
+        }
+        {ollamaLabel}
+      </div>
+    </div>
+  );
 };

@@ -214,8 +214,116 @@ async def get_ollama_vision_models():
 
 
 # ─────────────────────────────────────────────
+# Workflow & Generation
+# ─────────────────────────────────────────────
+from workflow_service import workflow_service
+from model_downloader import model_downloader
+import threading
+from typing import Dict, Any
+
+class GenerateRequest(BaseModel):
+    workflow_id: str
+    params: Dict[str, Any]
+
+@app.get("/api/workflow/list")
+async def list_workflows():
+    """List available high-level workflows from the mapping."""
+    try:
+        mapping = workflow_service.load_mapping()
+        return {
+            "success": True,
+            "workflows": [
+                {"id": k, "name": v["name"], "description": v.get("description", "")}
+                for k, v in mapping.items()
+            ]
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/generate")
+async def generate(req: GenerateRequest):
+    """
+    Core generation endpoint.
+    Loads workflow, injects params, and sends to ComfyUI.
+    """
+    try:
+        # 1. Prepare ComfyUI API payload
+        payload = workflow_service.prepare_payload(req.workflow_id, req.params)
+        if not payload:
+            raise HTTPException(status_code=400, detail=f"Failed to prepare workflow '{req.workflow_id}'")
+
+        # 2. Submit to ComfyUI
+        comfy_payload = {"prompt": payload, "client_id": "fedda_hub_v2"}
+        resp = requests.post(f"{COMFY_URL}/prompt", json=comfy_payload, timeout=5)
+        
+        if not resp.ok:
+            error_text = resp.text
+            try:
+                error_data = resp.json()
+                error_msg = error_data.get("error", {}).get("message", "ComfyUI API error")
+            except:
+                error_msg = error_text
+            raise HTTPException(status_code=resp.status_code, detail=error_msg)
+            
+        return {
+            "success": True, 
+            "prompt_id": resp.json().get("prompt_id"),
+            "message": "Generation started"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/generate/status/{prompt_id}")
+async def get_generation_status(prompt_id: str):
+    """Check status of a specific generation job."""
+    try:
+        # Check history first
+        resp = requests.get(f"{COMFY_URL}/history/{prompt_id}", timeout=2)
+        if resp.ok:
+            data = resp.json()
+            if prompt_id in data:
+                history = data[prompt_id]
+                outputs = history.get("outputs", {})
+                images = []
+                for node_id, output in outputs.items():
+                    if "images" in output:
+                        for img in output["images"]:
+                            images.append({
+                                "filename": img["filename"],
+                                "subfolder": img.get("subfolder", ""),
+                                "type": img.get("type", "output")
+                            })
+                return {"success": True, "status": "completed", "images": images}
+
+        # Check queue
+        q_resp = requests.get(f"{COMFY_URL}/queue", timeout=2)
+        if q_resp.ok:
+            q_data = q_resp.json()
+            running = q_data.get("queue_running", [])
+            pending = q_data.get("queue_pending", [])
+            
+            if any(j[1] == prompt_id for j in running):
+                return {"success": True, "status": "running"}
+            if any(j[1] == prompt_id for j in pending):
+                return {"success": True, "status": "pending"}
+
+        return {"success": True, "status": "not_found"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# ─────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────
+@app.post("/api/models/sync-hf")
+async def sync_models(repo: str, subfolder: str = "custom"):
+    return model_downloader.sync_hf_repo(repo, subfolder)
+
+@app.get("/api/models/status/{filename}")
+async def get_download_status(filename: str):
+    return model_downloader.get_progress(filename)
+
 if __name__ == "__main__":
     print("[Fedda Hub v2] Starting backend on port 8000...")
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

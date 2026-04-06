@@ -1,0 +1,57 @@
+{
+  "z-image": {
+    "name": "Z-Image Turbo (Classic)",
+    "filename": "Z IMAGE 6.json",
+    "description": "Standard high-speed generation using Z-Image Turbo (SD3 based).",
+    "inputs": {
+      "prompt": {
+        "node_id": "113",
+        "widget_index": 0,
+        "type": "string",
+        "label": "Positive Prompt"
+      },
+      "negative": {
+        "node_id": "38",
+        "widget_index": 0,
+        "type": "string",
+        "label": "Negative Prompt"
+      },
+      "width": {
+        "node_id": "87",
+        "widget_index": 0,
+        "type": "number",
+        "label": "Width"
+      },
+      "height": {
+        "node_id": "87",
+        "widget_index": 1,
+        "type": "number",
+        "label": "Height"
+      },
+      "seed": {
+        "node_id": "169",
+        "widget_index": 0,
+        "type": "number",
+        "label": "Seed"
+      },
+      "steps": {
+        "node_id": "169",
+        "widget_index": 2,
+        "type": "number",
+        "label": "Steps"
+      },
+      "cfg": {
+        "node_id": "169",
+        "widget_index": 3,
+        "type": "number",
+        "label": "CFG Scale"
+      },
+      "denoise": {
+        "node_id": "169",
+        "widget_index": 6,
+        "type": "number",
+        "label": "Denoise"
+      }
+    }
+  }
+}

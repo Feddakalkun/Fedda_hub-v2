@@ -23,6 +23,7 @@ interface NavItem {
   id: string;
   label: string;
   icon: LucideIcon;
+  subitems?: { id: string; label: string }[];
 }
 
 interface NavSection {
@@ -35,7 +36,17 @@ const SECTIONS: NavSection[] = [
     label: 'CREATE',
     items: [
       { id: 'chat',      label: 'Agent Chat',   icon: MessageSquare },
-      { id: 'image',     label: 'Image Studio', icon: Sparkles },
+      { 
+        id: 'image',     
+        label: 'Image Studio', 
+        icon: Sparkles,
+        subitems: [
+          { id: 'z-image', label: 'Z-Image' },
+          { id: 'flux', label: 'Flux' },
+          { id: 'qwen', label: 'Qwen' },
+          { id: 'image-other', label: 'Other' }
+        ]
+      },
       { id: 'video',     label: 'Video Studio', icon: Video },
       { id: 'audio',     label: 'Audio / SFX',  icon: Music },
     ],
@@ -86,30 +97,55 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
             </div>
 
             {/* Items */}
-            <div className="space-y-0.5">
               {section.items.map((item) => {
-                const isActive = activeTab === item.id;
+                const isActive = activeTab === item.id || item.subitems?.some(sub => sub.id === activeTab);
+                const isExactActive = activeTab === item.id;
+                
                 return (
-                  <button
-                    key={item.id}
-                    id={`nav-${item.id}`}
-                    onClick={() => onTabChange(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      isActive
-                        ? 'theme-active-tab shadow-md'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <item.icon
-                      className={`w-4 h-4 flex-shrink-0 transition-colors ${
-                        isActive ? '' : 'text-slate-600 group-hover:text-slate-300'
+                  <div key={item.id} className="space-y-0.5">
+                    <button
+                      id={`nav-${item.id}`}
+                      onClick={() => onTabChange(item.subitems ? item.subitems[0].id : item.id)} // Default to first subitem if parent clicked
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                        isExactActive || (isActive && !item.subitems)
+                          ? 'theme-active-tab shadow-md'
+                          : isActive 
+                            ? 'text-white bg-white/5' 
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                       }`}
-                    />
-                    <span className="tracking-tight">{item.label}</span>
-                  </button>
+                    >
+                      <item.icon
+                        className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                          isActive ? 'text-white' : 'text-slate-600 group-hover:text-slate-300'
+                        }`}
+                      />
+                      <span className="tracking-tight">{item.label}</span>
+                    </button>
+                    
+                    {/* Subitems */}
+                    {item.subitems && isActive && (
+                      <div className="pl-11 pr-3 py-1 space-y-0.5 border-l-2 border-white/5 ml-5 mt-1 mb-2">
+                        {item.subitems.map(subitem => {
+                          const isSubActive = activeTab === subitem.id;
+                          return (
+                            <button
+                              key={subitem.id}
+                              onClick={() => onTabChange(subitem.id)}
+                              className={`w-full text-left px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                                isSubActive
+                                  ? 'bg-white/10 text-white shadow-sm'
+                                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                              }`}
+                            >
+                              {subitem.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </div>
           </div>
         ))}
       </nav>

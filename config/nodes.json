@@ -40,5 +40,107 @@
     "url": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git",
     "folder": "ComfyUI-Custom-Scripts",
     "note": "ShowText|pysssss — debug display, workflow utilities"
+  },
+  {
+    "name": "ComfyUI-Studio-nodes",
+    "url": "https://github.com/comfyuistudio/ComfyUI-Studio-nodes.git",
+    "folder": "ComfyUI-Studio-nodes",
+    "note": "Aspect Ratio Image Size, HuggingFaceDownloader"
+  },
+  {
+    "name": "Derfuu_ComfyUI_ModdedNodes",
+    "url": "https://github.com/Derfuu/Derfuu_ComfyUI_ModdedNodes.git",
+    "folder": "Derfuu_ComfyUI_ModdedNodes",
+    "note": "DF_Int_to_Float"
+  },
+  {
+    "name": "ComfyUI-DonutNodes",
+    "url": "https://github.com/DonutsDelivery/ComfyUI-DonutNodes.git",
+    "folder": "ComfyUI-DonutNodes",
+    "note": "Donut Detailer"
+  },
+  {
+    "name": "comfyui_controlnet_aux",
+    "url": "https://github.com/Fannovel16/comfyui_controlnet_aux.git",
+    "folder": "comfyui_controlnet_aux",
+    "note": "CannyEdgePreprocessor, DWPreprocessor, HEDPreprocessor"
+  },
+  {
+    "name": "ComfyUI-Impact-Pack",
+    "url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git",
+    "folder": "ComfyUI-Impact-Pack",
+    "note": "FaceDetailer, SEGS tools, ImpactSwitch"
+  },
+  {
+    "name": "ComfyUI-Impact-Subpack",
+    "url": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git",
+    "folder": "ComfyUI-Impact-Subpack",
+    "note": "UltralyticsDetectorProvider"
+  },
+  {
+    "name": "ComfyUI-Styles_CSV_Loader",
+    "url": "https://github.com/theUpsider/ComfyUI-Styles_CSV_Loader.git",
+    "folder": "ComfyUI-Styles_CSV_Loader",
+    "note": "Load Styles CSV"
+  },
+  {
+    "name": "ComfyUI_LayerStyle",
+    "url": "https://github.com/chflame163/ComfyUI_LayerStyle.git",
+    "folder": "ComfyUI_LayerStyle",
+    "note": "LayerStyle basic nodes"
+  },
+  {
+    "name": "ComfyUI-KJNodes",
+    "url": "https://github.com/kijai/ComfyUI-KJNodes.git",
+    "folder": "ComfyUI-KJNodes",
+    "note": "KJNodes utilities"
+  },
+  {
+    "name": "ComfyUI-SeedVR2_VideoUpscaler",
+    "url": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git",
+    "folder": "ComfyUI-SeedVR2_VideoUpscaler",
+    "note": "Video Upscaling"
+  },
+  {
+    "name": "ComfyUI_UltimateSDUpscale",
+    "url": "https://github.com/ssitu/ComfyUI_UltimateSDUpscale.git",
+    "folder": "ComfyUI_UltimateSDUpscale",
+    "note": "Ultimate SD Upscale"
+  },
+  {
+    "name": "ComfyUI-Inpaint-CropAndStitch",
+    "url": "https://github.com/lquesada/ComfyUI-Inpaint-CropAndStitch.git",
+    "folder": "ComfyUI-Inpaint-CropAndStitch",
+    "note": "Inpaint Stitch Improved"
+  },
+  {
+    "name": "ComfyUI-Frame-Interpolation",
+    "url": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git",
+    "folder": "ComfyUI-Frame-Interpolation",
+    "note": "RIFE VFI"
+  },
+  {
+    "name": "ComfyUI_LayerStyle_Advance",
+    "url": "https://github.com/chflame163/ComfyUI_LayerStyle_Advance.git",
+    "folder": "ComfyUI_LayerStyle_Advance",
+    "note": "LayerStyle Advance features"
+  },
+  {
+    "name": "comfy-image-saver",
+    "url": "https://github.com/giriss/comfy-image-saver.git",
+    "folder": "comfy-image-saver",
+    "note": "Enhanced image saver"
+  },
+  {
+    "name": "ComfyUI-Lotus",
+    "url": "https://github.com/kijai/ComfyUI-Lotus.git",
+    "folder": "ComfyUI-Lotus",
+    "note": "Lotus nodes"
+  },
+  {
+    "name": "ComfyUI_Searge_LLM",
+    "url": "https://github.com/SeargeDP/ComfyUI_Searge_LLM.git",
+    "folder": "ComfyUI_Searge_LLM",
+    "note": "LLM integrations for prompts"
   }
 ]

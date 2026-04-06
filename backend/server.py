@@ -224,6 +224,7 @@ async def get_ollama_vision_models():
 # ─────────────────────────────────────────────
 from workflow_service import workflow_service
 from model_downloader import model_downloader
+from lora_service import lora_service
 import threading
 from typing import Dict, Any
 
@@ -330,6 +331,78 @@ async def sync_models(repo: str, subfolder: str = "custom"):
 @app.get("/api/models/status/{filename}")
 async def get_download_status(filename: str):
     return model_downloader.get_progress(filename)
+
+
+# ─────────────────────────────────────────────
+# LoRA Library
+# ─────────────────────────────────────────────
+
+@app.get("/api/lora/list")
+async def lora_list():
+    """List installed LoRA stem-names for the Z-Image picker."""
+    return {"success": True, "loras": lora_service.list_lora_names()}
+
+
+@app.get("/api/lora/installed")
+async def lora_installed():
+    """Return all installed LoRA files with path + size."""
+    return {"success": True, "installed": lora_service.get_installed()}
+
+
+@app.get("/api/lora/download-status/{filename}")
+async def lora_download_status(filename: str):
+    return lora_service.get_download_status(filename)
+
+
+@app.get("/api/lora/pack/{pack_key}/status")
+async def pack_status(pack_key: str):
+    return lora_service.get_pack_status(pack_key)
+
+
+@app.get("/api/lora/pack/{pack_key}/catalog")
+async def pack_catalog(pack_key: str, limit: int = 1000):
+    return lora_service.get_pack_catalog(pack_key, limit)
+
+
+class SingleDownloadRequest(BaseModel):
+    filename: str
+
+@app.post("/api/lora/pack/{pack_key}/sync")
+async def pack_sync(pack_key: str):
+    return lora_service.sync_pack(pack_key)
+
+
+@app.post("/api/lora/pack/{pack_key}/download")
+async def pack_download_single(pack_key: str, req: SingleDownloadRequest):
+    return lora_service.download_single(pack_key, req.filename)
+
+
+class InstallFreeRequest(BaseModel):
+    filename: str
+
+@app.post("/api/lora/install-free")
+async def install_free_lora(req: InstallFreeRequest):
+    return lora_service.install_free_lora(req.filename)
+
+
+@app.post("/api/lora/install-all-free")
+async def install_all_free():
+    return lora_service.install_all_free()
+
+
+class ImportUrlRequest(BaseModel):
+    url: str
+    hf_token: Optional[str] = None
+
+@app.post("/api/lora/import-url")
+async def lora_import_url(req: ImportUrlRequest):
+    return lora_service.import_from_url(req.url, req.hf_token)
+
+
+@app.get("/api/lora/import-status/{job_id}")
+async def lora_import_status(job_id: str):
+    return lora_service.get_import_status(job_id)
+
 
 if __name__ == "__main__":
     print("[Fedda Hub v2] Starting backend on port 8000...")

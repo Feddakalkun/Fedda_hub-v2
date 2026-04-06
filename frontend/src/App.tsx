@@ -54,7 +54,7 @@ function readActiveTab(): string {
 }
 
 import { ImageStudioPage } from './pages/ImageStudioPage';
-
+import { LibraryPage } from './pages/LibraryPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 // ─── App ───────────────────────────────────────────────────────────────────
@@ -84,6 +84,8 @@ function FeddaApp() {
       case 'qwen':
       case 'image-other':
         return <ImageStudioPage activeTab={activeTab} />;
+      case 'library':
+        return <LibraryPage />;
       case 'settings':
         return <SettingsPage />;
       default:

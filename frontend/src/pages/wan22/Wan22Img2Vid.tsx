@@ -18,7 +18,7 @@ export const Wan22Img2Vid = () => {
   const [uploading, setUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ url: string; filename: string }[]>([]);
+  const [history, setHistory] = usePersistentState<{ url: string; filename: string }[]>('wan22i2v_history', []);
   const [galleryOpen, setGalleryOpen] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);

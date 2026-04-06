@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Video, Upload, RefreshCw, Film, Loader2,
-  Play, Pause, Zap, ZapOff, ChevronDown, ChevronUp, Check,
+  Play, Pause, Zap, ZapOff, ChevronDown, ChevronUp, Check, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
@@ -83,8 +83,9 @@ export const Wan22Vid2Vid = () => {
   // Generation state
   const [isGenerating, setIsGenerating]       = useState(false);
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
-  const [sessionVideos, setSessionVideos]     = useState<string[]>([]);   // current run
-  const [history, setHistory]                 = useState<string[]>([]);   // all runs
+  const [sessionVideos, setSessionVideos]     = useState<string[]>([]);
+  const [history, setHistory]                 = usePersistentState<string[]>('wan22v2v_history', []);
+  const [galleryOpen, setGalleryOpen]         = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef     = useRef<HTMLVideoElement>(null);
@@ -500,8 +501,6 @@ export const Wan22Vid2Vid = () => {
 
       {/* ══════════ RIGHT: SCENE PREVIEW ══════════ */}
       <div className="flex-1 flex flex-col overflow-hidden bg-[#050505]">
-
-        {/* Header */}
         <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-white/5">
           <div className="flex items-center gap-2">
             <Film className="w-3.5 h-3.5 text-violet-400/60" />
@@ -510,31 +509,19 @@ export const Wan22Vid2Vid = () => {
           {isGenerating && (
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-              <span className="text-[9px] font-mono text-violet-400/60">
-                {sessionVideos.length}/{SCENE_COUNT} scenes
-              </span>
+              <span className="text-[9px] font-mono text-violet-400/60">{sessionVideos.length}/{SCENE_COUNT} scenes</span>
             </div>
-          )}
-          {!isGenerating && sessionVideos.length > 0 && (
-            <span className="text-[9px] font-mono text-white/20">{sessionVideos.length} video{sessionVideos.length !== 1 ? 's' : ''}</span>
           )}
         </div>
 
-        {/* Current session: 2×2 scene grid */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-          <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="grid grid-cols-2 gap-3 mb-4">
             {Array.from({ length: SCENE_COUNT }).map((_, i) => (
-              <SceneSlot
-                key={i}
-                index={i}
-                url={sessionVideos[i]}
-                isActive={isGenerating}
-                isPending={isGenerating && !sessionVideos[i]}
-              />
+              <SceneSlot key={i} index={i} url={sessionVideos[i]}
+                isActive={isGenerating} isPending={isGenerating && !sessionVideos[i]} />
             ))}
           </div>
 
-          {/* Slow motion extras (show if slow motion on and we have >4 videos) */}
           {slowMotion && sessionVideos.length > SCENE_COUNT && (
             <>
               <div className="flex items-center gap-3 mb-3">
@@ -544,14 +531,12 @@ export const Wan22Vid2Vid = () => {
                 </span>
                 <div className="h-px flex-1 bg-white/5" />
               </div>
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="grid grid-cols-2 gap-3">
                 {sessionVideos.slice(SCENE_COUNT).map((url, i) => (
                   <div key={url} className="rounded-xl overflow-hidden border border-violet-500/20 bg-black/40">
                     <video src={url} className="w-full aspect-video object-cover" autoPlay loop muted playsInline />
                     <div className="px-3 py-1.5">
-                      <span className="text-[8px] font-black uppercase tracking-widest text-violet-400/40">
-                        Slow Motion {i + 1}
-                      </span>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-violet-400/40">Slow Motion {i + 1}</span>
                     </div>
                   </div>
                 ))}
@@ -559,32 +544,45 @@ export const Wan22Vid2Vid = () => {
             </>
           )}
 
-          {/* Empty state */}
           {!isGenerating && sessionVideos.length === 0 && (
             <div className="flex flex-col items-center justify-center h-48 gap-3 opacity-30">
               <Video className="w-8 h-8 text-white/20" />
               <p className="text-xs font-black uppercase tracking-widest text-white/20">Upload a video and generate</p>
             </div>
           )}
+        </div>
+      </div>
 
-          {/* History */}
-          {history.length > SCENE_COUNT && (
-            <>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-px flex-1 bg-white/5" />
-                <span className="text-[8px] font-black uppercase tracking-widest text-white/15">Previous Runs</span>
-                <div className="h-px flex-1 bg-white/5" />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {history.slice(SCENE_COUNT).map((url, i) => (
-                  <div key={url + i} className="rounded-lg overflow-hidden border border-white/5 hover:border-white/10 transition-all bg-black/40 group">
-                    <video src={url} className="w-full aspect-video object-cover opacity-60 group-hover:opacity-100 transition-opacity" muted />
-                  </div>
-                ))}
-              </div>
-            </>
+      {/* ══════════ COLLAPSIBLE GALLERY ══════════ */}
+      <div className={`flex shrink-0 border-l border-white/5 bg-[#060606] transition-all duration-300 overflow-hidden ${galleryOpen ? 'w-[220px]' : 'w-10'}`}>
+        <div className="w-10 shrink-0 flex flex-col items-center pt-5 gap-3 border-r border-white/5">
+          <button onClick={() => setGalleryOpen(!galleryOpen)}
+            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/30 hover:text-white transition-all">
+            {galleryOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+          </button>
+          {!galleryOpen && history.length > 0 && (
+            <span className="text-[9px] font-black text-white/20 tracking-widest"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+              {history.length}
+            </span>
           )}
         </div>
+        {galleryOpen && (
+          <div className="flex-1 overflow-y-auto custom-scrollbar py-4 px-2 space-y-2">
+            {history.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 gap-2 opacity-30">
+                <Film className="w-5 h-5 text-white/20" />
+                <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Empty</span>
+              </div>
+            ) : (
+              history.map((url, i) => (
+                <div key={url + i} className="w-full aspect-video rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all bg-black/40">
+                  <video src={url} className="w-full h-full object-cover" muted playsInline />
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
     </div>

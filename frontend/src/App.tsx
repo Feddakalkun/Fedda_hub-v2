@@ -61,7 +61,6 @@ function readActiveTab(): string {
 
 import { ImageStudioPage } from './pages/ImageStudioPage';
 import { VideoStudioPage } from './pages/VideoStudioPage';
-import { LtxStudioPage } from './pages/LtxStudioPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -95,10 +94,9 @@ function FeddaApp() {
       case 'video':
       case 'wan22-vid2vid':
       case 'wan22-img2vid':
-        return <VideoStudioPage activeTab={activeTab} />;
       case 'ltx':
       case 'ltx-flf':
-        return <LtxStudioPage activeTab={activeTab} />;
+        return <VideoStudioPage activeTab={activeTab} />;
       case 'library':
         return <LibraryPage />;
       case 'settings':

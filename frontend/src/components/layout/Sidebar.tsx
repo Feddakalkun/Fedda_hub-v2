@@ -47,7 +47,15 @@ const SECTIONS: NavSection[] = [
           { id: 'image-other', label: 'Other' }
         ]
       },
-      { id: 'video',     label: 'Video Studio', icon: Video },
+      {
+        id: 'video',
+        label: 'Video Studio',
+        icon: Video,
+        subitems: [
+          { id: 'wan22-vid2vid', label: 'WAN 2.2 Vid2Vid' },
+          { id: 'wan22-img2vid', label: 'WAN 2.2 Img2Vid' },
+        ]
+      },
       { id: 'audio',     label: 'Audio / SFX',  icon: Music },
     ],
   },

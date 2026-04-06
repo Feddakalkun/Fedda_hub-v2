@@ -18,7 +18,7 @@ if backend_dir not in sys.path:
 
 import requests
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -231,6 +231,23 @@ from typing import Dict, Any
 class GenerateRequest(BaseModel):
     workflow_id: str
     params: Dict[str, Any]
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a video or image to ComfyUI's input directory."""
+    try:
+        content = await file.read()
+        resp = requests.post(
+            f"{COMFY_URL}/upload/image",
+            files={"image": (file.filename, content, file.content_type or "application/octet-stream")},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return {"success": True, "filename": data.get("name", file.filename)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/workflow/list")
 async def list_workflows():

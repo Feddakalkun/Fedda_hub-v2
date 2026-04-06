@@ -58,5 +58,97 @@
         "label": "LoRA Stack"
       }
     }
+  },
+  "wan22-vid2vid": {
+    "name": "WAN 2.2 Vid2Vid",
+    "filename": "wan22/vid2vid-4frames-wan22.json",
+    "description": "Extend and transform video with WAN 2.2 — 4-frame expansion chain",
+    "inputs": {
+      "video": {
+        "node_id": "148",
+        "input_key": "video",
+        "type": "string",
+        "label": "Input Video"
+      },
+      "skip_first_frames": {
+        "node_id": "148",
+        "input_key": "skip_first_frames",
+        "type": "number",
+        "label": "Start Frame"
+      },
+      "frame_load_cap": {
+        "node_id": "148",
+        "input_key": "frame_load_cap",
+        "type": "number",
+        "label": "Clip Length (frames)"
+      },
+      "prompt1": {
+        "node_id": "70",
+        "input_key": "text",
+        "type": "string",
+        "label": "Scene 1 Prompt"
+      },
+      "prompt2": {
+        "node_id": "71",
+        "input_key": "text",
+        "type": "string",
+        "label": "Scene 2 Prompt"
+      },
+      "prompt3": {
+        "node_id": "98",
+        "input_key": "text",
+        "type": "string",
+        "label": "Scene 3 Prompt"
+      },
+      "seed": {
+        "node_id": "138",
+        "input_key": "value",
+        "type": "number",
+        "label": "Seed"
+      }
+    }
+  },
+  "wan22-img2vid": {
+    "name": "WAN 2.2 Img2Vid",
+    "filename": "wan22/img2vid-4frames-wan22.json",
+    "description": "Animate a still image into video with WAN 2.2 — 4-frame expansion chain",
+    "inputs": {
+      "image": {
+        "node_id": "25",
+        "input_key": "image",
+        "type": "string",
+        "label": "Input Image"
+      },
+      "frame_count": {
+        "node_id": "29",
+        "input_key": "value",
+        "type": "number",
+        "label": "Frame Count"
+      },
+      "prompt1": {
+        "node_id": "70",
+        "input_key": "text",
+        "type": "string",
+        "label": "Scene 1 Prompt"
+      },
+      "prompt2": {
+        "node_id": "71",
+        "input_key": "text",
+        "type": "string",
+        "label": "Scene 2 Prompt"
+      },
+      "prompt3": {
+        "node_id": "98",
+        "input_key": "text",
+        "type": "string",
+        "label": "Scene 3 Prompt"
+      },
+      "seed": {
+        "node_id": "138",
+        "input_key": "value",
+        "type": "number",
+        "label": "Seed"
+      }
+    }
   }
 }

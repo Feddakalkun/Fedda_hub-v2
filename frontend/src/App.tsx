@@ -20,8 +20,9 @@ import {
 
 // ─── Tab registry ──────────────────────────────────────────────────────────
 const VALID_TABS = new Set([
-  'chat', 'image', 'z-image', 'flux', 'qwen', 'image-other', 'video', 'audio',
-  'gallery', 'videos', 'library', 'workflows',
+  'chat', 'image', 'z-image', 'flux', 'qwen', 'image-other',
+  'video', 'wan22-vid2vid', 'wan22-img2vid',
+  'audio', 'gallery', 'videos', 'library', 'workflows',
   'logs', 'settings',
 ]);
 
@@ -32,7 +33,9 @@ const PAGE_META: Record<string, { label: string; description: string; Icon: any 
   flux:        { label: 'Flux Studio',   description: 'Flux based operations and tools.', Icon: Sparkles },
   qwen:        { label: 'Qwen Studio',   description: 'Qwen based structural operations.', Icon: Sparkles },
   'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
-  video:       { label: 'Video Studio',  description: 'Create and animate video sequences with LTX & WAN.',  Icon: Video           },
+  video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
+  'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
+  'wan22-img2vid': { label: 'WAN 2.2 Img2Vid', description: 'Animate a still image into video with WAN 2.2.',      Icon: Video           },
   audio:       { label: 'Audio / SFX',   description: 'Generate music, voice, and sound effects.',           Icon: Music           },
   gallery:     { label: 'Gallery',       description: 'Browse and manage your generated images.',             Icon: Images          },
   videos:      { label: 'Videos',        description: 'View and manage your generated video files.',          Icon: Film            },
@@ -54,6 +57,7 @@ function readActiveTab(): string {
 }
 
 import { ImageStudioPage } from './pages/ImageStudioPage';
+import { VideoStudioPage } from './pages/VideoStudioPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -84,6 +88,10 @@ function FeddaApp() {
       case 'qwen':
       case 'image-other':
         return <ImageStudioPage activeTab={activeTab} />;
+      case 'video':
+      case 'wan22-vid2vid':
+      case 'wan22-img2vid':
+        return <VideoStudioPage activeTab={activeTab} />;
       case 'library':
         return <LibraryPage />;
       case 'settings':

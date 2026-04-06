@@ -53,7 +53,7 @@
         "label": "Denoise"
       },
       "loras": {
-        "node_id": "126",
+        "node_id": "185",
         "type": "loras",
         "label": "LoRA Stack"
       }

@@ -111,45 +111,58 @@ class WorkflowService:
 
                 if input_info.get("type") == "loras" and isinstance(param_value, list):
                     # Dynamic LoRA chain: replace the placeholder node with a chain of
-                    # standard LoraLoader nodes (one per LoRA), then rewire downstream refs.
+                    # LoraLoader / LoraLoaderModelOnly nodes, then rewire downstream refs.
                     if node_id not in workflow:
                         print(f"  [WARN] LoRA placeholder node {node_id} not found")
                         continue
 
-                    placeholder = workflow[node_id]
-                    model_source = placeholder["inputs"].get("model", ["16", 0])
-                    clip_source  = placeholder["inputs"].get("clip",  ["18", 0])
+                    placeholder   = workflow[node_id]
+                    model_source  = placeholder["inputs"].get("model", ["16", 0])
+                    clip_source   = placeholder["inputs"].get("clip")          # None for ModelOnly
+                    model_only    = clip_source is None
 
                     del workflow[node_id]
 
                     active_loras = [l for l in param_value if l.get("name")]
 
                     if not active_loras:
-                        # No LoRAs — rewire every reference to the placeholder directly
+                        # No LoRAs — bypass: rewire all downstream refs to upstream sources
                         for nid, node in workflow.items():
                             for key, val in list(node.get("inputs", {}).items()):
                                 if isinstance(val, list) and len(val) == 2 and str(val[0]) == node_id:
-                                    node["inputs"][key] = model_source if val[1] == 0 else clip_source
+                                    node["inputs"][key] = model_source if val[1] == 0 else (clip_source or ["18", 0])
                     else:
-                        curr_model, curr_clip = model_source, clip_source
-                        last_id = None
+                        curr_model = model_source
+                        curr_clip  = clip_source
+                        last_id    = None
+
                         for i, lora_data in enumerate(active_loras[:5]):
                             lid = f"_lora_{i}"
-                            workflow[lid] = {
-                                "inputs": {
-                                    "lora_name":      lora_data["name"],
-                                    "strength_model": float(lora_data.get("strength", 1.0)),
-                                    "strength_clip":  float(lora_data.get("strength", 1.0)),
-                                    "model": curr_model,
-                                    "clip":  curr_clip,
-                                },
-                                "class_type": "LoraLoader",
-                            }
+                            if model_only:
+                                workflow[lid] = {
+                                    "inputs": {
+                                        "lora_name":      lora_data["name"],
+                                        "strength_model": float(lora_data.get("strength", 1.0)),
+                                        "model":          curr_model,
+                                    },
+                                    "class_type": "LoraLoaderModelOnly",
+                                }
+                            else:
+                                workflow[lid] = {
+                                    "inputs": {
+                                        "lora_name":      lora_data["name"],
+                                        "strength_model": float(lora_data.get("strength", 1.0)),
+                                        "strength_clip":  float(lora_data.get("strength", 1.0)),
+                                        "model":          curr_model,
+                                        "clip":           curr_clip,
+                                    },
+                                    "class_type": "LoraLoader",
+                                }
+                                curr_clip = [lid, 1]
                             curr_model = [lid, 0]
-                            curr_clip  = [lid, 1]
                             last_id    = lid
 
-                        # Rewire every reference that pointed to the old placeholder
+                        # Rewire every downstream ref that pointed at the old placeholder
                         for nid, node in workflow.items():
                             if nid.startswith("_lora_"):
                                 continue

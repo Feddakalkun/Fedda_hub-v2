@@ -99,7 +99,8 @@ RUN python3 -m pip install --no-cache-dir \
     kokoro \
     soundfile \
     && python3 -m pip install --no-cache-dir chatterbox-tts \
-    && python3 -m pip install --no-cache-dir "numpy==1.26.4" --no-deps
+    && python3 -m pip install --no-cache-dir "numpy==1.26.4" --no-deps \
+    && python3 -m pip install --no-cache-dir "pydantic>=2.0,<3" "pydantic-core>=2.0,<3"
 
 # --- Copy app code from the cloned main repo (stage 1) ---
 COPY --from=frontend-builder /app/backend /app/backend

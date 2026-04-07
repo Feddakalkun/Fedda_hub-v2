@@ -17,7 +17,7 @@ RUN npm ci --no-audit --no-fund && npm run build
 # ============================================================================
 # Stage 2: Runtime image with CUDA + Python + all services
 # ============================================================================
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -44,11 +44,11 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip wheel setuptools
 # PyTorch + CUDA 12.4
 RUN python3 -m pip install --no-cache-dir \
     torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu124
+    --index-url https://download.pytorch.org/whl/cu121
 
 # Xformers
 RUN python3 -m pip install --no-cache-dir \
-    xformers --index-url https://download.pytorch.org/whl/cu124
+    xformers --index-url https://download.pytorch.org/whl/cu121
 
 # Clone ComfyUI at latest master to support newest LTX nodes
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /app/ComfyUI \

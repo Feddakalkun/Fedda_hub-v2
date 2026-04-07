@@ -13,9 +13,10 @@ interface LoraStackProps {
     availableLoras: string[];
 }
 
-/** Convert a lora path like "zimage-turbo/Alex_Kingston_PMv1a_ZImage.safetensors" to "Alex Kingston" */
+/** Convert a lora path like "zimage_turbo\Alex_Kingston_PMv1a_ZImage.safetensors" to "Alex Kingston" */
 function loraDisplayName(path: string): string {
-    const stem = path.split('/').pop()?.replace(/\.safetensors$/i, '') ?? path;
+    // Handle both Windows (\) and Unix (/) path separators
+    const stem = path.replace(/\\/g, '/').split('/').pop()?.replace(/\.safetensors$/i, '') ?? path;
     return stem.replace(/_PMv\d+[ab]_ZImage$/i, '').replace(/_/g, ' ');
 }
 

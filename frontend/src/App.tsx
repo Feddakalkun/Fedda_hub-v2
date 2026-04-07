@@ -97,6 +97,7 @@ function FeddaApp() {
       case 'wan22-img2vid':
       case 'ltx':
       case 'ltx-flf':
+      case 'ltx-img-audio':
         return <VideoStudioPage activeTab={activeTab} />;
       case 'library':
         return <LibraryPage />;

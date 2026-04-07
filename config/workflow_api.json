@@ -180,5 +180,19 @@
       "guide_strength_first": { "node_id": "5630", "input_key": "strength",     "type": "number", "label": "First Frame Strength" },
       "guide_strength_last":  { "node_id": "5634", "input_key": "strength",     "type": "number", "label": "Last Frame Strength"  }
     }
+  },
+  "ltx-img-audio": {
+    "name": "LTX 2.3 — Img + Audio Lipsync",
+    "filename": "ltx/LTX-23-imgaudio2video.json",
+    "description": "Generate lipsync video from a reference image and audio file using LTX Video 2.3",
+    "inputs": {
+      "image":          { "node_id": "5310", "input_key": "image",              "type": "string", "label": "Reference Image" },
+      "audio":          { "node_id": "5299", "input_key": "audio",              "type": "string", "label": "Audio File"      },
+      "audio_start":    { "node_id": "5299", "input_key": "start_time",         "type": "number", "label": "Start (s)"       },
+      "audio_duration": { "node_id": "5299", "input_key": "duration",           "type": "number", "label": "Duration (s)"    },
+      "prompt":         { "node_id": "5283", "input_key": "text",               "type": "string", "label": "Prompt"          },
+      "width":          { "node_id": "5311", "input_key": "resize_type.width",  "type": "number", "label": "Width (px)"      },
+      "seed":           { "node_id": "5293", "input_key": "noise_seed",         "type": "number", "label": "Seed"            }
+    }
   }
 }

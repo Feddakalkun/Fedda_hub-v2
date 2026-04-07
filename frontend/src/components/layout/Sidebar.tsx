@@ -54,7 +54,8 @@ const SECTIONS: NavSection[] = [
         subitems: [
           { id: 'wan22-vid2vid', label: 'WAN 2.2 — Vid2Vid' },
           { id: 'wan22-img2vid', label: 'WAN 2.2 — Img2Vid' },
-          { id: 'ltx-flf',      label: 'LTX — First/Last Frame' },
+          { id: 'ltx-flf',       label: 'LTX — First/Last Frame' },
+          { id: 'ltx-img-audio', label: 'LTX — Img + Audio Lipsync' },
         ]
       },
       { id: 'audio',     label: 'Audio / SFX',  icon: Music },

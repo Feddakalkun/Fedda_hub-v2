@@ -158,8 +158,8 @@ export const Wan22Img2Vid = () => {
     <div className="flex h-full bg-[#080808] overflow-hidden">
 
       {/* ══ LEFT PANEL ══════════════════════════════════════════════════════ */}
-      <div className="w-[440px] shrink-0 flex flex-col border-r border-white/5 overflow-y-auto custom-scrollbar">
-        <div className="px-7 py-7 space-y-7">
+      <div className="w-[380px] shrink-0 flex flex-col border-r border-white/5 overflow-y-auto custom-scrollbar">
+        <div className="px-5 py-5 space-y-5">
 
           {/* Header */}
           <div className="flex items-center gap-2">
@@ -239,11 +239,11 @@ export const Wan22Img2Vid = () => {
                     <PromptAssistant
                       context="wan-scene"
                       accent="violet"
-                      compact
+                      compact={i > 0}
                       value={value}
                       onChange={set}
                       placeholder={i === 0 ? 'Describe the motion / action...' : 'Leave empty to reuse Scene 1'}
-                      minRows={3}
+                      minRows={i === 0 ? 4 : 3}
                       enableCaption={false}
                     />
                   </div>
@@ -317,26 +317,26 @@ export const Wan22Img2Vid = () => {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: SCENE_COUNT }).map((_, i) => (
-              <SceneSlot key={i} index={i} url={sessionVideos[i]}
-                isActive={isGenerating} isPending={isGenerating && !sessionVideos[i]} />
-            ))}
-          </div>
-
-          {!isGenerating && sessionVideos.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-48 gap-3 opacity-30">
-              <Video className="w-8 h-8 text-white/20" />
-              <p className="text-xs font-black uppercase tracking-widest text-white/20">Upload an image and generate</p>
+        <div className="flex-1 flex items-center justify-center overflow-hidden p-5">
+          {(isGenerating || sessionVideos.length > 0) ? (
+            <div className="grid grid-cols-2 gap-3 w-full self-start">
+              {Array.from({ length: SCENE_COUNT }).map((_, i) => (
+                <SceneSlot key={i} index={i} url={sessionVideos[i]}
+                  isActive={isGenerating} isPending={isGenerating && !sessionVideos[i]} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 opacity-20">
+              <Film className="w-10 h-10 text-white/20" />
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/25">Upload an image and generate</p>
             </div>
           )}
         </div>
       </div>
 
       {/* ══ COLLAPSIBLE GALLERY ═════════════════════════════════════════════ */}
-      <div className={`flex shrink-0 border-l border-white/5 bg-[#060606] transition-all duration-300 overflow-hidden ${galleryOpen ? 'w-[220px]' : 'w-10'}`}>
-        <div className="w-10 shrink-0 flex flex-col items-center pt-5 gap-3 border-r border-white/5">
+      <div className={`flex shrink-0 border-l border-white/5 bg-[#060606] transition-all duration-300 overflow-hidden ${galleryOpen ? 'w-[180px]' : 'w-9'}`}>
+        <div className="w-9 shrink-0 flex flex-col items-center pt-5 gap-3 border-r border-white/5">
           <button onClick={() => setGalleryOpen(!galleryOpen)}
             className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/30 hover:text-white transition-all">
             {galleryOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}

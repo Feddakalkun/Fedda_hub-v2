@@ -22,6 +22,9 @@ FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
+ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # System packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake ninja-build \
     libgl1-mesa-glx libglib2.0-0 libsm6 libxrender1 libxext6 \
     libffi-dev libssl-dev \
+    libcudnn9-cuda-12 \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
     && ln -sf /usr/bin/python3 /usr/bin/python

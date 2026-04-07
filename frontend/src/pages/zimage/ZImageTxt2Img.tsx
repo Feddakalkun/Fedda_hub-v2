@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Maximize2, Loader2, Hash, RefreshCw, Settings2, Image as ImageIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { PromptAssistant } from '../../components/ui/PromptAssistant';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
@@ -127,18 +128,15 @@ export const ZImageTxt2Img = () => {
           </div>
 
           {/* Prompt */}
-          <div className="space-y-3">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center justify-between">
-              <span>Prompt</span>
-              <span className="text-white/10 font-mono">{prompt.length}</span>
-            </label>
-            <textarea
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              placeholder="Description..."
-              className="w-full bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-sm tracking-wide text-white/90 placeholder-white/10 resize-none min-h-[130px] focus:outline-none focus:bg-white/[0.04] focus:border-emerald-500/20 transition-all font-medium"
-            />
-          </div>
+          <PromptAssistant
+            context="zimage"
+            value={prompt}
+            onChange={setPrompt}
+            placeholder="Description of the subject, lighting, style..."
+            minRows={5}
+            accent="emerald"
+            label="Prompt"
+          />
 
           {/* ── LoRA ── */}
           <div className="space-y-4 pt-4 border-t border-white/5">

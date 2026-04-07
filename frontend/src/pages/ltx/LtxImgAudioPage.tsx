@@ -8,6 +8,7 @@ import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { comfyService } from '../../services/comfyService';
+import { PromptAssistant } from '../../components/ui/PromptAssistant';
 
 // ── Upload slot (image or audio) ──────────────────────────────────────────────
 function UploadSlot({ label, icon: Icon, accept, preview, filename, uploading, onFile }: {
@@ -255,13 +256,16 @@ export const LtxImgAudioPage = () => {
           <div className="h-px bg-white/5" />
 
           {/* ── PROMPT ── */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Motion Prompt</p>
-            <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
-              placeholder="Describe the facial motion and speaking style…"
-              rows={3}
-              className="w-full bg-black/30 border border-white/5 rounded-2xl p-4 text-sm text-white/90 placeholder-white/15 resize-none focus:outline-none focus:border-violet-500/20 transition-all" />
-          </div>
+          <PromptAssistant
+            context="ltx-lipsync"
+            value={prompt}
+            onChange={setPrompt}
+            placeholder="Describe the speaking style, energy, and facial animation…"
+            minRows={3}
+            accent="violet"
+            label="Motion Prompt"
+            enableCaption={false}
+          />
 
           <div className="h-px bg-white/5" />
 

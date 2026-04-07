@@ -20,7 +20,7 @@ import requests
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 # ─────────────────────────────────────────────
@@ -199,6 +199,188 @@ async def refresh_models():
         return {"success": resp.ok}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# ─────────────────────────────────────────────
+# Ollama — Prompt Assistant & Image Captioning
+# ─────────────────────────────────────────────
+OLLAMA_URL = "http://localhost:11434"
+
+OLLAMA_SYSTEM_PROMPTS: Dict[str, str] = {
+    "zimage": (
+        "You are an expert prompt engineer for Z-Image Turbo, a photorealistic portrait AI model. "
+        "Write a vivid, detailed portrait prompt. Include: subject appearance (facial features, expression, hair, "
+        "skin tone), clothing and styling, lighting (direction, quality, color temperature — golden hour, dramatic "
+        "side-light, soft studio, etc.), camera feel (85mm portrait, shallow depth of field), composition "
+        "(close-up, bust, three-quarter), environment/background, and overall mood. "
+        "Rules: under 120 words, avoid vague words like 'beautiful' — be specific and cinematic. "
+        "Output ONLY the prompt text, nothing else."
+    ),
+    "ltx-flf": (
+        "You are an expert at writing motion prompts for LTX Video 2.3, which generates cinematic video between "
+        "two keyframes. Write a prompt describing camera movement and scene motion. Include: camera movement "
+        "(slow dolly push, orbital pan, crane rise, handheld drift), subject motion (subtle breathing, head turn, "
+        "reaching gesture, hair in wind), atmospheric motion (light shifting, particles, shadow movement), "
+        "cinematic style (film grain, anamorphic lens, color grade). "
+        "Rules: under 80 words, focus on MOTION and TRANSITION — not static appearance. "
+        "Output ONLY the prompt text, nothing else."
+    ),
+    "ltx-lipsync": (
+        "You are writing motion prompts for LTX Video 2.3 lipsync — a portrait photograph comes alive and speaks. "
+        "Write a prompt describing video quality and character energy. Include: speaking energy and emotion "
+        "(passionate, calm, intense, joyful, authoritative), subtle facial micro-expressions and eye movement, "
+        "natural head movement and breathing, background atmosphere and depth, overall video quality style. "
+        "Rules: under 70 words, focus on FACIAL ANIMATION and natural human presence. "
+        "Output ONLY the prompt text, nothing else."
+    ),
+    "wan-scene": (
+        "You are writing scene transformation prompts for WAN 2.2 AI video generation. "
+        "Write a vivid scene as a video generation prompt. Include: visual style or cinematic aesthetic, "
+        "primary action or motion, lighting mood and color palette, atmospheric quality. "
+        "Rules: under 60 words, be specific and visual, no meta-commentary. "
+        "Output ONLY the prompt text, nothing else."
+    ),
+}
+
+
+def _get_ollama_text_model() -> Optional[str]:
+    """Pick the best available Ollama text model."""
+    try:
+        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        if not resp.ok:
+            return None
+        models = [m["name"] for m in resp.json().get("models", [])]
+        priority = ["llama3.2", "llama3.1", "llama3", "mistral", "gemma3", "gemma2",
+                    "phi4", "phi3", "qwen2.5", "qwen2", "gemma"]
+        for p in priority:
+            for m in models:
+                if p in m.lower() and "vision" not in m.lower() and "embed" not in m.lower():
+                    return m
+        # Fallback: any non-vision, non-embed model
+        for m in models:
+            if "vision" not in m.lower() and "embed" not in m.lower():
+                return m
+        return models[0] if models else None
+    except Exception:
+        return None
+
+
+def _get_ollama_vision_model() -> Optional[str]:
+    """Pick the best available Ollama vision model."""
+    try:
+        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        if not resp.ok:
+            return None
+        models = [m["name"] for m in resp.json().get("models", [])]
+        for p in ["llava", "minicpm", "qwen2.5-vl", "qwen2-vl", "moondream", "vision"]:
+            for m in models:
+                if p in m.lower():
+                    return m
+        return None
+    except Exception:
+        return None
+
+
+@app.get("/api/ollama/models")
+async def get_ollama_all_models():
+    """List all available Ollama models and best text model."""
+    try:
+        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
+        if not resp.ok:
+            return {"success": False, "models": [], "text_model": None, "vision_model": None}
+        models = [m["name"] for m in resp.json().get("models", [])]
+        return {
+            "success": True,
+            "models": models,
+            "text_model": _get_ollama_text_model(),
+            "vision_model": _get_ollama_vision_model(),
+        }
+    except Exception:
+        return {"success": False, "models": [], "text_model": None, "vision_model": None}
+
+
+class OllamaPromptRequest(BaseModel):
+    context: str = "zimage"
+    mode: str = "enhance"       # "enhance" | "inspire"
+    current_prompt: str = ""
+
+
+@app.post("/api/ollama/prompt")
+async def ollama_generate_prompt(req: OllamaPromptRequest):
+    """Generate or enhance a prompt using Ollama. Returns SSE stream of tokens."""
+    model = _get_ollama_text_model()
+    if not model:
+        raise HTTPException(status_code=503, detail="No Ollama text model available. Pull a model with: ollama pull llama3.2")
+
+    system = OLLAMA_SYSTEM_PROMPTS.get(req.context, OLLAMA_SYSTEM_PROMPTS["zimage"])
+
+    if req.mode == "enhance" and req.current_prompt.strip():
+        user_msg = f"Enhance and rewrite this prompt to be more detailed and cinematic:\n\n{req.current_prompt}"
+    else:
+        user_msg = "Write a creative, detailed, cinematic prompt. Be inspired and unexpected."
+
+    payload = {
+        "model": model,
+        "system": system,
+        "prompt": user_msg,
+        "stream": True,
+        "options": {"temperature": 0.85, "num_predict": 250},
+    }
+
+    def generate():
+        try:
+            r = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, stream=True, timeout=60)
+            for line in r.iter_lines():
+                if not line:
+                    continue
+                data = json.loads(line)
+                token = data.get("response", "")
+                if token:
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+                if data.get("done"):
+                    yield "data: [DONE]\n\n"
+                    return
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/ollama/caption")
+async def ollama_caption_image(file: UploadFile = File(...)):
+    """Caption an uploaded image using an Ollama vision model."""
+    import base64
+
+    model = _get_ollama_vision_model()
+    if not model:
+        raise HTTPException(
+            status_code=503,
+            detail="No vision model available. Install one with: ollama pull llava or ollama pull minicpm-v"
+        )
+
+    img_bytes = await file.read()
+    img_b64 = base64.b64encode(img_bytes).decode()
+
+    payload = {
+        "model": model,
+        "prompt": (
+            "Describe this image as a detailed AI generation prompt. Write it as instructions to recreate the image, "
+            "not a description of it. Include: subject, appearance details, lighting, composition, mood, style, "
+            "background. Under 100 words. Output ONLY the prompt text."
+        ),
+        "images": [img_b64],
+        "stream": False,
+        "options": {"temperature": 0.7, "num_predict": 180},
+    }
+
+    try:
+        r = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=90)
+        r.raise_for_status()
+        caption = r.json().get("response", "").strip()
+        return {"success": True, "caption": caption, "model": model}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Caption failed: {exc}")
 
 
 @app.get("/api/ollama/vision-models")

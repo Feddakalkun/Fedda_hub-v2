@@ -8,6 +8,7 @@ import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { comfyService } from '../../services/comfyService';
+import { PromptAssistant } from '../../components/ui/PromptAssistant';
 
 const FPS = 24;
 const SCENE_COUNT = 4;
@@ -434,12 +435,15 @@ export const Wan22Vid2Vid = () => {
                 </button>
                 {expanded[i] && (
                   <div className="px-4 pb-3">
-                    <textarea
+                    <PromptAssistant
+                      context="wan-scene"
+                      accent="violet"
+                      compact
                       value={value}
-                      onChange={e => set(e.target.value)}
-                      placeholder={i === 0 ? 'Describe the motion / action...' : `Leave empty to reuse Scene 1`}
-                      rows={3}
-                      className="w-full bg-black/30 border border-white/5 rounded-xl p-3 text-sm text-white/90 placeholder-white/15 resize-none focus:outline-none focus:border-violet-500/20 transition-all"
+                      onChange={set}
+                      placeholder={i === 0 ? 'Describe the motion / action...' : 'Leave empty to reuse Scene 1'}
+                      minRows={3}
+                      enableCaption={false}
                     />
                   </div>
                 )}

@@ -33,25 +33,43 @@ export const ZImageTxt2Img = () => {
   const [galleryOpen, setGalleryOpen]     = useState(true);
 
   const { toast } = useToast();
-  const { state: execState, lastOutputImages, lastCompletedPromptId } = useComfyExecution();
+  const { state: execState, clearOutputs } = useComfyExecution();
 
   useEffect(() => {
     comfyService.getLoras('zimage_turbo').then(setAvailableLoras).catch(() => {});
   }, []);
 
-  // Image completion
+  // Completion: fires when execState transitions to 'done'
   useEffect(() => {
-    if (!pendingPromptId || !lastOutputImages?.length) return;
-    if (lastCompletedPromptId !== pendingPromptId) return;
-    const img = lastOutputImages[lastOutputImages.length - 1];
-    const url = `/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
-    setCurrentImage(url);
-    setHistory(prev => (prev.includes(url) ? prev : [url, ...prev.slice(0, 29)]));
-    setIsGenerating(false);
-    setPendingPromptId(null);
-    setGalleryOpen(true);
-    toast('Complete', 'success');
-  }, [lastOutputImages, lastCompletedPromptId, pendingPromptId, toast]);
+    if (execState !== 'done' || !pendingPromptId) return;
+
+    const pid = pendingPromptId;
+
+    const fetchAndShow = async () => {
+      try {
+        const res = await fetch(`${BACKEND_API.BASE_URL}/api/generate/status/${pid}`);
+        const data = await res.json();
+        const imgs: Array<{ filename: string; subfolder: string; type: string }> =
+          data.images ?? [];
+        if (imgs.length > 0) {
+          const img = imgs[imgs.length - 1];
+          const url = `/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
+          setCurrentImage(url);
+          setHistory(prev => (prev.includes(url) ? prev : [url, ...prev.slice(0, 29)]));
+          setGalleryOpen(true);
+          toast('Complete', 'success');
+        }
+      } catch {
+        // silent — image may still appear via WS
+      } finally {
+        setIsGenerating(false);
+        setPendingPromptId(null);
+        clearOutputs();
+      }
+    };
+
+    fetchAndShow();
+  }, [execState, pendingPromptId, toast, clearOutputs]);
 
   useEffect(() => {
     if (execState === 'error') { setIsGenerating(false); setPendingPromptId(null); }
@@ -60,6 +78,7 @@ export const ZImageTxt2Img = () => {
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
+    clearOutputs();
     try {
       const params: Record<string, unknown> = {
         prompt,

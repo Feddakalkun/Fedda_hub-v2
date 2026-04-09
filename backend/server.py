@@ -55,6 +55,15 @@ OUTPUT_DIR = COMFY_DIR / "output"
 
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8199")
 AGENT_DB_PATH = CONFIG_DIR / "agent_memory.db"
+MEMORY_REFRESH_EVERY_TURNS = 2
+
+TTS_VOICE_PROFILES: Dict[str, Dict[str, Any]] = {
+    "Kore": {"temperature": 0.65, "top_p": 0.65, "repetition_penalty": 1.2, "seed": 42},
+    "Puck": {"temperature": 0.85, "top_p": 0.85, "repetition_penalty": 1.1, "seed": 7},
+    "Charon": {"temperature": 0.5, "top_p": 0.55, "repetition_penalty": 1.25, "seed": 99},
+    "Fenrir": {"temperature": 0.72, "top_p": 0.6, "repetition_penalty": 1.28, "seed": 2026},
+    "Zephyr": {"temperature": 0.8, "top_p": 0.78, "repetition_penalty": 1.15, "seed": 314},
+}
 
 # ─────────────────────────────────────────────
 # Settings helpers
@@ -311,6 +320,18 @@ def _normalize_for_tts(text: str) -> str:
     return cleaned
 
 
+def _tts_params_for_voice(voice_name: str) -> Dict[str, Any]:
+    profile_name = (voice_name or "").strip() or "Kore"
+    profile = TTS_VOICE_PROFILES.get(profile_name, TTS_VOICE_PROFILES["Kore"])
+    return {
+        "voice_name": profile_name,
+        "temperature": profile["temperature"],
+        "top_p": profile["top_p"],
+        "repetition_penalty": profile["repetition_penalty"],
+        "seed": profile["seed"],
+    }
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -429,8 +450,8 @@ async def chat(req: ChatRequest):
         turn_count = int(state.get("turn_count", 0)) + 1
         memory = str(state.get("memory", "") or "")
 
-        # Refresh memory every 5 turns to keep context fresh.
-        if turn_count % 5 == 0:
+        # Refresh memory every few turns to keep context fresh without slowing chat too much.
+        if turn_count % MEMORY_REFRESH_EVERY_TURNS == 0:
             try:
                 recent_for_memory = _get_session_history(req.session_id, limit=40)
                 memory = _update_memory_summary(memory, recent_for_memory)
@@ -444,6 +465,8 @@ async def chat(req: ChatRequest):
             "response": response_text,
             "tts_text": _normalize_for_tts(response_text),
             "memory": memory,
+            "turn_count": turn_count,
+            "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
         }
         return result
 
@@ -484,6 +507,8 @@ async def get_chat_history(session_id: str):
     return {
         "success": True,
         "memory": state.get("memory", ""),
+        "turn_count": int(state.get("turn_count", 0) or 0),
+        "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
         "history": history,
     }
 
@@ -494,6 +519,27 @@ async def reset_chat_history(session_id: str):
     return {"success": True}
 
 
+@app.post("/api/chat/memory/refresh/{session_id}")
+async def refresh_chat_memory(session_id: str):
+    state = _ensure_session(session_id)
+    history = _get_session_history(session_id, limit=40)
+    memory = _update_memory_summary(str(state.get("memory", "") or ""), history)
+    turn_count = int(state.get("turn_count", 0) or 0)
+    _set_session_memory_and_turns(session_id, memory, turn_count)
+    return {
+        "success": True,
+        "memory": memory,
+        "turn_count": turn_count,
+        "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
+    }
+
+
+@app.get("/api/chat/voices")
+async def get_chat_voices():
+    voices = [{"id": key, "name": key} for key in TTS_VOICE_PROFILES.keys()]
+    return {"success": True, "voices": voices}
+
+
 @app.post("/api/chat/tts")
 async def chat_tts(req: TtsRequest):
     text = req.text.strip()
@@ -501,7 +547,17 @@ async def chat_tts(req: TtsRequest):
         return {"success": False, "error": "Text is required."}
 
     try:
-        payload = workflow_service.prepare_payload("audio-fish-tts", {"text": text})
+        voice_params = _tts_params_for_voice(req.voice_name)
+        payload = workflow_service.prepare_payload(
+            "audio-fish-tts",
+            {
+                "text": text,
+                "temperature": voice_params["temperature"],
+                "top_p": voice_params["top_p"],
+                "repetition_penalty": voice_params["repetition_penalty"],
+                "seed": voice_params["seed"],
+            },
+        )
         if not payload:
             return {"success": False, "error": "Failed to prepare local TTS workflow."}
 
@@ -535,6 +591,7 @@ async def chat_tts(req: TtsRequest):
                     "success": True,
                     "provider": "local-fish",
                     "prompt_id": prompt_id,
+                    "voice_name": voice_params["voice_name"],
                     "audio": first,
                     "audio_url": view_url,
                 }

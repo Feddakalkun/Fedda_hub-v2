@@ -13,7 +13,8 @@ interface ChatMessage {
 const SESSION_KEY = 'fedda_agent_session_id_v1';
 const AUTO_SPEAK_KEY = 'fedda_agent_auto_speak_v1';
 const VOICE_KEY = 'fedda_agent_voice_v1';
-const VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
+const FALLBACK_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
+const DEFAULT_MEMORY_REFRESH_TURNS = 2;
 
 function getSessionId(): string {
   try {
@@ -65,7 +66,11 @@ export const AgentChatPage = () => {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isRefreshingMemory, setIsRefreshingMemory] = useState(false);
   const [localReady, setLocalReady] = useState(false);
+  const [turnCount, setTurnCount] = useState(0);
+  const [memoryRefreshEveryTurns, setMemoryRefreshEveryTurns] = useState(DEFAULT_MEMORY_REFRESH_TURNS);
+  const [availableVoices, setAvailableVoices] = useState<string[]>(FALLBACK_VOICES);
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUTO_SPEAK_KEY) === '1';
@@ -106,6 +111,27 @@ export const AgentChatPage = () => {
       }
 
       try {
+        const voiceRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/voices`);
+        const voiceData = await voiceRes.json();
+        const voices = Array.isArray(voiceData?.voices)
+          ? voiceData.voices
+              .map((v: unknown) => {
+                const voice = v as { id?: string; name?: string };
+                return String(voice?.id || voice?.name || '').trim();
+              })
+              .filter((v: string) => v.length > 0)
+          : [];
+        if (voices.length > 0) {
+          setAvailableVoices(voices);
+          if (!voices.includes(voiceName)) {
+            setVoiceName(voices[0]);
+          }
+        }
+      } catch {
+        setAvailableVoices(FALLBACK_VOICES);
+      }
+
+      try {
         const historyRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/history/${encodeURIComponent(sessionId)}`);
         const historyData = await historyRes.json();
         if (historyData?.success) {
@@ -122,6 +148,8 @@ export const AgentChatPage = () => {
             : [];
           setMessages(parsed);
           setMemory(String(historyData.memory ?? ''));
+          setTurnCount(Number(historyData.turn_count ?? 0) || 0);
+          setMemoryRefreshEveryTurns(Number(historyData.memory_refresh_every_turns ?? DEFAULT_MEMORY_REFRESH_TURNS) || DEFAULT_MEMORY_REFRESH_TURNS);
         }
       } catch {
         // Keep page usable even if history endpoint fails.
@@ -162,6 +190,8 @@ export const AgentChatPage = () => {
       const ttsText = String(data.tts_text ?? reply);
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
       setMemory(String(data.memory ?? ''));
+      setTurnCount(Number(data.turn_count ?? turnCount + 1) || 0);
+      setMemoryRefreshEveryTurns(Number(data.memory_refresh_every_turns ?? memoryRefreshEveryTurns) || DEFAULT_MEMORY_REFRESH_TURNS);
 
       if (autoSpeak && typeof data.audio_base64 === 'string' && data.audio_base64) {
         await playTtsFromBase64(data.audio_base64, String(data.mime_type ?? 'audio/L16;rate=24000'));
@@ -219,12 +249,35 @@ export const AgentChatPage = () => {
       await fetch(`${BACKEND_API.BASE_URL}/api/chat/reset/${encodeURIComponent(sessionId)}`, { method: 'POST' });
       setMessages([]);
       setMemory('');
+      setTurnCount(0);
     } catch {
       // Ignore reset failures and keep current state.
     }
   };
 
+  const refreshMemory = async () => {
+    if (isRefreshingMemory) return;
+    setIsRefreshingMemory(true);
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}/api/chat/memory/refresh/${encodeURIComponent(sessionId)}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) return;
+      setMemory(String(data.memory ?? ''));
+      setTurnCount(Number(data.turn_count ?? turnCount) || 0);
+      setMemoryRefreshEveryTurns(Number(data.memory_refresh_every_turns ?? memoryRefreshEveryTurns) || DEFAULT_MEMORY_REFRESH_TURNS);
+    } finally {
+      setIsRefreshingMemory(false);
+    }
+  };
+
   const canSend = useMemo(() => input.trim().length > 0 && !isSending && localReady, [input, isSending, localReady]);
+  const turnsUntilAutoRefresh = useMemo(() => {
+    const every = Math.max(1, memoryRefreshEveryTurns);
+    const remainder = turnCount % every;
+    return remainder === 0 ? every : every - remainder;
+  }, [turnCount, memoryRefreshEveryTurns]);
 
   return (
     <div className="h-full flex flex-col p-5 gap-4 overflow-hidden">
@@ -325,24 +378,39 @@ export const AgentChatPage = () => {
             onChange={(e) => setVoiceName(e.target.value)}
             className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-4"
           >
-            {VOICES.map((v) => (
+            {availableVoices.map((v) => (
               <option key={v} value={v}>{v}</option>
             ))}
           </select>
 
           <div className="text-[11px] text-slate-500 mb-4">
-            Local chat only. No Google key required.
+            Local chat only. Voice choice changes local TTS synthesis profile.
           </div>
 
           <div className="mt-5 p-3 rounded-lg border border-white/10 bg-white/[0.02]">
-            <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400 mb-1">Memory Snapshot</h4>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Memory Snapshot</h4>
+              <button
+                onClick={() => void refreshMemory()}
+                disabled={isRefreshingMemory}
+                className="text-[10px] px-2 py-1 rounded border border-white/10 text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRefreshingMemory ? 'Refreshing' : 'Refresh now'}
+              </button>
+            </div>
             <p className="text-xs text-slate-300 whitespace-pre-wrap">
               {memory || 'Memory builds automatically while chatting.'}
+            </p>
+            <p className="mt-2 text-[10px] text-slate-500">
+              Auto refresh every {memoryRefreshEveryTurns} turns. Next in {turnsUntilAutoRefresh} turn{turnsUntilAutoRefresh === 1 ? '' : 's'}.
             </p>
           </div>
 
           <div className="mt-4 text-[11px] text-slate-500">
             Session: {sessionId.slice(0, 12)}...
+          </div>
+          <div className="mt-1 text-[11px] text-slate-500">
+            Turns: {turnCount}
           </div>
           {isSpeaking && (
             <div className="mt-2 text-[11px] text-emerald-300 inline-flex items-center gap-1">

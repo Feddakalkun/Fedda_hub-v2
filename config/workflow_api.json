@@ -490,6 +490,30 @@
         "input_key": "text",
         "type": "string",
         "label": "Text"
+      },
+      "temperature": {
+        "node_id": "42",
+        "input_key": "temperature",
+        "type": "number",
+        "label": "Temperature"
+      },
+      "top_p": {
+        "node_id": "42",
+        "input_key": "top_p",
+        "type": "number",
+        "label": "Top P"
+      },
+      "repetition_penalty": {
+        "node_id": "42",
+        "input_key": "repetition_penalty",
+        "type": "number",
+        "label": "Repetition Penalty"
+      },
+      "seed": {
+        "node_id": "42",
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
       }
     }
   }

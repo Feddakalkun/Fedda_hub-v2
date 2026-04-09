@@ -52,17 +52,10 @@
         "type": "number",
         "label": "Denoise"
       },
-      "lora_name": {
+      "loras": {
         "node_id": "185",
-        "input_key": "lora_name",
-        "type": "string",
-        "label": "LoRA"
-      },
-      "lora_strength": {
-        "node_id": "185",
-        "input_key": "strength_model",
-        "type": "number",
-        "label": "LoRA Strength"
+        "type": "loras",
+        "label": "LoRAs"
       }
     }
   },

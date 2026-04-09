@@ -18,7 +18,7 @@ if backend_dir not in sys.path:
 
 import requests
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -242,6 +242,73 @@ OLLAMA_SYSTEM_PROMPTS: Dict[str, str] = {
     ),
 }
 
+def _build_prompt_user_message(context: str, mode: str, current_prompt: str) -> str:
+    """Build strict, context-aware user instruction for enhance/inspire modes."""
+    ctx = (context or "zimage").strip().lower()
+    safe_mode = "enhance" if mode == "enhance" else "inspire"
+    has_prompt = bool((current_prompt or "").strip())
+
+    context_focus = {
+        "zimage": (
+            "Prioritize photorealism, clean anatomy, realistic skin texture, lens/lighting clarity, and coherent styling."
+        ),
+        "ltx-flf": (
+            "Prioritize temporal continuity, camera movement language, and natural transition between first and last frame."
+        ),
+        "ltx-lipsync": (
+            "Prioritize believable speech-face motion, micro-expression realism, and stable identity."
+        ),
+        "wan-scene": (
+            "Prioritize scene action, cinematic pacing, and visual continuity across frames."
+        ),
+    }.get(ctx, "Prioritize clarity, cinematic detail, and usable generation language.")
+
+    if safe_mode == "enhance" and has_prompt:
+        return (
+            "Rewrite and enhance the prompt below while preserving its original intent.\n"
+            "Keep it model-ready, specific, and cinematic.\n"
+            f"{context_focus}\n"
+            "Rules: no markdown, no bullet list, no explanation, no preface. Output one final prompt only.\n\n"
+            f"INPUT PROMPT:\n{current_prompt.strip()}"
+        )
+
+    return (
+        "Create a brand-new prompt that is highly usable for direct generation.\n"
+        f"{context_focus}\n"
+        "Rules: no markdown, no bullet list, no explanation, no preface. Output one final prompt only."
+    )
+
+
+def _caption_prompt_for_context(context: str) -> str:
+    """Return image->prompt conversion instruction tuned by workflow context."""
+    ctx = (context or "zimage").strip().lower()
+    if ctx == "zimage":
+        return (
+            "Convert this image into a photorealistic generation prompt. Include subject identity cues, facial details, "
+            "wardrobe/materials, camera framing/lens feel, lighting direction and quality, color mood, and background depth. "
+            "Avoid meta wording like 'the image shows'. Under 110 words. Output only the prompt."
+        )
+    if ctx == "ltx-flf":
+        return (
+            "Convert this image into a motion-oriented prompt for keyframe-to-video generation. Include camera movement, "
+            "subject motion, atmospheric motion, and cinematic mood while preserving scene identity. Under 90 words. "
+            "Output only the prompt."
+        )
+    if ctx == "ltx-lipsync":
+        return (
+            "Convert this portrait image into a lipsync-ready motion prompt. Focus on expression energy, natural head/eye "
+            "movement, breathing, and speaking presence while keeping identity stable. Under 80 words. Output only the prompt."
+        )
+    if ctx == "wan-scene":
+        return (
+            "Convert this image into a WAN-style scene prompt with clear action, composition, atmosphere, and cinematic lighting. "
+            "Under 80 words. Output only the prompt."
+        )
+    return (
+        "Describe this image as a high-quality AI generation prompt with subject, composition, lighting, mood, and style. "
+        "Output only the prompt."
+    )
+
 
 def _get_ollama_text_model() -> Optional[str]:
     """Pick the best available Ollama text model."""
@@ -314,17 +381,19 @@ async def ollama_generate_prompt(req: OllamaPromptRequest):
 
     system = OLLAMA_SYSTEM_PROMPTS.get(req.context, OLLAMA_SYSTEM_PROMPTS["zimage"])
 
-    if req.mode == "enhance" and req.current_prompt.strip():
-        user_msg = f"Enhance and rewrite this prompt to be more detailed and cinematic:\n\n{req.current_prompt}"
-    else:
-        user_msg = "Write a creative, detailed, cinematic prompt. Be inspired and unexpected."
+    mode = "enhance" if req.mode == "enhance" else "inspire"
+    user_msg = _build_prompt_user_message(req.context, mode, req.current_prompt)
+
+    # Keep enhance more deterministic than inspire.
+    temp = 0.45 if mode == "enhance" else 0.8
+    max_tokens = 240 if req.context == "zimage" else 190
 
     payload = {
         "model": model,
         "system": system,
         "prompt": user_msg,
         "stream": True,
-        "options": {"temperature": 0.85, "num_predict": 250},
+        "options": {"temperature": temp, "num_predict": max_tokens},
     }
 
     def generate():
@@ -348,7 +417,7 @@ async def ollama_generate_prompt(req: OllamaPromptRequest):
 
 
 @app.post("/api/ollama/caption")
-async def ollama_caption_image(file: UploadFile = File(...)):
+async def ollama_caption_image(file: UploadFile = File(...), context: str = Form("zimage")):
     """Caption an uploaded image using an Ollama vision model."""
     import base64
 
@@ -364,14 +433,10 @@ async def ollama_caption_image(file: UploadFile = File(...)):
 
     payload = {
         "model": model,
-        "prompt": (
-            "Describe this image as a detailed AI generation prompt. Write it as instructions to recreate the image, "
-            "not a description of it. Include: subject, appearance details, lighting, composition, mood, style, "
-            "background. Under 100 words. Output ONLY the prompt text."
-        ),
+        "prompt": _caption_prompt_for_context(context),
         "images": [img_b64],
         "stream": False,
-        "options": {"temperature": 0.7, "num_predict": 180},
+        "options": {"temperature": 0.55, "num_predict": 200},
     }
 
     try:

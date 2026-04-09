@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  Sparkles, Maximize2, Loader2, RefreshCw,
-  ChevronLeft,
+  Sparkles, Maximize2, Loader2, RefreshCw, Plus, Trash2,
+  ChevronLeft, Image as ImageIcon, Expand,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
 import { LoraSelector } from '../../components/ui/LoraSelector';
+import { Lightbox } from '../../components/ui/Lightbox';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
@@ -18,28 +19,51 @@ const PRESETS = [
   { label: '9:16', w: 896,  h: 1152 },
 ];
 
+type ZImageLoraEntry = {
+  name: string;
+  strength: number;
+};
+
+const normLora = (v: string) => v.replace(/\\/g, '/').toLowerCase().trim();
+
+const resolveInstalledLoraName = (name: string, available: string[]) => {
+  if (!name) return '';
+  const direct = available.find((a) => normLora(a) === normLora(name));
+  if (direct) return direct;
+
+  const candidate = name
+    .replace(/zimage_turbo/gi, 'zimage-turbo')
+    .replace(/zimage\/turbo/gi, 'zimage-turbo');
+  const fixed = available.find((a) => normLora(a) === normLora(candidate));
+  return fixed ?? name;
+};
+
 export const ZImageTxt2Img = () => {
   const [prompt, setPrompt]                   = usePersistentState('zimage_prompt', '');
   const [negativePrompt, setNegativePrompt]   = usePersistentState('zimage_negative', 'blurry, ugly, bad proportions, low quality, artifacts');
   const [width, setWidth]                     = usePersistentState('zimage_width', 1024);
   const [height, setHeight]                   = usePersistentState('zimage_height', 1024);
-  const [steps, setSteps]                     = usePersistentState('zimage_steps', 8);
-  const [cfg]                                 = usePersistentState('zimage_cfg', 1.5);
+  const [steps, setSteps]                     = usePersistentState('zimage_steps', 11);
+  const cfg                                   = 1.0;
   const [seed, setSeed]                       = usePersistentState('zimage_seed', -1);
-  const [loraName, setLoraName]               = usePersistentState('zimage_lora_name', '');
-  const [loraStrength, setLoraStrength]       = usePersistentState('zimage_lora_strength', 1.0);
+  const [loraEntries, setLoraEntries]         = usePersistentState<ZImageLoraEntry[]>('zimage_loras', []);
 
   const [isGenerating, setIsGenerating]       = useState(false);
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
-  const [currentImage, setCurrentImage]       = useState<string | null>(null);
-  const [history, setHistory]                 = useState<string[]>([]);
-  void currentImage;
-  void history;
+  const [currentImage, setCurrentImage]       = usePersistentState<string | null>('zimage_current_image', null);
+  const [history, setHistory]                 = usePersistentState<string[]>('zimage_history', []);
   const [availableLoras, setAvailableLoras]   = useState<string[]>([]);
   const [negExpanded, setNegExpanded]         = useState(false);
+  const [lightboxImage, setLightboxImage]     = useState<string | null>(null);
 
   const { toast } = useToast();
-  const { state: execState, clearOutputs } = useComfyExecution();
+  const {
+    state: execState,
+    clearOutputs,
+    previewUrl,
+    outputReadyCount,
+    lastOutputImages,
+  } = useComfyExecution();
 
   useEffect(() => {
     comfyService.getLoras().then((loras) => {
@@ -50,6 +74,48 @@ export const ZImageTxt2Img = () => {
       setAvailableLoras(filtered);
     }).catch(() => {});
   }, []);
+
+  // Normalize persisted LoRA paths to currently installed names.
+  useEffect(() => {
+    if (availableLoras.length === 0 || loraEntries.length === 0) return;
+    const normalized = loraEntries.map((entry) => ({
+      ...entry,
+      name: resolveInstalledLoraName(entry.name, availableLoras),
+    }));
+    const changed = normalized.some((entry, i) => entry.name !== loraEntries[i]?.name);
+    if (changed) setLoraEntries(normalized);
+  }, [availableLoras, loraEntries, setLoraEntries]);
+
+  // One-time defaults migration for existing browsers:
+  // force Z-Image defaults to 11 steps / CFG 1.0.
+  useEffect(() => {
+    try {
+      const marker = 'zimage_defaults_migrated_v2';
+      if (window.localStorage.getItem(marker)) return;
+      setSteps(11);
+      window.localStorage.setItem('zimage_cfg', JSON.stringify(1.0));
+      window.localStorage.setItem(marker, '1');
+    } catch {
+      // ignore storage access errors
+    }
+  }, [setSteps]);
+
+  // One-time migration from legacy single-LoRA keys.
+  useEffect(() => {
+    if (loraEntries.length > 0) return;
+    try {
+      const legacyNameRaw = window.localStorage.getItem('zimage_lora_name');
+      const legacyStrengthRaw = window.localStorage.getItem('zimage_lora_strength');
+      if (!legacyNameRaw) return;
+      const legacyName = JSON.parse(legacyNameRaw) as string;
+      const legacyStrength = legacyStrengthRaw ? Number(JSON.parse(legacyStrengthRaw)) : 1.0;
+      if (legacyName && legacyName.trim()) {
+        setLoraEntries([{ name: legacyName, strength: Number.isFinite(legacyStrength) ? legacyStrength : 1.0 }]);
+      }
+    } catch {
+      // ignore legacy parsing errors
+    }
+  }, [loraEntries.length, setLoraEntries]);
 
   useEffect(() => {
     if (execState !== 'done' || !pendingPromptId) return;
@@ -80,6 +146,17 @@ export const ZImageTxt2Img = () => {
     if (execState === 'error') { setIsGenerating(false); setPendingPromptId(null); }
   }, [execState]);
 
+  // Also consume real-time executed output events so the strip updates immediately.
+  useEffect(() => {
+    if (!isGenerating || outputReadyCount <= 0 || lastOutputImages.length === 0) return;
+    const urls = lastOutputImages.map((img) => comfyService.getImageUrl(img));
+    setHistory((prev) => {
+      const merged = [...urls, ...prev.filter((u) => !urls.includes(u))];
+      return merged.slice(0, 40);
+    });
+    if (urls[0]) setCurrentImage(urls[0]);
+  }, [isGenerating, outputReadyCount, lastOutputImages, setHistory, setCurrentImage]);
+
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
@@ -90,7 +167,14 @@ export const ZImageTxt2Img = () => {
         seed: seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
         steps, cfg, client_id: (comfyService as any).clientId,
       };
-      if (loraName) { params.lora_name = loraName; params.lora_strength = loraStrength; }
+      const activeLoras = loraEntries
+        .filter((l) => l.name && l.name.trim())
+        .map((l) => ({
+          name: resolveInstalledLoraName(l.name, availableLoras),
+          strength: l.strength,
+        }))
+        .filter((l) => availableLoras.some((a) => normLora(a) === normLora(l.name)));
+      if (activeLoras.length > 0) params.loras = activeLoras;
       const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.GENERATE}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workflow_id: 'z-image', params }),
@@ -104,7 +188,18 @@ export const ZImageTxt2Img = () => {
     }
   };
 
+  const stripImages = [
+    ...(previewUrl ? [previewUrl] : []),
+    ...history.filter((h) => h !== previewUrl),
+  ].slice(0, 5);
+
+  const openImage = (url: string) => {
+    setCurrentImage(url);
+    setLightboxImage(url);
+  };
+
   return (
+    <>
     <div className="flex h-full bg-[#080808] overflow-hidden">
 
       {/* ══════════════ LEFT PANEL ══════════════ */}
@@ -115,6 +210,53 @@ export const ZImageTxt2Img = () => {
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Z-Image</span>
+          </div>
+
+          {/* Top preview strip */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/25">Preview</span>
+              <span className="text-[8px] font-mono text-white/20">
+                {previewUrl ? 'Live' : 'Recent'} · {history.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {Array.from({ length: 5 }).map((_, idx) => {
+                const url = stripImages[idx] ?? null;
+                const isLive = !!previewUrl && idx === 0 && !!url;
+                return (
+                  <button
+                    key={`z-preview-${idx}`}
+                    onClick={() => { if (url) openImage(url); }}
+                    disabled={!url}
+                    className={`group relative aspect-square rounded-xl border overflow-hidden transition-all ${
+                      url
+                        ? 'border-white/15 bg-black/40 hover:border-emerald-400/50'
+                        : 'border-white/[0.06] bg-white/[0.02]'
+                    } ${currentImage === url ? 'ring-1 ring-emerald-400/50' : ''}`}
+                  >
+                    {url ? (
+                      <>
+                        <img src={url} alt={`Preview ${idx + 1}`} className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors" />
+                        <div className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold text-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Expand className="h-2.5 w-2.5" />
+                        </div>
+                        {isLive && (
+                          <div className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-emerald-500/80 px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-black">
+                            <Loader2 className="h-2 w-2 animate-spin" /> Live
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-white/12">
+                        <ImageIcon className="h-4 w-4" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Prompt */}
@@ -129,14 +271,74 @@ export const ZImageTxt2Img = () => {
           />
 
           <LoraSelector
-            label="LoRA"
-            value={loraName}
-            onChange={setLoraName}
-            strength={loraStrength}
-            onStrengthChange={setLoraStrength}
+            label="LoRA 1"
+            value={loraEntries[0]?.name ?? ''}
+            onChange={(name) => {
+              setLoraEntries((prev) => {
+                const next = [...prev];
+                if (!next[0]) next[0] = { name: '', strength: 1.0 };
+                next[0] = { ...next[0], name };
+                return next;
+              });
+            }}
+            strength={loraEntries[0]?.strength ?? 1.0}
+            onStrengthChange={(strength) => {
+              setLoraEntries((prev) => {
+                const next = [...prev];
+                if (!next[0]) next[0] = { name: '', strength: 1.0 };
+                next[0] = { ...next[0], strength };
+                return next;
+              });
+            }}
             options={availableLoras}
             accent="emerald"
           />
+
+          {loraEntries.slice(1).map((entry, idx) => (
+            <div key={`zimage-lora-${idx + 1}`} className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.01] p-2.5">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setLoraEntries((prev) => prev.filter((_, i) => i !== idx + 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/40 transition-colors hover:border-red-500/30 hover:text-red-400"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove
+                </button>
+              </div>
+              <LoraSelector
+                label={`LoRA ${idx + 2}`}
+                value={entry.name}
+                onChange={(name) => {
+                  setLoraEntries((prev) => {
+                    const next = [...prev];
+                    next[idx + 1] = { ...next[idx + 1], name };
+                    return next;
+                  });
+                }}
+                strength={entry.strength}
+                onStrengthChange={(strength) => {
+                  setLoraEntries((prev) => {
+                    const next = [...prev];
+                    next[idx + 1] = { ...next[idx + 1], strength };
+                    return next;
+                  });
+                }}
+                options={availableLoras}
+                accent="emerald"
+              />
+            </div>
+          ))}
+
+          <button
+            onClick={() => setLoraEntries((prev) => (prev.length >= 5 ? prev : [...prev, { name: '', strength: 1.0 }]))}
+            disabled={loraEntries.length >= 5}
+            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all ${
+              loraEntries.length >= 5
+                ? 'cursor-not-allowed border-white/[0.05] bg-white/[0.02] text-white/20'
+                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15'
+            }`}
+          >
+            <Plus className="h-3 w-3" /> Add LoRA
+          </button>
 
           <div className="h-px bg-white/[0.04]" />
 
@@ -231,6 +433,10 @@ export const ZImageTxt2Img = () => {
       </div>
 
     </div>
+    {lightboxImage && (
+      <Lightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
+    )}
+    </>
   );
 };
 

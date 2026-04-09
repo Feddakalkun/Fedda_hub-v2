@@ -158,6 +158,7 @@ export const PromptAssistant = ({
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('context', context);
       const resp = await fetch(
         `${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.OLLAMA_CAPTION}`,
         { method: 'POST', body: fd },

@@ -861,7 +861,7 @@ if (-not (Test-Path $ManagerConfigDir)) {
 # Always overwrite to ensure security_level is set to weak
 $ConfigContent = @"
 [default]
-preview_method = none
+preview_method = auto
 git_exe = 
 use_uv = False
 channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
@@ -880,6 +880,18 @@ db_mode = remote
 "@
 Set-Content -Path $ManagerConfigFile -Value $ConfigContent
 Write-Log "Security level set to 'weak' - all custom nodes can auto-install."
+
+# Enforce preview defaults in Comfy user settings.
+$PreviewSetupScript = Join-Path $ScriptPath "setup_comfyui_config.py"
+if (Test-Path $PreviewSetupScript) {
+    try {
+        Start-Process -FilePath $PyExe -ArgumentList "`"$PreviewSetupScript`"" -NoNewWindow -Wait
+        Write-Log "Comfy preview defaults configured (auto live preview)."
+    }
+    catch {
+        Write-Log "WARNING: Could not apply preview defaults (non-fatal): $_"
+    }
+}
 
 Pause-Step
 

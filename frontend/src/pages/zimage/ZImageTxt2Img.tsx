@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Sparkles, Maximize2, Loader2, RefreshCw, Plus, Trash2,
-  ChevronLeft, Image as ImageIcon, Expand,
+  ChevronLeft, Expand, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
 import { LoraSelector } from '../../components/ui/LoraSelector';
@@ -55,6 +55,7 @@ export const ZImageTxt2Img = () => {
   const [availableLoras, setAvailableLoras]   = useState<string[]>([]);
   const [negExpanded, setNegExpanded]         = useState(false);
   const [lightboxImage, setLightboxImage]     = useState<string | null>(null);
+  const [previewCollapsed, setPreviewCollapsed] = usePersistentState('zimage_preview_collapsed', false);
 
   const { toast } = useToast();
   const {
@@ -191,7 +192,7 @@ export const ZImageTxt2Img = () => {
   const stripImages = [
     ...(previewUrl ? [previewUrl] : []),
     ...history.filter((h) => h !== previewUrl),
-  ].slice(0, 5);
+  ];
 
   const openImage = (url: string) => {
     setCurrentImage(url);
@@ -215,48 +216,57 @@ export const ZImageTxt2Img = () => {
           {/* Top preview strip */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/25">Preview</span>
-              <span className="text-[8px] font-mono text-white/20">
-                {previewUrl ? 'Live' : 'Recent'} · {history.length}
-              </span>
+              <button
+                onClick={() => setPreviewCollapsed((v) => !v)}
+                className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.2em] text-white/30 hover:text-white/65 transition-colors"
+              >
+                {previewCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+                Preview
+              </button>
+              <span className="text-[8px] font-mono text-white/20">{previewUrl ? 'Live' : 'Recent'} · {history.length}</span>
             </div>
-            <div className="grid grid-cols-5 gap-2">
-              {Array.from({ length: 5 }).map((_, idx) => {
-                const url = stripImages[idx] ?? null;
-                const isLive = !!previewUrl && idx === 0 && !!url;
-                return (
-                  <button
-                    key={`z-preview-${idx}`}
-                    onClick={() => { if (url) openImage(url); }}
-                    disabled={!url}
-                    className={`group relative aspect-square rounded-xl border overflow-hidden transition-all ${
-                      url
-                        ? 'border-white/15 bg-black/40 hover:border-emerald-400/50'
-                        : 'border-white/[0.06] bg-white/[0.02]'
-                    } ${currentImage === url ? 'ring-1 ring-emerald-400/50' : ''}`}
-                  >
-                    {url ? (
-                      <>
-                        <img src={url} alt={`Preview ${idx + 1}`} className="h-full w-full object-cover" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors" />
-                        <div className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold text-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Expand className="h-2.5 w-2.5" />
-                        </div>
-                        {isLive && (
-                          <div className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-emerald-500/80 px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-black">
-                            <Loader2 className="h-2 w-2 animate-spin" /> Live
+            {!previewCollapsed && (
+              <>
+                {stripImages.length === 0 ? (
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[10px] text-white/30">
+                    No previews yet. Generate an image to fill this bar.
+                  </div>
+                ) : (
+                  <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                    {stripImages.map((url, idx) => {
+                      const isLive = !!previewUrl && idx === 0;
+                      return (
+                        <button
+                          key={`z-preview-${idx}`}
+                          onClick={() => openImage(url)}
+                          className={`group relative h-24 w-24 shrink-0 rounded-xl border overflow-hidden transition-all ${
+                            currentImage === url
+                              ? 'ring-1 ring-emerald-400/50 border-emerald-400/40'
+                              : 'border-white/15 bg-black/40 hover:border-emerald-400/50'
+                          }`}
+                        >
+                          <img src={url} alt={`Preview ${idx + 1}`} className="h-full w-full object-cover" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors" />
+                          <div className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold text-white/80 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Expand className="h-2.5 w-2.5" />
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-white/12">
-                        <ImageIcon className="h-4 w-4" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+                          {isLive && (
+                            <div className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-emerald-500/80 px-1 py-0.5 text-[7px] font-black uppercase tracking-wider text-black">
+                              <Loader2 className="h-2 w-2 animate-spin" /> Live
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {isGenerating && !previewUrl && (
+                  <div className="text-[9px] text-white/30">
+                    Live preview is off in ComfyUI. Enable it in ComfyUI Settings if you want step-by-step preview.
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Prompt */}

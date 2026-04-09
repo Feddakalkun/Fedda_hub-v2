@@ -623,7 +623,7 @@ $MgrDir = Join-Path $ComfyDir "user\__manager"
 if (-not (Test-Path $MgrDir)) { New-Item -ItemType Directory -Path $MgrDir -Force | Out-Null }
 $MgrConfig = @"
 [default]
-preview_method = none
+preview_method = auto
 git_exe =
 use_uv = False
 channel_url = https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main
@@ -641,6 +641,17 @@ db_mode = remote
 "@
 Set-Content -Path (Join-Path $MgrDir "config.ini") -Value $MgrConfig
 Write-Step "ComfyUI-Manager configured (weak security)." "Green"
+
+# Enforce preview defaults in Comfy user settings.
+$PreviewSetupScript = Join-Path $ScriptPath "setup_comfyui_config.py"
+if (Test-Path $PreviewSetupScript) {
+    try {
+        & $VenvPy "$PreviewSetupScript" 2>&1 | Out-Null
+        Write-Step "Comfy preview defaults configured (auto live preview)." "Green"
+    } catch {
+        Write-Step "WARNING: Could not apply preview defaults (non-fatal)." "Yellow"
+    }
+}
 
 # ============================================================================
 # 7. SMOKE TEST

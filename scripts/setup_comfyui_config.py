@@ -1,48 +1,67 @@
 """
-Configure ComfyUI Manager settings for auto-installation
-Sets security_level to 'weak' to allow all custom nodes to install
+Configure ComfyUI defaults used by FEDDA.
+1) ComfyUI-Manager: keep permissive node install policy.
+2) ComfyUI user settings: enforce preview-friendly defaults.
 """
-import os
+import json
 from pathlib import Path
 import configparser
 
-def setup_comfyui_manager_config():
-    """Configure ComfyUI Manager to allow all custom nodes"""
-    
-    # Path to config.ini
-    config_dir = Path(__file__).parent.parent / "ComfyUI" / "user" / "__manager"
+
+def _resolve_comfy_dir() -> Path:
+    return Path(__file__).parent.parent / "ComfyUI"
+
+
+def setup_comfyui_manager_config(comfy_dir: Path) -> None:
+    """Configure ComfyUI-Manager defaults."""
+    config_dir = comfy_dir / "user" / "__manager"
     config_file = config_dir / "config.ini"
-    
-    # Create directory if it doesn't exist
     config_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create or update config
+
     config = configparser.ConfigParser()
-    
-    # Load existing config if it exists
     if config_file.exists():
         config.read(config_file)
-    
-    # Ensure [default] section exists
-    if 'default' not in config:
-        config['default'] = {}
-    
-    # Set security_level to weak to allow all custom nodes
-    config['default']['security_level'] = 'weak'
-    
-    # Set other useful defaults
-    config['default']['preview_method'] = 'none'
-    config['default']['file_logging'] = 'True'
-    config['default']['component_policy'] = 'mine'
-    config['default']['update_policy'] = 'stable-comfyui'
-    config['default']['always_lazy_install'] = 'False'
-    
-    # Write config
-    with open(config_file, 'w') as f:
+
+    if "default" not in config:
+        config["default"] = {}
+
+    section = config["default"]
+    section["security_level"] = "weak"
+    section["preview_method"] = "auto"
+    section["file_logging"] = "True"
+    section["component_policy"] = "mine"
+    section["update_policy"] = "stable-comfyui"
+    section["always_lazy_install"] = "False"
+
+    with open(config_file, "w", encoding="utf-8") as f:
         config.write(f)
-    
-    print(f"✅ ComfyUI Manager config updated: {config_file}")
-    print("   Security level set to 'weak' - all custom nodes can be installed")
+
+    print(f"[OK] ComfyUI Manager config updated: {config_file}")
+
+
+def setup_comfyui_preview_defaults(comfy_dir: Path) -> None:
+    """Set Comfy UI preview defaults in user settings."""
+    settings_path = comfy_dir / "user" / "default" / "comfy.settings.json"
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data = {}
+    if settings_path.exists():
+        try:
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+
+    # Ensure live previews are available by default in UI.
+    data["Comfy.Execution.PreviewMethod"] = "auto"
+    # VHS advanced previews should always emit when available.
+    data["VHS.AdvancedPreviews"] = "Always"
+
+    settings_path.write_text(json.dumps(data, ensure_ascii=False, indent=4), encoding="utf-8")
+    print(f"[OK] Comfy user settings updated: {settings_path}")
+
 
 if __name__ == "__main__":
-    setup_comfyui_manager_config()
+    comfy = _resolve_comfy_dir()
+    setup_comfyui_manager_config(comfy)
+    setup_comfyui_preview_defaults(comfy)
+    print("   Preview defaults set (Execution=auto, VHS=Always)")

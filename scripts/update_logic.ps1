@@ -348,6 +348,20 @@ try {
     Write-Host "  [WARNING] edge-tts sync failed (non-fatal): $_" -ForegroundColor Yellow
 }
 
+# Keep Comfy preview defaults enabled for end users.
+Write-Host "`n[2b/3] Applying Comfy preview defaults..." -ForegroundColor Yellow
+$PreviewSetupScript = Join-Path $RootPath "scripts\setup_comfyui_config.py"
+if (Test-Path $PreviewSetupScript) {
+    try {
+        & $PyExe "$PreviewSetupScript" 2>&1 | Out-Null
+        Write-Host "  Preview defaults applied (Execution=auto, VHS=Always)." -ForegroundColor Green
+    } catch {
+        Write-Host "  [WARNING] Preview defaults update failed (non-fatal): $_" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  [WARNING] setup_comfyui_config.py not found, skipping preview defaults." -ForegroundColor Yellow
+}
+
 
 # ============================================================================
 # DONE

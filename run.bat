@@ -187,7 +187,7 @@ timeout /t 1 /nobreak >nul
 
 cd /d "%COMFYUI_DIR%"
 echo [%date% %time%] Starting ComfyUI...
-"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method none --disable-auto-launch
+"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch
 
 if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] ComfyUI crashed with error code %errorlevel%

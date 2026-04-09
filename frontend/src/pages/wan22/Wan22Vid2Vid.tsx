@@ -9,6 +9,7 @@ import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { comfyService } from '../../services/comfyService';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
+import { LoraSelector } from '../../components/ui/LoraSelector';
 
 const FPS = 24;
 const SCENE_COUNT = 4;
@@ -68,6 +69,10 @@ export const Wan22Vid2Vid = () => {
   const [aspectRatio, setAspectRatio] = usePersistentState('wan22v2v_ar', '16:9');
   const [direction, setDirection]     = usePersistentState('wan22v2v_dir', 'Vertical');
   const [cropMethod, setCropMethod]   = usePersistentState('wan22v2v_crop', 'Stretch');
+  const [loraHigh, setLoraHigh]       = usePersistentState('wan22v2v_lora_high', '');
+  const [loraLow, setLoraLow]         = usePersistentState('wan22v2v_lora_low', '');
+  const [loraStrengthHigh, setLoraStrengthHigh] = usePersistentState('wan22v2v_lora_high_strength', 1.0);
+  const [loraStrengthLow, setLoraStrengthLow]   = usePersistentState('wan22v2v_lora_low_strength', 1.0);
 
   // Which scene prompt panels are expanded
   const [expanded, setExpanded] = useState<boolean[]>([true, true, true, true]);
@@ -91,6 +96,7 @@ export const Wan22Vid2Vid = () => {
   const [history, setHistory]                 = usePersistentState<string[]>('wan22v2v_history', []);
   void sessionVideos;
   void history;
+  const [availableLoras, setAvailableLoras]   = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef     = useRef<HTMLVideoElement>(null);
@@ -105,6 +111,24 @@ export const Wan22Vid2Vid = () => {
     outputReadyCount,
     registerNodeMap,
   } = useComfyExecution();
+
+  useEffect(() => {
+    comfyService.getLoras().then((loras) => {
+      const filtered = loras.filter((l) => {
+        const n = l.replace(/\\/g, '/').toLowerCase();
+        return n.startsWith('wan22/') || n.includes('wan2.2') || n.includes('wan22');
+      });
+      setAvailableLoras(filtered);
+      if (!loraHigh) {
+        const guessHigh = filtered.find((f) => /high/i.test(f));
+        if (guessHigh) setLoraHigh(guessHigh);
+      }
+      if (!loraLow) {
+        const guessLow = filtered.find((f) => /low/i.test(f));
+        if (guessLow) setLoraLow(guessLow);
+      }
+    }).catch(() => {});
+  }, []);
 
   const totalFrames = Math.max(1, Math.floor(videoDuration * FPS));
   const inFrame     = Math.round(inPoint * FPS);
@@ -240,6 +264,8 @@ export const Wan22Vid2Vid = () => {
             aspect_ratio: aspectRatio,
             direction: direction,
             crop_method: cropMethod,
+            ...(loraHigh ? { lora_high: { on: true, lora: loraHigh, strength: loraStrengthHigh } } : {}),
+            ...(loraLow ? { lora_low: { on: true, lora: loraLow, strength: loraStrengthLow } } : {}),
           },
         }),
       });
@@ -454,6 +480,30 @@ export const Wan22Vid2Vid = () => {
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="h-px bg-white/5" />
+
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">LoRA Loaders</p>
+            <LoraSelector
+              label="High Noise LoRA"
+              value={loraHigh}
+              onChange={setLoraHigh}
+              strength={loraStrengthHigh}
+              onStrengthChange={setLoraStrengthHigh}
+              options={availableLoras}
+              accent="violet"
+            />
+            <LoraSelector
+              label="Low Noise LoRA"
+              value={loraLow}
+              onChange={setLoraLow}
+              strength={loraStrengthLow}
+              onStrengthChange={setLoraStrengthLow}
+              options={availableLoras}
+              accent="violet"
+            />
           </div>
 
           <div className="h-px bg-white/5" />

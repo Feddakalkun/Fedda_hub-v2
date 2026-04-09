@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { LoRADownloader } from '../components/LoRADownloader';
 
-type Family = 'z-image' | 'flux2klein' | 'sd15' | 'sdxl';
+type Family = 'z-image' | 'flux2klein' | 'sd15' | 'sdxl' | 'wan';
 
 const FAMILIES: { key: Family; label: string; desc: string }[] = [
   { key: 'z-image',   label: 'Z-Image',     desc: 'Turbo celeb & character LoRAs' },
   { key: 'flux2klein',label: 'FLUX2KLEIN',   desc: 'FLUX.2-klein & FLUX.1-dev packs' },
   { key: 'sd15',      label: 'SD 1.5',       desc: 'Classic portrait & style LoRAs' },
   { key: 'sdxl',      label: 'SDXL',         desc: 'High-res XL character models' },
+  { key: 'wan',       label: 'WAN 2.2',      desc: 'WAN 2.2 LoRA packs' },
 ];
 
 export const LibraryPage = () => {

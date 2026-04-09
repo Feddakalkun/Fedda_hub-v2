@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
+import { LoraSelector } from '../../components/ui/LoraSelector';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
@@ -62,6 +63,8 @@ export const LtxFlfPage = () => {
   const [seed,        setSeed]        = usePersistentState('ltx_flf_seed', -1);
   const [guideFirst,  setGuideFirst]  = usePersistentState('ltx_flf_gf', 0.7);
   const [guideLast,   setGuideLast]   = usePersistentState('ltx_flf_gl', 0.7);
+  const [loraName, setLoraName]       = usePersistentState('ltx_flf_lora_name', '');
+  const [loraStrength, setLoraStrength] = usePersistentState('ltx_flf_lora_strength', 1.0);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [firstPreview,  setFirstPreview]  = useState<string | null>(null);
@@ -77,12 +80,23 @@ export const LtxFlfPage = () => {
   const [history, setHistory] = usePersistentState<string[]>('ltx_flf_history', []);
   void currentVideo;
   void history;
+  const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
   const sessionRef   = useRef<string[]>([]);
   const prevCountRef = useRef(0);
 
   const { toast } = useToast();
   const { state: execState, lastOutputVideos, outputReadyCount, registerNodeMap } = useComfyExecution();
+
+  useEffect(() => {
+    comfyService.getLoras().then((loras) => {
+      const filtered = loras.filter((l) => {
+        const n = l.replace(/\\/g, '/').toLowerCase();
+        return n.startsWith('ltx/') || n.includes('ltx');
+      });
+      setAvailableLoras(filtered);
+    }).catch(() => {});
+  }, []);
 
   const uploadFrame = async (
     file: File,
@@ -160,6 +174,9 @@ export const LtxFlfPage = () => {
             length_seconds: lengthSec,
             seed: seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
             guide_strength_first: guideFirst, guide_strength_last: guideLast,
+            ...(loraName
+              ? { lora_slot2: { on: true, lora: loraName, strength: loraStrength } }
+              : {}),
             client_id: (comfyService as any).clientId,
           },
         }),
@@ -294,6 +311,16 @@ export const LtxFlfPage = () => {
               </div>
             )}
           </div>
+
+          <LoraSelector
+            label="LoRA"
+            value={loraName}
+            onChange={setLoraName}
+            strength={loraStrength}
+            onStrengthChange={setLoraStrength}
+            options={availableLoras}
+            accent="violet"
+          />
 
           {/* Generate */}
           <div className="pb-4">

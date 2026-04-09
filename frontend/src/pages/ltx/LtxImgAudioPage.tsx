@@ -3,6 +3,7 @@ import {
   Mic, RefreshCw, Loader2, Play,
   Music, Image as ImageIcon,
 } from 'lucide-react';
+import { LoraSelector } from '../../components/ui/LoraSelector';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
@@ -68,6 +69,8 @@ export const LtxImgAudioPage = () => {
   const [audioDuration, setAudioDuration] = usePersistentState('ltx_ia_dur', 5);
   const [width,         setWidth]         = usePersistentState('ltx_ia_width', 720);
   const [seed,          setSeed]          = usePersistentState('ltx_ia_seed', -1);
+  const [loraName, setLoraName] = usePersistentState('ltx_ia_lora_name', '');
+  const [loraStrength, setLoraStrength] = usePersistentState('ltx_ia_lora_strength', 1.0);
 
   const [imageFilename,  setImageFilename]  = useState<string | null>(null);
   const [imagePreview,   setImagePreview]   = useState<string | null>(null);
@@ -84,12 +87,23 @@ export const LtxImgAudioPage = () => {
   const [history, setHistory] = usePersistentState<string[]>('ltx_ia_history', []);
   void currentVideo;
   void history;
+  const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
   const sessionRef   = useRef<string[]>([]);
   const prevCountRef = useRef(0);
 
   const { toast } = useToast();
   const { state: execState, lastOutputVideos, outputReadyCount, registerNodeMap } = useComfyExecution();
+
+  useEffect(() => {
+    comfyService.getLoras().then((loras) => {
+      const filtered = loras.filter((l) => {
+        const n = l.replace(/\\/g, '/').toLowerCase();
+        return n.startsWith('ltx/') || n.includes('ltx');
+      });
+      setAvailableLoras(filtered);
+    }).catch(() => {});
+  }, []);
 
   const uploadFile = async (
     file: File,
@@ -172,6 +186,7 @@ export const LtxImgAudioPage = () => {
             audio_start: audioStart, audio_duration: audioDuration,
             prompt: prompt.trim(), width,
             seed: seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
+            ...(loraName ? { lora_name: loraName, lora_strength: loraStrength } : {}),
             client_id: (comfyService as any).clientId,
           },
         }),
@@ -294,6 +309,16 @@ export const LtxImgAudioPage = () => {
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          <LoraSelector
+            label="LoRA"
+            value={loraName}
+            onChange={setLoraName}
+            strength={loraStrength}
+            onStrengthChange={setLoraStrength}
+            options={availableLoras}
+            accent="violet"
+          />
 
           {/* Generate */}
           <div className="pb-4">

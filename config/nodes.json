@@ -180,6 +180,30 @@
     "note": "CRT collection — 102 utility nodes for ComfyUI"
   },
   {
+    "name": "ComfyUI-AutoCropFaces",
+    "url": "https://github.com/liusida/ComfyUI-AutoCropFaces.git",
+    "folder": "ComfyUI-AutoCropFaces",
+    "note": "Auto face crop nodes for portrait prep workflows"
+  },
+  {
+    "name": "ComfyUI-AdvancedLivePortrait",
+    "url": "https://github.com/PowerHouseMan/ComfyUI-AdvancedLivePortrait.git",
+    "folder": "ComfyUI-AdvancedLivePortrait",
+    "note": "Advanced LivePortrait workflow nodes"
+  },
+  {
+    "name": "ComfyUI-MVAdapter",
+    "url": "https://github.com/huanngzh/ComfyUI-MVAdapter.git",
+    "folder": "ComfyUI-MVAdapter",
+    "note": "MVAdapter nodes for multi-view adapter workflows"
+  },
+  {
+    "name": "ComfyUI-Diffusers",
+    "url": "https://github.com/Limitex/ComfyUI-Diffusers.git",
+    "folder": "ComfyUI-Diffusers",
+    "note": "Diffusers integration nodes for ComfyUI"
+  },
+  {
     "name": "ComfyUI-FishAudioS2",
     "url": "https://github.com/Saganaki22/ComfyUI-FishAudioS2.git",
     "folder": "ComfyUI-FishAudioS2",

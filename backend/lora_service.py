@@ -22,8 +22,18 @@ PACKS: Dict[str, Dict[str, str]] = {
     "zimage_turbo": {
         "hf_repo":        "pmczip/Z-Image-Turbo_Models",
         "hf_type":        "model",
-        "dest":           "zimage-turbo",
+        "dest":           "zimage_turbo",
         "img_subfolder":  "ZIT_Images",
+    },
+    "zimage_nsfw": {
+        "hf_repo":       "qqnyanddld/nsfw-z-image-lora",
+        "hf_type":       "model",
+        "dest":          "zimage_turbo",
+    },
+    "wan22_nsfw": {
+        "hf_repo":       "lkzd7/WAN2.2_LoraSet_NSFW",
+        "hf_type":       "model",
+        "dest":          "wan22",
     },
     "flux2klein": {
         "hf_repo":       "pmczip/FLUX.2-klein-9B_Models",

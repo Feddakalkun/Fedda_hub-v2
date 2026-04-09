@@ -127,6 +127,8 @@
       "aspect_ratio":  { "node_id": "157", "input_key": "aspect_ratio", "type": "string", "label": "Aspect Ratio" },
       "direction":     { "node_id": "157", "input_key": "direction",    "type": "string", "label": "Direction" },
       "crop_method":   { "node_id": "157", "input_key": "crop_method",  "type": "string", "label": "Crop Method" },
+      "lora_high":     { "node_id": "9",   "input_key": "lora_1",       "type": "object", "label": "High Noise LoRA" },
+      "lora_low":      { "node_id": "10",  "input_key": "lora_1",       "type": "object", "label": "Low Noise LoRA" },
       "nsfw":          { "type": "nsfw_toggle", "label": "NSFW" }
     }
   },
@@ -171,6 +173,18 @@
         "type": "number",
         "label": "Seed"
       },
+      "lora_high": {
+        "node_id": "9",
+        "input_key": "lora_1",
+        "type": "object",
+        "label": "High Noise LoRA"
+      },
+      "lora_low": {
+        "node_id": "10",
+        "input_key": "lora_1",
+        "type": "object",
+        "label": "Low Noise LoRA"
+      },
       "nsfw": { "type": "nsfw_toggle", "label": "NSFW" }
     }
   },
@@ -187,7 +201,8 @@
       "length_seconds":       { "node_id": "5646", "input_key": "value",        "type": "number", "label": "Length (s)"  },
       "seed":                 { "node_id": "5650", "input_key": "noise_seed",   "type": "number", "label": "Seed"        },
       "guide_strength_first": { "node_id": "5630", "input_key": "strength",     "type": "number", "label": "First Frame Strength" },
-      "guide_strength_last":  { "node_id": "5634", "input_key": "strength",     "type": "number", "label": "Last Frame Strength"  }
+      "guide_strength_last":  { "node_id": "5634", "input_key": "strength",     "type": "number", "label": "Last Frame Strength"  },
+      "lora_slot2":           { "node_id": "5618", "input_key": "lora_2",       "type": "object", "label": "LoRA (Slot 2)" }
     }
   },
   "ltx-img-audio": {
@@ -202,6 +217,9 @@
       "prompt":         { "node_id": "5283", "input_key": "text",               "type": "string", "label": "Prompt"          },
       "width":          { "node_id": "5311", "input_key": "resize_type.width",  "type": "number", "label": "Width (px)"      },
       "seed":           { "node_id": "5293", "input_key": "noise_seed",         "type": "number", "label": "Seed"            }
+      ,
+      "lora_name":      { "node_id": "5284", "input_key": "lora_name",          "type": "string", "label": "LoRA"            },
+      "lora_strength":  { "node_id": "5284", "input_key": "strength_model",     "type": "number", "label": "LoRA Strength"   }
     }
   }
 }

@@ -1,19 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sparkles, Maximize2, Loader2, RefreshCw,
-  ChevronLeft, X,
+  ChevronLeft,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
+import { LoraSelector } from '../../components/ui/LoraSelector';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
 import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { comfyService } from '../../services/comfyService';
-
-function loraLabel(path: string): string {
-  const stem = path.replace(/\\/g, '/').split('/').pop()?.replace(/\.safetensors$/i, '') ?? path;
-  return stem.replace(/_PMv\d+[ab]_ZImage$/i, '').replace(/_/g, ' ');
-}
 
 const PRESETS = [
   { label: '1:1',  w: 1024, h: 1024 },
@@ -40,17 +36,19 @@ export const ZImageTxt2Img = () => {
   void currentImage;
   void history;
   const [availableLoras, setAvailableLoras]   = useState<string[]>([]);
-  const [loraSearch, setLoraSearch]           = useState('');
-  const [showLoraList, setShowLoraList]       = useState(false);
   const [negExpanded, setNegExpanded]         = useState(false);
-
-  const loraInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
   const { state: execState, clearOutputs } = useComfyExecution();
 
   useEffect(() => {
-    comfyService.getLoras('zimage_turbo').then(setAvailableLoras).catch(() => {});
+    comfyService.getLoras().then((loras) => {
+      const filtered = loras.filter((l) => {
+        const normalized = l.replace(/\\/g, '/').toLowerCase();
+        return normalized.startsWith('zimage_turbo/') || normalized.startsWith('zimage-turbo/');
+      });
+      setAvailableLoras(filtered);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -106,10 +104,6 @@ export const ZImageTxt2Img = () => {
     }
   };
 
-  const filteredLoras = availableLoras.filter(l =>
-    loraLabel(l).toLowerCase().includes(loraSearch.toLowerCase())
-  );
-
   return (
     <div className="flex h-full bg-[#080808] overflow-hidden">
 
@@ -134,63 +128,15 @@ export const ZImageTxt2Img = () => {
             label="Prompt"
           />
 
-          {/* LoRA */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/25">LoRA</span>
-              {loraName && (
-                <button onClick={() => { setLoraName(''); setLoraSearch(''); }}
-                  className="flex items-center gap-1 text-[8px] font-bold text-white/15 hover:text-red-400 transition-colors uppercase tracking-widest">
-                  <X className="w-2.5 h-2.5" /> Clear
-                </button>
-              )}
-            </div>
-
-            {loraName ? (
-              <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                <span className="text-xs font-semibold text-emerald-300/90">{loraLabel(loraName)}</span>
-                <span className="text-[9px] font-mono text-emerald-500/50">×{loraStrength.toFixed(1)}</span>
-              </div>
-            ) : (
-              <p className="text-[10px] text-white/10 font-medium">None — workflow default</p>
-            )}
-
-            <div className="relative">
-              <input
-                ref={loraInputRef}
-                type="text"
-                value={loraSearch}
-                onChange={e => { setLoraSearch(e.target.value); setShowLoraList(true); }}
-                onFocus={() => setShowLoraList(true)}
-                onBlur={() => setTimeout(() => setShowLoraList(false), 150)}
-                placeholder={availableLoras.length ? `Search ${availableLoras.length} LoRAs…` : 'Loading…'}
-                className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2 text-[11px] text-white/70 placeholder-white/15 focus:outline-none focus:border-emerald-500/25 transition-all"
-              />
-              {showLoraList && filteredLoras.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-[#111115] border border-white/8 rounded-xl shadow-2xl max-h-52 overflow-y-auto custom-scrollbar">
-                  {filteredLoras.map((l, i) => (
-                    <button key={i}
-                      onMouseDown={() => { setLoraName(l); setLoraSearch(''); setShowLoraList(false); }}
-                      className="w-full text-left px-3 py-2 text-[11px] text-white/50 hover:bg-white/[0.04] hover:text-white/90 transition-colors border-b border-white/[0.03] last:border-0">
-                      {loraLabel(l)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {loraName && (
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-white/20">
-                  <span>Strength</span>
-                  <span className="text-emerald-400/70 font-mono">{loraStrength.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0" max="2" step="0.05" value={loraStrength}
-                  onChange={e => setLoraStrength(parseFloat(e.target.value))}
-                  className="w-full h-1 rounded-full appearance-none outline-none accent-emerald-500 cursor-pointer" />
-              </div>
-            )}
-          </div>
+          <LoraSelector
+            label="LoRA"
+            value={loraName}
+            onChange={setLoraName}
+            strength={loraStrength}
+            onStrengthChange={setLoraStrength}
+            options={availableLoras}
+            accent="emerald"
+          />
 
           <div className="h-px bg-white/[0.04]" />
 

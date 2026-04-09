@@ -9,6 +9,7 @@ import { useComfyExecution } from '../../contexts/ComfyExecutionContext';
 import { usePersistentState } from '../../hooks/usePersistentState';
 import { comfyService } from '../../services/comfyService';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
+import { LoraSelector } from '../../components/ui/LoraSelector';
 
 const SCENE_COUNT = 3;
 void SCENE_COUNT;
@@ -51,6 +52,10 @@ export const Wan22Img2Vid = () => {
   const [frameCount, setFrameCount] = usePersistentState('wan22i2v_frames', 81);
   const [seed, setSeed]             = usePersistentState('wan22i2v_seed', -1);
   const [nsfw, setNsfw]             = usePersistentState('wan22i2v_nsfw', true);
+  const [loraHigh, setLoraHigh]     = usePersistentState('wan22i2v_lora_high', '');
+  const [loraLow, setLoraLow]       = usePersistentState('wan22i2v_lora_low', '');
+  const [loraStrengthHigh, setLoraStrengthHigh] = usePersistentState('wan22i2v_lora_high_strength', 1.0);
+  const [loraStrengthLow, setLoraStrengthLow]   = usePersistentState('wan22i2v_lora_low_strength', 1.0);
 
   const [expanded, setExpanded] = useState<boolean[]>([true, true, true]);
   const toggleExpand = (i: number) => setExpanded(prev => prev.map((v, idx) => idx === i ? !v : v));
@@ -65,6 +70,7 @@ export const Wan22Img2Vid = () => {
   const [history, setHistory] = usePersistentState<string[]>('wan22i2v_history', []);
   void sessionVideos;
   void history;
+  const [availableLoras, setAvailableLoras] = useState<string[]>([]);
 
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const sessionRef    = useRef<string[]>([]);
@@ -72,6 +78,24 @@ export const Wan22Img2Vid = () => {
 
   const { toast } = useToast();
   const { state: execState, lastOutputVideos, outputReadyCount, registerNodeMap } = useComfyExecution();
+
+  useEffect(() => {
+    comfyService.getLoras().then((loras) => {
+      const filtered = loras.filter((l) => {
+        const n = l.replace(/\\/g, '/').toLowerCase();
+        return n.startsWith('wan22/') || n.includes('wan2.2') || n.includes('wan22');
+      });
+      setAvailableLoras(filtered);
+      if (!loraHigh) {
+        const guessHigh = filtered.find((f) => /high/i.test(f));
+        if (guessHigh) setLoraHigh(guessHigh);
+      }
+      if (!loraLow) {
+        const guessLow = filtered.find((f) => /low/i.test(f));
+        if (guessLow) setLoraLow(guessLow);
+      }
+    }).catch(() => {});
+  }, []);
 
   // ── Upload ────────────────────────────────────────────────────────────────
   const handleUpload = async (file: File) => {
@@ -138,6 +162,8 @@ export const Wan22Img2Vid = () => {
             prompt3:     prompt3.trim() || prompt1.trim(),
             seed:        seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
             nsfw,
+            ...(loraHigh ? { lora_high: { on: true, lora: loraHigh, strength: loraStrengthHigh } } : {}),
+            ...(loraLow ? { lora_low: { on: true, lora: loraLow, strength: loraStrengthLow } } : {}),
             client_id:   (comfyService as any).clientId,
           },
         }),
@@ -253,6 +279,30 @@ export const Wan22Img2Vid = () => {
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="h-px bg-white/5" />
+
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">LoRA Loaders</p>
+            <LoraSelector
+              label="High Noise LoRA"
+              value={loraHigh}
+              onChange={setLoraHigh}
+              strength={loraStrengthHigh}
+              onStrengthChange={setLoraStrengthHigh}
+              options={availableLoras}
+              accent="violet"
+            />
+            <LoraSelector
+              label="Low Noise LoRA"
+              value={loraLow}
+              onChange={setLoraLow}
+              strength={loraStrengthLow}
+              onStrengthChange={setLoraStrengthLow}
+              options={availableLoras}
+              accent="violet"
+            />
           </div>
 
           <div className="h-px bg-white/5" />

@@ -43,7 +43,10 @@ interface CatalogItem {
 }
 
 const FAMILY_PACKS: Record<LoRAFamily, PackConfig[]> = {
-    'z-image':    [{ key: 'zimage_turbo', title: 'Z-Image Turbo Celeb Pack', subtitle: 'pmczip/Z-Image-Turbo_Models' }],
+    'z-image':    [
+        { key: 'zimage_turbo', title: 'Z-Image Turbo Celeb Pack', subtitle: 'pmczip/Z-Image-Turbo_Models' },
+        { key: 'zimage_nsfw', title: 'Z-Image NSFW Pack', subtitle: 'qqnyanddld/nsfw-z-image-lora' },
+    ],
     qwen:         [],
     flux2klein:   [
         { key: 'flux2klein', title: 'FLUX2KLEIN Celeb Pack',  subtitle: 'pmczip/FLUX.2-klein-9B_Models' },
@@ -57,7 +60,9 @@ const FAMILY_PACKS: Record<LoRAFamily, PackConfig[]> = {
     sd15_lycoris: [{ key: 'sd15_lycoris', title: 'SD1.5 LyCORIS Pack', subtitle: 'pmczip/SD1.5_LyCORIS_Models' }],
     sdxl:         [{ key: 'sdxl', title: 'SDXL LoRA Pack', subtitle: 'pmczip/SDXL_Models' }],
     ltx:          [],
-    wan:          [],
+    wan:          [
+        { key: 'wan22_nsfw', title: 'WAN 2.2 NSFW Pack', subtitle: 'lkzd7/WAN2.2_LoraSet_NSFW' },
+    ],
     'ace-step':   [],
 };
 
@@ -69,6 +74,7 @@ const FAMILY_LABELS: Record<string, string> = {
     sd15:         'SD1.5',
     sd15_lycoris: 'SD1.5 LyCORIS',
     sdxl:         'SDXL',
+    wan:          'WAN 2.2',
 };
 
 // ─── Character preview card ───────────────────────────────────────────────────

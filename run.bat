@@ -40,7 +40,7 @@ echo   FEDDA LAUNCHER  (%MODE% mode)
 echo ============================================================================
 echo.
 
-echo [1/5] Skipping auto-update (run update.bat manually)
+echo [1/5] Auto-update disabled (updates are distributed manually)
 echo.
 
 :: ============================================================================

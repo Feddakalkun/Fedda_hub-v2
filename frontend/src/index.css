@@ -12,6 +12,22 @@
   --bg-app:     #08080e;
   --bg-main:    #050508;
   --bg-sidebar: #09090f;
+  --studio-left-pane-width: 560px;
+  --studio-results-max-width: 980px;
+}
+
+@media (max-width: 1700px) {
+  :root {
+    --studio-left-pane-width: 500px;
+    --studio-results-max-width: 900px;
+  }
+}
+
+@media (max-width: 1400px) {
+  :root {
+    --studio-left-pane-width: 440px;
+    --studio-results-max-width: 780px;
+  }
 }
 
 /* ──────────────────────────────────────────
@@ -177,3 +193,4 @@ body {
   pointer-events: none;
   z-index: 999;
 }
+

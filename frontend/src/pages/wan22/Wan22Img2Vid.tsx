@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Video, Upload, RefreshCw, Film, Loader2,
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Check, FlameKindling,
+  ChevronDown, ChevronUp, Check, FlameKindling,
 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
@@ -11,6 +11,7 @@ import { comfyService } from '../../services/comfyService';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
 
 const SCENE_COUNT = 3;
+void SCENE_COUNT;
 
 // ── Scene slot ────────────────────────────────────────────────────────────────
 function SceneSlot({ index, url, isActive, isPending }: {
@@ -40,6 +41,7 @@ function SceneSlot({ index, url, isActive, isPending }: {
     </div>
   );
 }
+void SceneSlot;
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export const Wan22Img2Vid = () => {
@@ -61,7 +63,8 @@ export const Wan22Img2Vid = () => {
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
   const [sessionVideos,   setSessionVideos]   = useState<string[]>([]);
   const [history, setHistory] = usePersistentState<string[]>('wan22i2v_history', []);
-  const [galleryOpen, setGalleryOpen] = useState(true);
+  void sessionVideos;
+  void history;
 
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const sessionRef    = useRef<string[]>([]);
@@ -158,7 +161,7 @@ export const Wan22Img2Vid = () => {
     <div className="flex h-full bg-[#080808] overflow-hidden">
 
       {/* ══ LEFT PANEL ══════════════════════════════════════════════════════ */}
-      <div className="w-[380px] shrink-0 flex flex-col border-r border-white/5 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-w-0 flex flex-col border-r border-white/5 overflow-y-auto custom-scrollbar">
         <div className="px-5 py-5 space-y-5">
 
           {/* Header */}
@@ -302,70 +305,7 @@ export const Wan22Img2Vid = () => {
         </div>
       </div>
 
-      {/* ══ SCENE OUTPUT ════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#050505]">
-        <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <Film className="w-3.5 h-3.5 text-violet-400/60" />
-            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/30">Scene Output</span>
-          </div>
-          {isGenerating && (
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-              <span className="text-[9px] font-mono text-violet-400/60">{sessionVideos.length}/{SCENE_COUNT} scenes</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 flex items-center justify-center overflow-hidden p-5">
-          {(isGenerating || sessionVideos.length > 0) ? (
-            <div className="grid grid-cols-2 gap-3 w-full self-start">
-              {Array.from({ length: SCENE_COUNT }).map((_, i) => (
-                <SceneSlot key={i} index={i} url={sessionVideos[i]}
-                  isActive={isGenerating} isPending={isGenerating && !sessionVideos[i]} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 opacity-20">
-              <Film className="w-10 h-10 text-white/20" />
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/25">Upload an image and generate</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ══ COLLAPSIBLE GALLERY ═════════════════════════════════════════════ */}
-      <div className={`flex shrink-0 border-l border-white/5 bg-[#060606] transition-all duration-300 overflow-hidden ${galleryOpen ? 'w-[180px]' : 'w-9'}`}>
-        <div className="w-9 shrink-0 flex flex-col items-center pt-5 gap-3 border-r border-white/5">
-          <button onClick={() => setGalleryOpen(!galleryOpen)}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/30 hover:text-white transition-all">
-            {galleryOpen ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-          </button>
-          {!galleryOpen && history.length > 0 && (
-            <span className="text-[9px] font-black text-white/20 tracking-widest"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-              {history.length}
-            </span>
-          )}
-        </div>
-        {galleryOpen && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar py-4 px-2 space-y-2">
-            {history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 gap-2 opacity-30">
-                <Film className="w-5 h-5 text-white/20" />
-                <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Empty</span>
-              </div>
-            ) : (
-              history.map((url, i) => (
-                <div key={url + i} className="w-full aspect-video rounded-xl overflow-hidden border border-white/5 hover:border-white/20 transition-all bg-black/40">
-                  <video src={url} className="w-full h-full object-cover" muted playsInline />
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
     </div>
   );
 };
+

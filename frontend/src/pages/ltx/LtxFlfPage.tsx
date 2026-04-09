@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Upload, RefreshCw, Loader2, Play, Pause,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Film,
+  Upload, RefreshCw, Loader2, Play,
+  ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
 import { useToast } from '../../components/ui/Toast';
@@ -53,41 +53,6 @@ function FrameSlot({ label, preview, uploading, onFile }: {
   );
 }
 
-// ── Video player ──────────────────────────────────────────────────────────────
-function VideoPlayer({ src }: { src: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(true);
-
-  const toggle = () => {
-    if (!ref.current) return;
-    if (ref.current.paused) { ref.current.play(); setPlaying(true); }
-    else                     { ref.current.pause(); setPlaying(false); }
-  };
-
-  return (
-    <div className="relative w-full h-full group cursor-pointer" onClick={toggle}>
-      <video
-        ref={ref}
-        key={src}
-        src={src}
-        className="w-full h-full object-contain"
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
-      <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${playing ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`}>
-        <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/15 flex items-center justify-center">
-          {playing
-            ? <Pause className="w-4 h-4 text-white/80" />
-            : <Play  className="w-4 h-4 text-white/80 ml-0.5" />
-          }
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export const LtxFlfPage = () => {
   const [prompt,      setPrompt]      = usePersistentState('ltx_flf_prompt', '');
@@ -98,7 +63,6 @@ export const LtxFlfPage = () => {
   const [guideFirst,  setGuideFirst]  = usePersistentState('ltx_flf_gf', 0.7);
   const [guideLast,   setGuideLast]   = usePersistentState('ltx_flf_gl', 0.7);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [galleryOpen, setGalleryOpen] = useState(true);
 
   const [firstPreview,  setFirstPreview]  = useState<string | null>(null);
   const [firstFilename, setFirstFilename] = useState<string | null>(null);
@@ -111,6 +75,8 @@ export const LtxFlfPage = () => {
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
   const [currentVideo,    setCurrentVideo]    = useState<string | null>(null);
   const [history, setHistory] = usePersistentState<string[]>('ltx_flf_history', []);
+  void currentVideo;
+  void history;
 
   const sessionRef   = useRef<string[]>([]);
   const prevCountRef = useRef(0);
@@ -215,7 +181,7 @@ export const LtxFlfPage = () => {
     <div className="flex h-full bg-[#080808] overflow-hidden">
 
       {/* ══ LEFT PANEL ══════════════════════════════════════════════════════ */}
-      <div className="w-[360px] shrink-0 flex flex-col border-r border-white/[0.04] overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-w-0 flex flex-col border-r border-white/[0.04] overflow-y-auto custom-scrollbar">
         <div className="px-5 py-5 space-y-5">
 
           {/* Keyframes */}
@@ -352,84 +318,7 @@ export const LtxFlfPage = () => {
         </div>
       </div>
 
-      {/* ══ CENTER — VIDEO OUTPUT ════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#050505]">
-        <div className="h-10 shrink-0 flex items-center justify-between px-4 border-b border-white/[0.04]">
-          <div className="flex items-center gap-2">
-            <Play className="w-3 h-3 text-white/15" />
-            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-white/20">Output</span>
-          </div>
-          {isGenerating && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-              <span className="text-[8px] font-mono text-violet-400/50">Generating…</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 flex items-center justify-center overflow-hidden">
-          {currentVideo ? (
-            <VideoPlayer src={currentVideo} />
-          ) : isGenerating ? (
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative w-14 h-14">
-                <div className="absolute inset-0 rounded-full border border-violet-500/15 animate-ping" />
-                <div className="absolute inset-2 rounded-full border border-violet-500/25 animate-ping" style={{ animationDelay: '0.4s' }} />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-violet-500/50 animate-spin" />
-                </div>
-              </div>
-              <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/15">LTX is working…</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 opacity-15">
-              <Film className="w-10 h-10 text-white/20" />
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/25">
-                Upload frames and generate
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ══ RIGHT — GALLERY ══════════════════════════════════════════════════ */}
-      <div className={`flex shrink-0 border-l border-white/[0.04] bg-[#060606] transition-all duration-300 overflow-hidden ${galleryOpen ? 'w-[180px]' : 'w-9'}`}>
-        <div className="w-9 shrink-0 flex flex-col items-center pt-4 gap-3 border-r border-white/[0.04]">
-          <button onClick={() => setGalleryOpen(v => !v)}
-            className="w-6 h-6 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] flex items-center justify-center text-white/20 hover:text-white/60 transition-all">
-            {galleryOpen ? <ChevronRight className="w-2.5 h-2.5" /> : <ChevronLeft className="w-2.5 h-2.5" />}
-          </button>
-          {!galleryOpen && history.length > 0 && (
-            <span className="text-[8px] font-black text-white/15 tracking-widest"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-              {history.length}
-            </span>
-          )}
-        </div>
-
-        {galleryOpen && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar py-3 px-2 space-y-2">
-            {history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-28 gap-2 opacity-20">
-                <Film className="w-4 h-4 text-white/20" />
-                <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">Empty</span>
-              </div>
-            ) : (
-              history.map((url, i) => (
-                <button key={url + i} onClick={() => setCurrentVideo(url)}
-                  className={`w-full aspect-video rounded-xl overflow-hidden border-2 transition-all hover:opacity-90 ${
-                    currentVideo === url
-                      ? 'border-violet-500/60 shadow-[0_0_12px_rgba(139,92,246,0.2)]'
-                      : 'border-white/[0.06] hover:border-white/20'
-                  }`}>
-                  <video src={url} className="w-full h-full object-cover" muted playsInline />
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
     </div>
   );
 };
+

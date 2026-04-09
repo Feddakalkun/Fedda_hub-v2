@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, Maximize2, Loader2, RefreshCw,
-  ChevronLeft, ChevronRight, X, Download, Image as ImageIcon,
+  ChevronLeft, X,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
 import { useToast } from '../../components/ui/Toast';
@@ -37,11 +37,11 @@ export const ZImageTxt2Img = () => {
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
   const [currentImage, setCurrentImage]       = useState<string | null>(null);
   const [history, setHistory]                 = useState<string[]>([]);
+  void currentImage;
+  void history;
   const [availableLoras, setAvailableLoras]   = useState<string[]>([]);
   const [loraSearch, setLoraSearch]           = useState('');
   const [showLoraList, setShowLoraList]       = useState(false);
-  const [galleryOpen, setGalleryOpen]         = useState(true);
-  const [zoom, setZoom]                       = useState(false);
   const [negExpanded, setNegExpanded]         = useState(false);
 
   const loraInputRef = useRef<HTMLInputElement>(null);
@@ -66,7 +66,6 @@ export const ZImageTxt2Img = () => {
           const url = `/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder)}&type=${img.type}`;
           setCurrentImage(url);
           setHistory(prev => (prev.includes(url) ? prev : [url, ...prev.slice(0, 29)]));
-          setGalleryOpen(true);
           toast('Complete', 'success');
         }
       } catch { /* silent */ }
@@ -107,14 +106,6 @@ export const ZImageTxt2Img = () => {
     }
   };
 
-  const handleDownload = () => {
-    if (!currentImage) return;
-    const a = document.createElement('a');
-    a.href = currentImage;
-    a.download = `zimage_${Date.now()}.png`;
-    a.click();
-  };
-
   const filteredLoras = availableLoras.filter(l =>
     loraLabel(l).toLowerCase().includes(loraSearch.toLowerCase())
   );
@@ -123,7 +114,7 @@ export const ZImageTxt2Img = () => {
     <div className="flex h-full bg-[#080808] overflow-hidden">
 
       {/* ══════════════ LEFT PANEL ══════════════ */}
-      <div className="w-[360px] shrink-0 flex flex-col border-r border-white/[0.04] overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-w-0 flex flex-col border-r border-white/[0.04] overflow-y-auto custom-scrollbar">
         <div className="px-6 py-6 space-y-6">
 
           {/* Header */}
@@ -293,118 +284,7 @@ export const ZImageTxt2Img = () => {
         </div>
       </div>
 
-      {/* ══════════════ CENTER — IMAGE OUTPUT ══════════════ */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#050505] relative">
-
-        {/* Toolbar */}
-        <div className="h-10 shrink-0 flex items-center justify-between px-4 border-b border-white/[0.04]">
-          <div className="flex items-center gap-2">
-            <ImageIcon className="w-3 h-3 text-white/15" />
-            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-white/20">Output</span>
-          </div>
-          {currentImage && (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setZoom(v => !v)}
-                className="text-[8px] font-black uppercase tracking-widest text-white/20 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
-                {zoom ? 'Fit' : 'Fill'}
-              </button>
-              <button onClick={handleDownload}
-                className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-white/20 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
-                <Download className="w-3 h-3" /> Save
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Image / states */}
-        <div className="flex-1 flex items-center justify-center overflow-hidden p-4">
-
-          {isGenerating && !currentImage && (
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative w-16 h-16">
-                <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
-                <div className="absolute inset-2 rounded-full border border-emerald-500/30 animate-ping" style={{ animationDelay: '0.3s' }} />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-emerald-500/60 animate-spin" />
-                </div>
-              </div>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">
-                Generating…
-              </p>
-            </div>
-          )}
-
-          {!isGenerating && !currentImage && (
-            <div className="flex flex-col items-center gap-3 opacity-20">
-              <Sparkles className="w-10 h-10 text-white/30" />
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30">
-                Run to see output
-              </p>
-            </div>
-          )}
-
-          {currentImage && (
-            <div className="relative max-w-full max-h-full flex items-center justify-center group">
-              <img
-                src={currentImage}
-                alt="Generated"
-                className={`rounded-2xl shadow-2xl transition-all duration-300 ${
-                  zoom
-                    ? 'w-full h-full object-cover'
-                    : 'max-w-full max-h-[calc(100vh-12rem)] object-contain'
-                }`}
-                style={{ boxShadow: '0 0 80px rgba(0,0,0,0.8)' }}
-              />
-              {isGenerating && (
-                <div className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
-                </div>
-              )}
-            </div>
-          )}
-
-        </div>
-      </div>
-
-      {/* ══════════════ RIGHT — GALLERY ══════════════ */}
-      <div className={`flex shrink-0 border-l border-white/[0.04] bg-[#060606] transition-all duration-300 overflow-hidden ${galleryOpen ? 'w-[180px]' : 'w-9'}`}>
-        <div className="w-9 shrink-0 flex flex-col items-center pt-4 gap-3 border-r border-white/[0.04]">
-          <button onClick={() => setGalleryOpen(v => !v)}
-            className="w-6 h-6 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] flex items-center justify-center text-white/20 hover:text-white/60 transition-all">
-            {galleryOpen ? <ChevronRight className="w-2.5 h-2.5" /> : <ChevronLeft className="w-2.5 h-2.5" />}
-          </button>
-          {!galleryOpen && history.length > 0 && (
-            <span className="text-[8px] font-black text-white/15 tracking-widest"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-              {history.length}
-            </span>
-          )}
-        </div>
-
-        {galleryOpen && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar py-3 px-2 space-y-2">
-            {history.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-28 gap-2 opacity-20">
-                <ImageIcon className="w-4 h-4 text-white/20" />
-                <span className="text-[7px] text-white/20 font-black uppercase tracking-widest">Empty</span>
-              </div>
-            ) : (
-              history.map((url, i) => (
-                <button key={url}
-                  onClick={() => setCurrentImage(url)}
-                  className={`w-full aspect-square rounded-xl overflow-hidden border-2 transition-all hover:opacity-90 ${
-                    currentImage === url
-                      ? 'border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                      : 'border-white/[0.06] hover:border-white/20'
-                  }`}>
-                  <img src={url} alt={`${i + 1}`} className="w-full h-full object-cover" />
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
     </div>
   );
 };
+

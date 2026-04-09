@@ -667,6 +667,7 @@ async def refresh_models():
 # Ollama — Prompt Assistant & Image Captioning
 # ─────────────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434"
+OLLAMA_RECOMMENDED_TEXT_MODEL = os.environ.get("OLLAMA_RECOMMENDED_TEXT_MODEL", "llama3.2")
 
 OLLAMA_SYSTEM_PROMPTS: Dict[str, str] = {
     "zimage": (
@@ -836,22 +837,74 @@ async def get_ollama_all_models():
     try:
         resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
         if not resp.ok:
-            return {"success": False, "models": [], "text_model": None, "vision_model": None}
+            return {
+                "success": False,
+                "ollama_online": False,
+                "models": [],
+                "text_model": None,
+                "vision_model": None,
+                "recommended_text_model": OLLAMA_RECOMMENDED_TEXT_MODEL,
+            }
         models = [m["name"] for m in resp.json().get("models", [])]
         return {
             "success": True,
+            "ollama_online": True,
             "models": models,
             "text_model": _get_ollama_text_model(),
             "vision_model": _get_ollama_vision_model(),
+            "recommended_text_model": OLLAMA_RECOMMENDED_TEXT_MODEL,
         }
-    except Exception:
-        return {"success": False, "models": [], "text_model": None, "vision_model": None}
+    except Exception as exc:
+        return {
+            "success": False,
+            "ollama_online": False,
+            "models": [],
+            "text_model": None,
+            "vision_model": None,
+            "recommended_text_model": OLLAMA_RECOMMENDED_TEXT_MODEL,
+            "error": str(exc),
+        }
 
 
 class OllamaPromptRequest(BaseModel):
     context: str = "zimage"
     mode: str = "enhance"       # "enhance" | "inspire"
     current_prompt: str = ""
+
+
+class OllamaPullRequest(BaseModel):
+    name: str = OLLAMA_RECOMMENDED_TEXT_MODEL
+
+
+@app.post("/api/ollama/pull")
+async def ollama_pull_model(req: OllamaPullRequest):
+    model_name = (req.name or "").strip() or OLLAMA_RECOMMENDED_TEXT_MODEL
+    payload = {"name": model_name, "stream": True}
+
+    def generate():
+        try:
+            with requests.post(
+                f"{OLLAMA_URL}/api/pull",
+                json=payload,
+                stream=True,
+                timeout=1800,
+            ) as resp:
+                if not resp.ok:
+                    detail = (resp.text or "").strip() or f"Ollama pull failed ({resp.status_code})"
+                    yield json.dumps({"status": "error", "error": detail}) + "\n"
+                    return
+                for line in resp.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+                    yield f"{line}\n"
+        except Exception as exc:
+            yield json.dumps({"status": "error", "error": str(exc)}) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/ollama/prompt")

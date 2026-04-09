@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Bot, MessageSquare, Mic, RotateCcw, Send, Volume2, VolumeX } from 'lucide-react';
+import { Bot, Download, MessageSquare, Mic, RefreshCw, RotateCcw, Send, Volume2, VolumeX } from 'lucide-react';
 import { BACKEND_API } from '../config/api';
 
 type ChatRole = 'user' | 'assistant';
@@ -15,6 +15,7 @@ const AUTO_SPEAK_KEY = 'fedda_agent_auto_speak_v1';
 const VOICE_KEY = 'fedda_agent_voice_v1';
 const FALLBACK_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
 const DEFAULT_MEMORY_REFRESH_TURNS = 2;
+const DEFAULT_RECOMMENDED_TEXT_MODEL = 'llama3.2';
 
 function getSessionId(): string {
   try {
@@ -67,10 +68,16 @@ export const AgentChatPage = () => {
   const [isSending, setIsSending] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRefreshingMemory, setIsRefreshingMemory] = useState(false);
+  const [isPullingModel, setIsPullingModel] = useState(false);
   const [localReady, setLocalReady] = useState(false);
+  const [ollamaOnline, setOllamaOnline] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
   const [memoryRefreshEveryTurns, setMemoryRefreshEveryTurns] = useState(DEFAULT_MEMORY_REFRESH_TURNS);
   const [availableVoices, setAvailableVoices] = useState<string[]>(FALLBACK_VOICES);
+  const [recommendedTextModel, setRecommendedTextModel] = useState(DEFAULT_RECOMMENDED_TEXT_MODEL);
+  const [pullStatus, setPullStatus] = useState('');
+  const [pullPercent, setPullPercent] = useState<number | null>(null);
+  const [pullError, setPullError] = useState('');
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUTO_SPEAK_KEY) === '1';
@@ -102,13 +109,7 @@ export const AgentChatPage = () => {
 
   useEffect(() => {
     const init = async () => {
-      try {
-        const localRes = await fetch(`${BACKEND_API.BASE_URL}/api/ollama/models`);
-        const localData = await localRes.json();
-        setLocalReady(Boolean(localData?.success && localData?.text_model));
-      } catch {
-        setLocalReady(false);
-      }
+      await refreshLocalModelState();
 
       try {
         const voiceRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/voices`);
@@ -157,6 +158,89 @@ export const AgentChatPage = () => {
     };
     void init();
   }, [sessionId]);
+
+  const refreshLocalModelState = async () => {
+    try {
+      const localRes = await fetch(`${BACKEND_API.BASE_URL}/api/ollama/models`);
+      const localData = await localRes.json();
+      setLocalReady(Boolean(localData?.success && localData?.text_model));
+      setOllamaOnline(Boolean(localData?.ollama_online ?? localData?.success));
+      setRecommendedTextModel(String(localData?.recommended_text_model ?? DEFAULT_RECOMMENDED_TEXT_MODEL));
+    } catch {
+      setLocalReady(false);
+      setOllamaOnline(false);
+    }
+  };
+
+  const installRecommendedModel = async () => {
+    if (isPullingModel) return;
+    setIsPullingModel(true);
+    setPullError('');
+    setPullStatus(`Starting download: ${recommendedTextModel}`);
+    setPullPercent(null);
+
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}/api/ollama/pull`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: recommendedTextModel }),
+      });
+
+      if (!res.ok || !res.body) {
+        const text = await res.text();
+        throw new Error(text || 'Model download failed');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let sawError = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
+          try {
+            const data = JSON.parse(line) as {
+              status?: string;
+              completed?: number;
+              total?: number;
+              error?: string;
+            };
+            if (data.error) {
+              sawError = true;
+              setPullError(String(data.error));
+              continue;
+            }
+            if (data.status) {
+              setPullStatus(String(data.status));
+            }
+            if (typeof data.completed === 'number' && typeof data.total === 'number' && data.total > 0) {
+              const pct = Math.max(0, Math.min(100, Math.round((data.completed / data.total) * 100)));
+              setPullPercent(pct);
+            }
+          } catch {
+            // Ignore malformed stream lines.
+          }
+        }
+      }
+
+      if (!sawError) {
+        setPullStatus('Download completed. Checking model availability...');
+      }
+      await refreshLocalModelState();
+    } catch (error) {
+      setPullError(error instanceof Error ? error.message : 'Model download failed');
+    } finally {
+      setIsPullingModel(false);
+    }
+  };
 
   const sendMessage = async (evt?: FormEvent) => {
     evt?.preventDefault();
@@ -286,9 +370,13 @@ export const AgentChatPage = () => {
           <MessageSquare className="w-4 h-4 text-cyan-300" />
           <span className="font-semibold tracking-[0.12em] uppercase">Agent Chat</span>
           <span className={`px-2 py-0.5 rounded-full border text-[10px] ${
-            localReady ? 'border-emerald-400/40 text-emerald-300' : 'border-amber-400/40 text-amber-300'
+            localReady
+              ? 'border-emerald-400/40 text-emerald-300'
+              : ollamaOnline
+                ? 'border-amber-400/40 text-amber-300'
+                : 'border-red-400/40 text-red-300'
           }`}>
-            {localReady ? 'Local Ready' : 'Local Model Missing'}
+            {localReady ? 'Local Ready' : (ollamaOnline ? 'No Text Model' : 'Ollama Offline')}
           </span>
         </div>
 
@@ -320,6 +408,43 @@ export const AgentChatPage = () => {
 
       <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4">
         <section className="min-h-0 flex flex-col rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
+          {!localReady && (
+            <div className="border-b border-amber-300/20 bg-amber-500/5 p-3 text-xs text-amber-100 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  {ollamaOnline
+                    ? `No local text model installed. Recommended: ${recommendedTextModel}`
+                    : 'Ollama appears offline. Start Ollama first, then install a text model.'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void refreshLocalModelState()}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/15 text-slate-200 bg-white/[0.03]"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Recheck
+                </button>
+                {ollamaOnline && (
+                  <button
+                    onClick={() => void installRecommendedModel()}
+                    disabled={isPullingModel}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-cyan-400/40 text-cyan-200 bg-cyan-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isPullingModel ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                    {isPullingModel ? 'Installing...' : `Install ${recommendedTextModel}`}
+                  </button>
+                )}
+              </div>
+              {(isPullingModel || pullStatus) && (
+                <div className="text-[11px] text-slate-300">
+                  {pullStatus}{typeof pullPercent === 'number' ? ` (${pullPercent}%)` : ''}
+                </div>
+              )}
+              {pullError && <div className="text-[11px] text-red-300">{pullError}</div>}
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center gap-3 text-center text-slate-500">

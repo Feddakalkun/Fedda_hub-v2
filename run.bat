@@ -211,6 +211,12 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8000"') do (taskkill
 timeout /t 1 /nobreak >nul
 
 cd /d "%BACKEND_DIR%"
+echo [%date% %time%] Checking backend Python dependencies...
+"%PYTHON%" -c "import uvicorn, fastapi, requests, pydantic" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [%date% %time%] Installing missing backend dependencies...
+    "%PYTHON%" -m pip install uvicorn fastapi requests python-multipart pydantic
+)
 echo [%date% %time%] Starting Backend...
 "%PYTHON%" -u server.py
 

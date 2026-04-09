@@ -1,0 +1,22 @@
+{
+  "38": {
+    "inputs": {
+      "UNKNOWN": "[false,true]"
+    },
+    "_meta": {}
+  },
+  "42": {
+    "inputs": {
+      "filename_prefix": "AUDIO/QWEN3-TTS/0",
+      "audioUI": "",
+      "audio": [
+        "38",
+        0
+      ]
+    },
+    "class_type": "SaveAudio",
+    "_meta": {
+      "title": "Save Audio (FLAC)"
+    }
+  }
+}

@@ -216,6 +216,60 @@
     "note": "InstantID nodes for identity-preserving generation"
   },
   {
+    "name": "ComfyUI-qwenmultiangle",
+    "url": "https://github.com/jtydhr88/ComfyUI-qwenmultiangle.git",
+    "folder": "ComfyUI-qwenmultiangle",
+    "note": "Qwen multi-angle nodes for character angle consistency workflows"
+  },
+  {
+    "name": "ComfyUI-Qwen-TTS",
+    "url": "https://github.com/flybirdxx/ComfyUI-Qwen-TTS.git",
+    "folder": "ComfyUI-Qwen-TTS",
+    "note": "Qwen TTS nodes for local text-to-speech and voice design"
+  },
+  {
+    "name": "VibeVoice-ComfyUI",
+    "url": "https://github.com/Enemyx-net/VibeVoice-ComfyUI.git",
+    "folder": "VibeVoice-ComfyUI",
+    "note": "VibeVoice nodes for natural single/multi-speaker speech generation"
+  },
+  {
+    "name": "ComfyUI_Comfyroll_CustomNodes",
+    "url": "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes.git",
+    "folder": "ComfyUI_Comfyroll_CustomNodes",
+    "note": "Comfyroll utility nodes used by several audio and control workflows"
+  },
+  {
+    "name": "audio-separation-nodes-comfyui",
+    "url": "https://github.com/christian-byrne/audio-separation-nodes-comfyui.git",
+    "folder": "audio-separation-nodes-comfyui",
+    "note": "Audio crop and separation nodes used in transcription and voice workflows"
+  },
+  {
+    "name": "ComfyUI-F5-TTS",
+    "url": "https://github.com/niknah/ComfyUI-F5-TTS.git",
+    "folder": "ComfyUI-F5-TTS",
+    "note": "F5-TTS local voice synthesis and cloning nodes"
+  },
+  {
+    "name": "ComfyUI-Whisper",
+    "url": "https://github.com/yuvraj108c/ComfyUI-Whisper.git",
+    "folder": "ComfyUI-Whisper",
+    "note": "Whisper transcription nodes for mic/audio to text"
+  },
+  {
+    "name": "ComfyUI-Chatterbox",
+    "url": "https://github.com/wildminder/ComfyUI-Chatterbox.git",
+    "folder": "ComfyUI-Chatterbox",
+    "note": "Chatterbox TTS nodes for expressive local voice generation"
+  },
+  {
+    "name": "ComfyUI-Index-TTS",
+    "url": "https://github.com/chenpipi0807/ComfyUI-Index-TTS.git",
+    "folder": "ComfyUI-Index-TTS",
+    "note": "Index-TTS nodes for high-quality voice cloning and emotional control"
+  },
+  {
     "name": "ComfyUI-FishAudioS2",
     "url": "https://github.com/Saganaki22/ComfyUI-FishAudioS2.git",
     "folder": "ComfyUI-FishAudioS2",

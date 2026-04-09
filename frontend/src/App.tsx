@@ -20,7 +20,7 @@ import {
 
 // ─── Tab registry ──────────────────────────────────────────────────────────
 const VALID_TABS = new Set([
-  'chat', 'image', 'z-image', 'flux', 'qwen', 'image-other',
+  'chat', 'image', 'z-image', 'z-image-txt2img', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'image-other',
   'video', 'wan22-vid2vid', 'wan22-img2vid',
   'ltx', 'ltx-flf', 'ltx-img-audio',
   'audio', 'gallery', 'videos', 'library', 'workflows',
@@ -30,9 +30,13 @@ const VALID_TABS = new Set([
 const PAGE_META: Record<string, { label: string; description: string; Icon: any }> = {
   chat:        { label: 'Agent Chat',    description: 'Your AI assistant and creative collaborator.',         Icon: MessageSquare   },
   image:       { label: 'Image Studio',  description: 'Generate and edit images with advanced AI models.',    Icon: Sparkles        },
-  'z-image':   { label: 'Z-Image (Txt2Img)', description: 'Premium text to image generation using z-image workflow.', Icon: Sparkles },
-  flux:        { label: 'Flux Studio',   description: 'Flux based operations and tools.', Icon: Sparkles },
-  qwen:        { label: 'Qwen Studio',   description: 'Qwen based structural operations.', Icon: Sparkles },
+  'z-image':   { label: 'Z-Image', description: 'Z-Image workflow family.', Icon: Sparkles },
+  'z-image-txt2img': { label: 'Z-Image (Txt2Img)', description: 'Premium text to image generation using z-image workflow.', Icon: Sparkles },
+  flux:        { label: 'FLUX2-KLEIN Studio',   description: 'FLUX2-KLEIN workflow family.', Icon: Sparkles },
+  'flux-txt2img': { label: 'FLUX2-KLEIN (Txt2Img)', description: 'Txt2Img workspace for FLUX2-KLEIN.', Icon: Sparkles },
+  qwen:        { label: 'Qwen Studio',   description: 'Qwen workflow family.', Icon: Sparkles },
+  'qwen-txt2img': { label: 'Qwen (Txt2Img)', description: 'Txt2Img workspace for Qwen.', Icon: Sparkles },
+  'qwen-image-ref': { label: 'Qwen (Image Reference)', description: 'Generate from a reference image to keep character identity.', Icon: Sparkles },
   'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
   video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
   'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
@@ -64,6 +68,7 @@ import { ImageStudioPage } from './pages/ImageStudioPage';
 import { VideoStudioPage } from './pages/VideoStudioPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AgentChatPage } from './pages/AgentChatPage';
 
 // ─── App ───────────────────────────────────────────────────────────────────
 function FeddaApp() {
@@ -86,10 +91,16 @@ function FeddaApp() {
   // Route determining component
   const renderPage = () => {
     switch (activeTab) {
+      case 'chat':
+        return <AgentChatPage />;
       case 'image':
       case 'z-image':
+      case 'z-image-txt2img':
       case 'flux':
+      case 'flux-txt2img':
       case 'qwen':
+      case 'qwen-txt2img':
+      case 'qwen-image-ref':
       case 'image-other':
         return <ImageStudioPage activeTab={activeTab} />;
       case 'video':

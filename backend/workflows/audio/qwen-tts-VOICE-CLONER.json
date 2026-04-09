@@ -1,0 +1,36 @@
+{
+  "44": {
+    "inputs": {
+      "UNKNOWN": "[false,true]",
+      "ref_audio": [
+        "46",
+        0
+      ]
+    },
+    "_meta": {}
+  },
+  "45": {
+    "inputs": {
+      "filename_prefix": "AUDIO/QWEN3-TTS/0",
+      "audioUI": "",
+      "audio": [
+        "44",
+        0
+      ]
+    },
+    "class_type": "SaveAudio",
+    "_meta": {
+      "title": "Save Audio (FLAC)"
+    }
+  },
+  "46": {
+    "inputs": {
+      "audio": "AUDIO WOMAN.MP3",
+      "audioUI": "/api/view?filename=AUDIO%20WOMAN.MP3&type=input&subfolder=&rand=0.06559156348781625"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "18": {
+    "inputs": {
+      "audio": "charlotte.wav",
+      "audioUI": "/api/view?filename=charlotte.wav&type=input&subfolder=&rand=0.6032019661167383"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "21": {
+    "inputs": {
+      "filename_prefix": "AUDIO/VIBEVOICE/0",
+      "audioUI": "",
+      "audio": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "SaveAudio",
+    "_meta": {
+      "title": "Save Audio (FLAC)"
+    }
+  },
+  "26": {
+    "inputs": {
+      "UNKNOWN": "[false,true]",
+      "voice_to_clone": [
+        "18",
+        0
+      ]
+    },
+    "_meta": {}
+  }
+}

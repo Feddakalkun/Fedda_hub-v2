@@ -1,4 +1,5 @@
-// Sidebar Navigation Component — clean flat layout, no submenus
+// Sidebar Navigation Component — expandable multi-level menu
+import { useEffect, useMemo, useState } from 'react';
 import {
   Video,
   Music,
@@ -10,6 +11,8 @@ import {
   Film,
   Wand2,
   LayoutDashboard,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
 import { APP_CONFIG } from '../../config/api';
@@ -23,7 +26,13 @@ interface NavItem {
   id: string;
   label: string;
   icon: LucideIcon;
-  subitems?: { id: string; label: string }[];
+  subitems?: NavNode[];
+}
+
+interface NavNode {
+  id: string;
+  label: string;
+  subitems?: NavNode[];
 }
 
 interface NavSection {
@@ -41,9 +50,28 @@ const SECTIONS: NavSection[] = [
         label: 'Image Studio', 
         icon: Sparkles,
         subitems: [
-          { id: 'z-image', label: 'Z-Image' },
-          { id: 'flux', label: 'Flux' },
-          { id: 'qwen', label: 'Qwen' },
+          {
+            id: 'z-image',
+            label: 'Z-Image',
+            subitems: [
+              { id: 'z-image-txt2img', label: 'Txt2Img' },
+            ],
+          },
+          {
+            id: 'flux',
+            label: 'FLUX2-KLEIN',
+            subitems: [
+              { id: 'flux-txt2img', label: 'Txt2Img' },
+            ],
+          },
+          {
+            id: 'qwen',
+            label: 'Qwen',
+            subitems: [
+              { id: 'qwen-txt2img', label: 'Txt2Img' },
+              { id: 'qwen-image-ref', label: 'Image Reference' },
+            ],
+          },
           { id: 'image-other', label: 'Other' }
         ]
       },
@@ -79,7 +107,144 @@ const SECTIONS: NavSection[] = [
   },
 ];
 
+const SIDEBAR_EXPAND_KEY = 'fedda_sidebar_expand_v1';
+
+function collectExpandableIds(items: NavItem[]): string[] {
+  const ids: string[] = [];
+  const walk = (nodes: NavNode[]) => {
+    nodes.forEach((node) => {
+      if (node.subitems && node.subitems.length > 0) {
+        ids.push(node.id);
+        walk(node.subitems);
+      }
+    });
+  };
+  items.forEach((item) => {
+    if (item.subitems && item.subitems.length > 0) {
+      ids.push(item.id);
+      walk(item.subitems);
+    }
+  });
+  return ids;
+}
+
+function hasActiveInTree(node: NavNode, activeTab: string): boolean {
+  if (node.id === activeTab) return true;
+  return !!node.subitems?.some((child) => hasActiveInTree(child, activeTab));
+}
+
+function firstLeafId(node: NavNode): string {
+  if (!node.subitems || node.subitems.length === 0) return node.id;
+  return firstLeafId(node.subitems[0]);
+}
+
+function firstLeafFromItem(item: NavItem): string {
+  if (!item.subitems || item.subitems.length === 0) return item.id;
+  return firstLeafId(item.subitems[0]);
+}
+
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
+  const expandableIds = useMemo(() => collectExpandableIds(SECTIONS.flatMap((s) => s.items)), []);
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_EXPAND_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { image: true, video: true, 'z-image': true };
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_EXPAND_KEY, JSON.stringify(expanded));
+    } catch {}
+  }, [expanded]);
+
+  useEffect(() => {
+    const next = { ...expanded };
+    let changed = false;
+    SECTIONS.forEach((section) => {
+      section.items.forEach((item) => {
+        const isActive = item.id === activeTab || item.subitems?.some((node) => hasActiveInTree(node, activeTab));
+        if (isActive && item.subitems && !next[item.id]) {
+          next[item.id] = true;
+          changed = true;
+        }
+        item.subitems?.forEach((node) => {
+          const nodeActive = hasActiveInTree(node, activeTab);
+          if (nodeActive && node.subitems && !next[node.id]) {
+            next[node.id] = true;
+            changed = true;
+          }
+        });
+      });
+    });
+    if (changed) setExpanded(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const toggleExpanded = (id: string) => {
+    if (!expandableIds.includes(id)) return;
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleParentClick = (item: NavItem) => {
+    if (!item.subitems || item.subitems.length === 0) {
+      onTabChange(item.id);
+      return;
+    }
+    const currentlyOpen = !!expanded[item.id];
+    toggleExpanded(item.id);
+    if (!currentlyOpen) {
+      const subtreeHasActive = item.subitems.some((node) => hasActiveInTree(node, activeTab));
+      if (!subtreeHasActive) onTabChange(firstLeafFromItem(item));
+    }
+  };
+
+  const renderNode = (node: NavNode, level: 1 | 2) => {
+    const hasChildren = !!(node.subitems && node.subitems.length > 0);
+    const isOpen = !!expanded[node.id];
+    const isActive = hasActiveInTree(node, activeTab);
+    const isExact = activeTab === node.id;
+
+    return (
+      <div key={node.id} className="space-y-0.5">
+        <button
+          onClick={() => {
+            if (!hasChildren) {
+              onTabChange(node.id);
+              return;
+            }
+            const currentlyOpen = !!expanded[node.id];
+            toggleExpanded(node.id);
+            if (!currentlyOpen) {
+              const subtreeHasActive = node.subitems!.some((child) => hasActiveInTree(child, activeTab));
+              if (!subtreeHasActive) onTabChange(firstLeafId(node));
+            }
+          }}
+          className={`w-full flex items-center justify-between rounded-lg px-3 py-1.5 text-left transition-colors ${
+            isExact
+              ? 'bg-white/10 text-white shadow-sm'
+              : isActive
+                ? 'bg-white/[0.04] text-slate-100'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          } ${level === 1 ? 'text-[13px] font-medium' : 'text-[12px] font-medium'}`}
+        >
+          <span className="truncate">{node.label}</span>
+          {hasChildren && (
+            isOpen ? <ChevronDown className="h-3 w-3 text-white/35" /> : <ChevronRight className="h-3 w-3 text-white/25" />
+          )}
+        </button>
+
+        {hasChildren && isOpen && (
+          <div className={`${level === 1 ? 'ml-3 pl-2.5 border-l border-white/5' : 'ml-2 pl-2 border-l border-white/5'} space-y-0.5`}>
+            {node.subitems!.map((child) => renderNode(child, 2))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <aside className="w-64 theme-bg-sidebar border-r border-white/5 flex flex-col shadow-2xl z-10 relative">
       {/* Top accent line */}
@@ -115,7 +280,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                   <div key={item.id} className="space-y-0.5">
                     <button
                       id={`nav-${item.id}`}
-                      onClick={() => onTabChange(item.subitems ? item.subitems[0].id : item.id)} // Default to first subitem if parent clicked
+                      onClick={() => handleParentClick(item)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                         isExactActive || (isActive && !item.subitems)
                           ? 'theme-active-tab shadow-md'
@@ -130,27 +295,21 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                         }`}
                       />
                       <span className="tracking-tight">{item.label}</span>
+                      {item.subitems && (
+                        <span className="ml-auto">
+                          {expanded[item.id] ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-white/40" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-white/30" />
+                          )}
+                        </span>
+                      )}
                     </button>
                     
                     {/* Subitems */}
-                    {item.subitems && isActive && (
+                    {item.subitems && expanded[item.id] && (
                       <div className="pl-11 pr-3 py-1 space-y-0.5 border-l-2 border-white/5 ml-5 mt-1 mb-2">
-                        {item.subitems.map(subitem => {
-                          const isSubActive = activeTab === subitem.id;
-                          return (
-                            <button
-                              key={subitem.id}
-                              onClick={() => onTabChange(subitem.id)}
-                              className={`w-full text-left px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                                isSubActive
-                                  ? 'bg-white/10 text-white shadow-sm'
-                                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                              }`}
-                            >
-                              {subitem.label}
-                            </button>
-                          );
-                        })}
+                        {item.subitems.map(subitem => renderNode(subitem, 1))}
                       </div>
                     )}
                   </div>

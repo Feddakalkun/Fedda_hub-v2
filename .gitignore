@@ -102,3 +102,9 @@ comfyfront.code-workspace
 # Prompt harvester (scans private local script folders, not for public repo)
 harvest_log.txt
 backend/prompt_harvester.py
+
+# Local runtime state
+cache/
+.gitconfig
+config/agent_chat_store.json
+config/agent_memory.db

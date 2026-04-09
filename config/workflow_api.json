@@ -59,6 +59,126 @@
       }
     }
   },
+  "qwen-edit-2512": {
+    "name": "Qwen Edit 2512 (Txt2Img)",
+    "filename": "qwen/qwen-edit-2512.json",
+    "description": "Qwen Image Edit 2512 txt2img pipeline with multi-LoRA injection.",
+    "inputs": {
+      "prompt": {
+        "node_id": "13",
+        "input_key": "string",
+        "type": "string",
+        "label": "Positive Prompt"
+      },
+      "negative": {
+        "node_id": "6",
+        "input_key": "prompt",
+        "type": "string",
+        "label": "Negative Prompt"
+      },
+      "width": {
+        "node_id": "14",
+        "input_key": "width",
+        "type": "number",
+        "label": "Width"
+      },
+      "height": {
+        "node_id": "14",
+        "input_key": "height",
+        "type": "number",
+        "label": "Height"
+      },
+      "seed": {
+        "node_id": "4",
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
+      },
+      "steps": {
+        "node_id": "4",
+        "input_key": "steps",
+        "type": "number",
+        "label": "Steps"
+      },
+      "cfg": {
+        "node_id": "4",
+        "input_key": "cfg",
+        "type": "number",
+        "label": "CFG Scale"
+      },
+      "denoise": {
+        "node_id": "4",
+        "input_key": "denoise",
+        "type": "number",
+        "label": "Denoise"
+      },
+      "loras": {
+        "node_id": "2",
+        "type": "loras",
+        "label": "LoRAs"
+      }
+    }
+  },
+  "qwen-edit-2509-image-reference": {
+    "name": "Qwen Edit 2509 (Image Reference)",
+    "filename": "qwen/qwen-edit-2509-image-reference.json",
+    "description": "Qwen image-reference generation using uploaded character image and multi-LoRA chain.",
+    "inputs": {
+      "image": {
+        "node_id": "16",
+        "input_key": "image",
+        "type": "string",
+        "label": "Reference Image"
+      },
+      "prompt": {
+        "node_id": "22",
+        "input_key": "string",
+        "type": "string",
+        "label": "Positive Prompt"
+      },
+      "width": {
+        "node_id": "17",
+        "input_key": "width",
+        "type": "number",
+        "label": "Width"
+      },
+      "height": {
+        "node_id": "17",
+        "input_key": "height",
+        "type": "number",
+        "label": "Height"
+      },
+      "seed": {
+        "node_id": "24",
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
+      },
+      "steps": {
+        "node_id": "24",
+        "input_key": "steps",
+        "type": "number",
+        "label": "Steps"
+      },
+      "cfg": {
+        "node_id": "24",
+        "input_key": "cfg",
+        "type": "number",
+        "label": "CFG Scale"
+      },
+      "denoise": {
+        "node_id": "24",
+        "input_key": "denoise",
+        "type": "number",
+        "label": "Denoise"
+      },
+      "loras": {
+        "node_id": "23",
+        "type": "loras",
+        "label": "LoRAs"
+      }
+    }
+  },
   "wan22-vid2vid": {
     "name": "WAN 2.2 Vid2Vid",
     "filename": "wan22/vid2vid-4frames-wan22.json",
@@ -112,17 +232,65 @@
         "type": "number",
         "label": "Seed"
       },
-      "slow_motion_1": { "node_id": "18",  "input_key": "save_output", "type": "boolean" },
-      "slow_motion_2": { "node_id": "47",  "input_key": "save_output", "type": "boolean" },
-      "slow_motion_3": { "node_id": "82",  "input_key": "save_output", "type": "boolean" },
-      "slow_motion_4": { "node_id": "111", "input_key": "save_output", "type": "boolean" },
-      "slow_motion_5": { "node_id": "152", "input_key": "save_output", "type": "boolean" },
-      "aspect_ratio":  { "node_id": "157", "input_key": "aspect_ratio", "type": "string", "label": "Aspect Ratio" },
-      "direction":     { "node_id": "157", "input_key": "direction",    "type": "string", "label": "Direction" },
-      "crop_method":   { "node_id": "157", "input_key": "crop_method",  "type": "string", "label": "Crop Method" },
-      "lora_high":     { "node_id": "9",   "input_key": "lora_1",       "type": "object", "label": "High Noise LoRA" },
-      "lora_low":      { "node_id": "10",  "input_key": "lora_1",       "type": "object", "label": "Low Noise LoRA" },
-      "nsfw":          { "type": "nsfw_toggle", "label": "NSFW" }
+      "slow_motion_1": {
+        "node_id": "18",
+        "input_key": "save_output",
+        "type": "boolean"
+      },
+      "slow_motion_2": {
+        "node_id": "47",
+        "input_key": "save_output",
+        "type": "boolean"
+      },
+      "slow_motion_3": {
+        "node_id": "82",
+        "input_key": "save_output",
+        "type": "boolean"
+      },
+      "slow_motion_4": {
+        "node_id": "111",
+        "input_key": "save_output",
+        "type": "boolean"
+      },
+      "slow_motion_5": {
+        "node_id": "152",
+        "input_key": "save_output",
+        "type": "boolean"
+      },
+      "aspect_ratio": {
+        "node_id": "157",
+        "input_key": "aspect_ratio",
+        "type": "string",
+        "label": "Aspect Ratio"
+      },
+      "direction": {
+        "node_id": "157",
+        "input_key": "direction",
+        "type": "string",
+        "label": "Direction"
+      },
+      "crop_method": {
+        "node_id": "157",
+        "input_key": "crop_method",
+        "type": "string",
+        "label": "Crop Method"
+      },
+      "lora_high": {
+        "node_id": "9",
+        "input_key": "lora_1",
+        "type": "object",
+        "label": "High Noise LoRA"
+      },
+      "lora_low": {
+        "node_id": "10",
+        "input_key": "lora_1",
+        "type": "object",
+        "label": "Low Noise LoRA"
+      },
+      "nsfw": {
+        "type": "nsfw_toggle",
+        "label": "NSFW"
+      }
     }
   },
   "wan22-img2vid": {
@@ -178,7 +346,10 @@
         "type": "object",
         "label": "Low Noise LoRA"
       },
-      "nsfw": { "type": "nsfw_toggle", "label": "NSFW" }
+      "nsfw": {
+        "type": "nsfw_toggle",
+        "label": "NSFW"
+      }
     }
   },
   "ltx-flf": {
@@ -186,16 +357,66 @@
     "filename": "ltx/LTX-23-flf.json",
     "description": "Generate video from first and last frame images using LTX Video 2.3",
     "inputs": {
-      "image_first":          { "node_id": "5613", "input_key": "image",        "type": "string", "label": "First Frame" },
-      "image_last":           { "node_id": "5614", "input_key": "image",        "type": "string", "label": "Last Frame"  },
-      "prompt":               { "node_id": "5644", "input_key": "text",         "type": "string", "label": "Prompt"      },
-      "aspect_ratio":         { "node_id": "5645", "input_key": "aspect_ratio", "type": "string", "label": "Aspect Ratio" },
-      "direction":            { "node_id": "5645", "input_key": "direction",    "type": "string", "label": "Direction"   },
-      "length_seconds":       { "node_id": "5646", "input_key": "value",        "type": "number", "label": "Length (s)"  },
-      "seed":                 { "node_id": "5650", "input_key": "noise_seed",   "type": "number", "label": "Seed"        },
-      "guide_strength_first": { "node_id": "5630", "input_key": "strength",     "type": "number", "label": "First Frame Strength" },
-      "guide_strength_last":  { "node_id": "5634", "input_key": "strength",     "type": "number", "label": "Last Frame Strength"  },
-      "lora_slot2":           { "node_id": "5618", "input_key": "lora_2",       "type": "object", "label": "LoRA (Slot 2)" }
+      "image_first": {
+        "node_id": "5613",
+        "input_key": "image",
+        "type": "string",
+        "label": "First Frame"
+      },
+      "image_last": {
+        "node_id": "5614",
+        "input_key": "image",
+        "type": "string",
+        "label": "Last Frame"
+      },
+      "prompt": {
+        "node_id": "5644",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt"
+      },
+      "aspect_ratio": {
+        "node_id": "5645",
+        "input_key": "aspect_ratio",
+        "type": "string",
+        "label": "Aspect Ratio"
+      },
+      "direction": {
+        "node_id": "5645",
+        "input_key": "direction",
+        "type": "string",
+        "label": "Direction"
+      },
+      "length_seconds": {
+        "node_id": "5646",
+        "input_key": "value",
+        "type": "number",
+        "label": "Length (s)"
+      },
+      "seed": {
+        "node_id": "5650",
+        "input_key": "noise_seed",
+        "type": "number",
+        "label": "Seed"
+      },
+      "guide_strength_first": {
+        "node_id": "5630",
+        "input_key": "strength",
+        "type": "number",
+        "label": "First Frame Strength"
+      },
+      "guide_strength_last": {
+        "node_id": "5634",
+        "input_key": "strength",
+        "type": "number",
+        "label": "Last Frame Strength"
+      },
+      "lora_slot2": {
+        "node_id": "5618",
+        "input_key": "lora_2",
+        "type": "object",
+        "label": "LoRA (Slot 2)"
+      }
     }
   },
   "ltx-img-audio": {
@@ -203,16 +424,73 @@
     "filename": "ltx/LTX-23-imgaudio2video.json",
     "description": "Generate lipsync video from a reference image and audio file using LTX Video 2.3",
     "inputs": {
-      "image":          { "node_id": "5310", "input_key": "image",              "type": "string", "label": "Reference Image" },
-      "audio":          { "node_id": "5299", "input_key": "audio",              "type": "string", "label": "Audio File"      },
-      "audio_start":    { "node_id": "5299", "input_key": "start_time",         "type": "number", "label": "Start (s)"       },
-      "audio_duration": { "node_id": "5299", "input_key": "duration",           "type": "number", "label": "Duration (s)"    },
-      "prompt":         { "node_id": "5283", "input_key": "text",               "type": "string", "label": "Prompt"          },
-      "width":          { "node_id": "5311", "input_key": "resize_type.width",  "type": "number", "label": "Width (px)"      },
-      "seed":           { "node_id": "5293", "input_key": "noise_seed",         "type": "number", "label": "Seed"            }
-      ,
-      "lora_name":      { "node_id": "5284", "input_key": "lora_name",          "type": "string", "label": "LoRA"            },
-      "lora_strength":  { "node_id": "5284", "input_key": "strength_model",     "type": "number", "label": "LoRA Strength"   }
+      "image": {
+        "node_id": "5310",
+        "input_key": "image",
+        "type": "string",
+        "label": "Reference Image"
+      },
+      "audio": {
+        "node_id": "5299",
+        "input_key": "audio",
+        "type": "string",
+        "label": "Audio File"
+      },
+      "audio_start": {
+        "node_id": "5299",
+        "input_key": "start_time",
+        "type": "number",
+        "label": "Start (s)"
+      },
+      "audio_duration": {
+        "node_id": "5299",
+        "input_key": "duration",
+        "type": "number",
+        "label": "Duration (s)"
+      },
+      "prompt": {
+        "node_id": "5283",
+        "input_key": "text",
+        "type": "string",
+        "label": "Prompt"
+      },
+      "width": {
+        "node_id": "5311",
+        "input_key": "resize_type.width",
+        "type": "number",
+        "label": "Width (px)"
+      },
+      "seed": {
+        "node_id": "5293",
+        "input_key": "noise_seed",
+        "type": "number",
+        "label": "Seed"
+      },
+      "lora_name": {
+        "node_id": "5284",
+        "input_key": "lora_name",
+        "type": "string",
+        "label": "LoRA"
+      },
+      "lora_strength": {
+        "node_id": "5284",
+        "input_key": "strength_model",
+        "type": "number",
+        "label": "LoRA Strength"
+      }
+    }
+  },
+  "audio-fish-tts": {
+    "name": "Audio Fish TTS",
+    "filename": "audio/FISH-API.json",
+    "description": "Local Fish S2 TTS for Agent Chat voice output.",
+    "inputs": {
+      "text": {
+        "node_id": "42",
+        "input_key": "text",
+        "type": "string",
+        "label": "Text"
+      }
     }
   }
 }

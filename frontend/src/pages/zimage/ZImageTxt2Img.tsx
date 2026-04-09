@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Sparkles, Maximize2, Loader2, RefreshCw, Plus, Trash2,
+  Sparkles, Maximize2, Loader2, RefreshCw, Plus, Upload,
   ChevronLeft, Expand, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { PromptAssistant } from '../../components/ui/PromptAssistant';
-import { LoraSelector } from '../../components/ui/LoraSelector';
+import { LoraCharacterCard } from '../../components/ui/LoraCharacterCard';
 import { Lightbox } from '../../components/ui/Lightbox';
 import { useToast } from '../../components/ui/Toast';
 import { BACKEND_API } from '../../config/api';
@@ -24,7 +24,28 @@ type ZImageLoraEntry = {
   strength: number;
 };
 
+interface Txt2ImgPageConfig {
+  storageKey?: string;
+  workflowId?: string;
+  familyLabel?: string;
+  promptContext?: 'zimage' | 'ltx-flf' | 'ltx-lipsync' | 'wan-scene';
+  accent?: 'emerald' | 'violet';
+  loraPrefixes?: string[];
+  loraPacks?: string[];
+  aspectPresets?: Array<{ label: string; w: number; h: number }>;
+  allowedResolutions?: Array<{ w: number; h: number }>;
+  requireImageUpload?: boolean;
+  imageParamKey?: string;
+  imageLabel?: string;
+}
+
+type LoraCatalogItem = {
+  file: string;
+  preview_url?: string;
+};
+
 const normLora = (v: string) => v.replace(/\\/g, '/').toLowerCase().trim();
+const loraFileName = (path: string) => path.replace(/\\/g, '/').split('/').pop()?.toLowerCase() ?? '';
 
 const resolveInstalledLoraName = (name: string, available: string[]) => {
   if (!name) return '';
@@ -39,23 +60,56 @@ const resolveInstalledLoraName = (name: string, available: string[]) => {
 };
 
 export const ZImageTxt2Img = () => {
-  const [prompt, setPrompt]                   = usePersistentState('zimage_prompt', '');
-  const [negativePrompt, setNegativePrompt]   = usePersistentState('zimage_negative', 'blurry, ugly, bad proportions, low quality, artifacts');
-  const [width, setWidth]                     = usePersistentState('zimage_width', 1024);
-  const [height, setHeight]                   = usePersistentState('zimage_height', 1024);
-  const [steps, setSteps]                     = usePersistentState('zimage_steps', 11);
+  return (
+    <Txt2ImgPage
+      storageKey="zimage"
+      workflowId="z-image"
+      familyLabel="Z-Image"
+      promptContext="zimage"
+      accent="emerald"
+      loraPrefixes={['zimage_turbo/', 'zimage-turbo/']}
+      loraPacks={['zimage_turbo', 'zimage_nsfw']}
+    />
+  );
+};
+
+export const Txt2ImgPage = ({
+  storageKey = 'zimage',
+  workflowId = 'z-image',
+  familyLabel = 'Z-Image',
+  promptContext = 'zimage',
+  accent = 'emerald',
+  loraPrefixes = ['zimage_turbo/', 'zimage-turbo/'],
+  loraPacks = ['zimage_turbo', 'zimage_nsfw'],
+  aspectPresets = PRESETS,
+  allowedResolutions = [],
+  requireImageUpload = false,
+  imageParamKey = 'image',
+  imageLabel = 'Reference Image',
+}: Txt2ImgPageConfig) => {
+  const key = (name: string) => `${storageKey}_${name}`;
+  const [prompt, setPrompt]                   = usePersistentState(key('prompt'), '');
+  const [negativePrompt, setNegativePrompt]   = usePersistentState(key('negative'), 'blurry, ugly, bad proportions, low quality, artifacts');
+  const [width, setWidth]                     = usePersistentState(key('width'), 1024);
+  const [height, setHeight]                   = usePersistentState(key('height'), 1024);
+  const [steps, setSteps]                     = usePersistentState(key('steps'), 11);
   const cfg                                   = 1.0;
-  const [seed, setSeed]                       = usePersistentState('zimage_seed', -1);
-  const [loraEntries, setLoraEntries]         = usePersistentState<ZImageLoraEntry[]>('zimage_loras', []);
+  const [seed, setSeed]                       = usePersistentState(key('seed'), -1);
+  const [loraEntries, setLoraEntries]         = usePersistentState<ZImageLoraEntry[]>(key('loras'), []);
+  const [loraPreviewMap, setLoraPreviewMap]   = useState<Record<string, string>>({});
 
   const [isGenerating, setIsGenerating]       = useState(false);
   const [pendingPromptId, setPendingPromptId] = useState<string | null>(null);
-  const [currentImage, setCurrentImage]       = usePersistentState<string | null>('zimage_current_image', null);
-  const [history, setHistory]                 = usePersistentState<string[]>('zimage_history', []);
+  const [currentImage, setCurrentImage]       = usePersistentState<string | null>(key('current_image'), null);
+  const [history, setHistory]                 = usePersistentState<string[]>(key('history'), []);
   const [availableLoras, setAvailableLoras]   = useState<string[]>([]);
   const [negExpanded, setNegExpanded]         = useState(false);
   const [lightboxImage, setLightboxImage]     = useState<string | null>(null);
-  const [previewCollapsed, setPreviewCollapsed] = usePersistentState('zimage_preview_collapsed', false);
+  const [previewCollapsed, setPreviewCollapsed] = usePersistentState(key('preview_collapsed'), false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImageName, setUploadedImageName] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const { toast } = useToast();
   const {
@@ -70,11 +124,31 @@ export const ZImageTxt2Img = () => {
     comfyService.getLoras().then((loras) => {
       const filtered = loras.filter((l) => {
         const normalized = l.replace(/\\/g, '/').toLowerCase();
-        return normalized.startsWith('zimage_turbo/') || normalized.startsWith('zimage-turbo/');
+        return loraPrefixes.some((prefix) => normalized.startsWith(prefix.toLowerCase()));
       });
       setAvailableLoras(filtered);
     }).catch(() => {});
-  }, []);
+  }, [loraPrefixes]);
+
+  useEffect(() => {
+    const fetchCatalog = async (packKey: string) => {
+      const res = await fetch(`${BACKEND_API.BASE_URL}/api/lora/pack/${packKey}/catalog?limit=3000`);
+      const data = await res.json();
+      if (!data?.success || !Array.isArray(data?.items)) return [] as LoraCatalogItem[];
+      return data.items as LoraCatalogItem[];
+    };
+
+    Promise.all(loraPacks.map((pack) => fetchCatalog(pack)))
+      .then((packSets) => {
+        const map: Record<string, string> = {};
+        packSets.flat().forEach((item) => {
+          if (!item?.file || !item?.preview_url) return;
+          map[item.file.toLowerCase()] = item.preview_url;
+        });
+        setLoraPreviewMap(map);
+      })
+      .catch(() => {});
+  }, [loraPacks]);
 
   // Normalize persisted LoRA paths to currently installed names.
   useEffect(() => {
@@ -91,22 +165,33 @@ export const ZImageTxt2Img = () => {
   // force Z-Image defaults to 11 steps / CFG 1.0.
   useEffect(() => {
     try {
-      const marker = 'zimage_defaults_migrated_v2';
+      const marker = `${storageKey}_defaults_migrated_v2`;
       if (window.localStorage.getItem(marker)) return;
       setSteps(11);
-      window.localStorage.setItem('zimage_cfg', JSON.stringify(1.0));
+      window.localStorage.setItem(`${storageKey}_cfg`, JSON.stringify(1.0));
       window.localStorage.setItem(marker, '1');
     } catch {
       // ignore storage access errors
     }
-  }, [setSteps]);
+  }, [setSteps, storageKey]);
+
+  // Ensure persisted size is valid for model families with strict resolution support.
+  useEffect(() => {
+    if (allowedResolutions.length === 0) return;
+    const isAllowed = allowedResolutions.some((r) => r.w === width && r.h === height);
+    if (isAllowed) return;
+    const fallback = aspectPresets[0] ?? allowedResolutions[0];
+    if (!fallback) return;
+    setWidth(fallback.w);
+    setHeight(fallback.h);
+  }, [allowedResolutions, aspectPresets, width, height, setWidth, setHeight]);
 
   // One-time migration from legacy single-LoRA keys.
   useEffect(() => {
     if (loraEntries.length > 0) return;
     try {
-      const legacyNameRaw = window.localStorage.getItem('zimage_lora_name');
-      const legacyStrengthRaw = window.localStorage.getItem('zimage_lora_strength');
+      const legacyNameRaw = window.localStorage.getItem(`${storageKey}_lora_name`);
+      const legacyStrengthRaw = window.localStorage.getItem(`${storageKey}_lora_strength`);
       if (!legacyNameRaw) return;
       const legacyName = JSON.parse(legacyNameRaw) as string;
       const legacyStrength = legacyStrengthRaw ? Number(JSON.parse(legacyStrengthRaw)) : 1.0;
@@ -116,7 +201,7 @@ export const ZImageTxt2Img = () => {
     } catch {
       // ignore legacy parsing errors
     }
-  }, [loraEntries.length, setLoraEntries]);
+  }, [loraEntries.length, setLoraEntries, storageKey]);
 
   useEffect(() => {
     if (execState !== 'done' || !pendingPromptId) return;
@@ -147,6 +232,24 @@ export const ZImageTxt2Img = () => {
     if (execState === 'error') { setIsGenerating(false); setPendingPromptId(null); }
   }, [execState]);
 
+  const handleUploadImage = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${BACKEND_API.BASE_URL}/api/upload`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.detail || 'Upload failed');
+      setUploadedImageName(data.filename);
+      if (uploadedImage?.startsWith('blob:')) URL.revokeObjectURL(uploadedImage);
+      setUploadedImage(URL.createObjectURL(file));
+    } catch (err: any) {
+      toast(err.message || 'Upload failed', 'error');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   // Also consume real-time executed output events so the strip updates immediately.
   useEffect(() => {
     if (!isGenerating || outputReadyCount <= 0 || lastOutputImages.length === 0) return;
@@ -160,6 +263,17 @@ export const ZImageTxt2Img = () => {
 
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating) return;
+    if (requireImageUpload && !uploadedImageName) {
+      toast(`${familyLabel}: upload a reference image first`, 'error');
+      return;
+    }
+    if (
+      allowedResolutions.length > 0 &&
+      !allowedResolutions.some((r) => r.w === width && r.h === height)
+    ) {
+      toast(`${familyLabel}: unsupported resolution ${width}x${height}`, 'error');
+      return;
+    }
     setIsGenerating(true);
     clearOutputs();
     try {
@@ -168,6 +282,9 @@ export const ZImageTxt2Img = () => {
         seed: seed === -1 ? Math.floor(Math.random() * 10_000_000_000) : seed,
         steps, cfg, client_id: (comfyService as any).clientId,
       };
+      if (requireImageUpload && uploadedImageName) {
+        params[imageParamKey] = uploadedImageName;
+      }
       const activeLoras = loraEntries
         .filter((l) => l.name && l.name.trim())
         .map((l) => ({
@@ -178,13 +295,13 @@ export const ZImageTxt2Img = () => {
       if (activeLoras.length > 0) params.loras = activeLoras;
       const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.GENERATE}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflow_id: 'z-image', params }),
+        body: JSON.stringify({ workflow_id: workflowId, params }),
       });
       const data = await res.json();
       if (data.success) setPendingPromptId(data.prompt_id);
       else throw new Error(data.detail || 'Failed');
     } catch (err: any) {
-      toast(err.message || 'Failed', 'error');
+      toast(err.message || `${familyLabel} generate failed`, 'error');
       setIsGenerating(false);
     }
   };
@@ -199,6 +316,14 @@ export const ZImageTxt2Img = () => {
     setLightboxImage(url);
   };
 
+  const getLoraPreview = (loraPath: string) => {
+    if (!loraPath) return null;
+    const byPath = loraPreviewMap[normLora(loraPath)];
+    if (byPath) return byPath;
+    const byFile = loraPreviewMap[loraFileName(loraPath)];
+    return byFile ?? null;
+  };
+
   return (
     <>
     <div className="flex h-full bg-[#080808] overflow-hidden">
@@ -210,7 +335,7 @@ export const ZImageTxt2Img = () => {
           {/* Header */}
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Z-Image</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">{familyLabel}</span>
           </div>
 
           {/* Top preview strip */}
@@ -270,79 +395,105 @@ export const ZImageTxt2Img = () => {
           </div>
 
           {/* Prompt */}
+          {requireImageUpload && (
+            <>
+              {!uploadedImage ? (
+                <div
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files[0];
+                    if (f?.type.startsWith('image/')) handleUploadImage(f);
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="cursor-pointer rounded-2xl border-2 border-dashed border-white/10 hover:border-emerald-500/30 bg-white/[0.02] hover:bg-white/[0.04] transition-all"
+                >
+                  <div className="flex flex-col items-center py-10 gap-3">
+                    {uploadingImage ? <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" /> : <Upload className="w-7 h-7 text-white/20" />}
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-white/30">{uploadingImage ? 'Uploading...' : `Drop ${imageLabel}`}</p>
+                      <p className="text-xs text-white/20 mt-0.5">or click to browse</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative rounded-2xl overflow-hidden border border-white/5 cursor-pointer group"
+                >
+                  <img src={uploadedImage} alt={imageLabel} className="w-full max-h-[280px] object-contain bg-black/20" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Replace</span>
+                  </div>
+                  <div className="absolute bottom-2 left-2 right-2">
+                    <span className="text-[8px] font-mono bg-black/60 rounded px-1.5 py-0.5 text-white/50">{uploadedImageName}</span>
+                  </div>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUploadImage(file);
+                }}
+              />
+            </>
+          )}
+
           <PromptAssistant
-            context="zimage"
+            context={promptContext}
             value={prompt}
             onChange={setPrompt}
             placeholder="Describe the subject, mood, lighting…"
             minRows={5}
-            accent="emerald"
+            accent={accent}
             label="Prompt"
           />
 
-          <LoraSelector
-            label="LoRA 1"
-            value={loraEntries[0]?.name ?? ''}
-            onChange={(name) => {
-              setLoraEntries((prev) => {
-                const next = [...prev];
-                if (!next[0]) next[0] = { name: '', strength: 1.0 };
-                next[0] = { ...next[0], name };
-                return next;
-              });
-            }}
-            strength={loraEntries[0]?.strength ?? 1.0}
-            onStrengthChange={(strength) => {
-              setLoraEntries((prev) => {
-                const next = [...prev];
-                if (!next[0]) next[0] = { name: '', strength: 1.0 };
-                next[0] = { ...next[0], strength };
-                return next;
-              });
-            }}
-            options={availableLoras}
-            accent="emerald"
-          />
-
-          {loraEntries.slice(1).map((entry, idx) => (
-            <div key={`zimage-lora-${idx + 1}`} className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.01] p-2.5">
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setLoraEntries((prev) => prev.filter((_, i) => i !== idx + 1))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/40 transition-colors hover:border-red-500/30 hover:text-red-400"
-                >
-                  <Trash2 className="h-3 w-3" /> Remove
-                </button>
-              </div>
-              <LoraSelector
-                label={`LoRA ${idx + 2}`}
-                value={entry.name}
-                onChange={(name) => {
-                  setLoraEntries((prev) => {
-                    const next = [...prev];
-                    next[idx + 1] = { ...next[idx + 1], name };
-                    return next;
-                  });
-                }}
-                strength={entry.strength}
-                onStrengthChange={(strength) => {
-                  setLoraEntries((prev) => {
-                    const next = [...prev];
-                    next[idx + 1] = { ...next[idx + 1], strength };
-                    return next;
-                  });
-                }}
-                options={availableLoras}
-                accent="emerald"
-              />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/25">Characters / LoRAs</span>
+              <span className="text-[8px] font-mono text-white/20">{loraEntries.length || 1}/6</span>
             </div>
-          ))}
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {(loraEntries.length > 0 ? loraEntries : [{ name: '', strength: 1.0 }]).map((entry, idx) => (
+                <LoraCharacterCard
+                  key={`zimage-lora-card-${idx}`}
+                  index={idx}
+                  value={entry.name}
+                  strength={entry.strength}
+                  options={availableLoras}
+                  previewUrl={getLoraPreview(entry.name)}
+                  accent={accent}
+                  onChange={(name) => {
+                    setLoraEntries((prev) => {
+                      const source = prev.length > 0 ? [...prev] : [{ name: '', strength: 1.0 }];
+                      source[idx] = { ...source[idx], name };
+                      return source;
+                    });
+                  }}
+                  onStrengthChange={(strength) => {
+                    setLoraEntries((prev) => {
+                      const source = prev.length > 0 ? [...prev] : [{ name: '', strength: 1.0 }];
+                      source[idx] = { ...source[idx], strength };
+                      return source;
+                    });
+                  }}
+                  onRemove={idx > 0 ? () => setLoraEntries((prev) => prev.filter((_, i) => i !== idx)) : undefined}
+                />
+              ))}
+            </div>
+          </div>
 
           <button
-            onClick={() => setLoraEntries((prev) => (prev.length >= 5 ? prev : [...prev, { name: '', strength: 1.0 }]))}
-            disabled={loraEntries.length >= 5}
+            onClick={() => setLoraEntries((prev) => (prev.length >= 6 ? prev : [...prev, { name: '', strength: 1.0 }]))}
+            disabled={loraEntries.length >= 6}
             className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all ${
-              loraEntries.length >= 5
+              loraEntries.length >= 6
                 ? 'cursor-not-allowed border-white/[0.05] bg-white/[0.02] text-white/20'
                 : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15'
             }`}
@@ -359,7 +510,7 @@ export const ZImageTxt2Img = () => {
               <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/25">Dimensions</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
-              {PRESETS.map(r => (
+              {aspectPresets.map(r => (
                 <button key={r.label}
                   onClick={() => { setWidth(r.w); setHeight(r.h); }}
                   className={`py-2 rounded-lg border text-[8px] font-black uppercase tracking-wider transition-all ${

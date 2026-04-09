@@ -284,9 +284,12 @@ def _caption_prompt_for_context(context: str) -> str:
     ctx = (context or "zimage").strip().lower()
     if ctx == "zimage":
         return (
-            "Convert this image into a photorealistic generation prompt. Include subject identity cues, facial details, "
-            "wardrobe/materials, camera framing/lens feel, lighting direction and quality, color mood, and background depth. "
-            "Avoid meta wording like 'the image shows'. Under 110 words. Output only the prompt."
+            "Write one photorealistic generation prompt grounded ONLY in visible details. Include: subject identity cues, "
+            "facial expression, visible makeup/face paint, hair, wardrobe/materials, composition, lighting direction and color, "
+            "and background mood. If clown/joker-style makeup or nose paint is visible, mention it explicitly. "
+            "Do NOT invent facts not clearly visible (e.g., pregnancy, sauna, unseen body posture, unseen location). "
+            "Do NOT mention fisheye, ultra-wide, or lens distortion unless clearly visible. "
+            "No meta wording like 'the image shows'. 55-95 words. Output only the final prompt."
         )
     if ctx == "ltx-flf":
         return (
@@ -339,13 +342,30 @@ def _get_ollama_vision_model() -> Optional[str]:
         if not resp.ok:
             return None
         models = [m["name"] for m in resp.json().get("models", [])]
-        for p in ["llava", "minicpm", "qwen2.5-vl", "qwen2-vl", "moondream", "vision"]:
+        for p in ["qwen2.5-vl", "qwen2-vl", "minicpm-v", "minicpm", "llava:34b", "llava", "moondream", "vision"]:
             for m in models:
                 if p in m.lower():
                     return m
         return None
     except Exception:
         return None
+
+
+def _clean_caption_text(text: str) -> str:
+    """Light cleanup for caption output so it is prompt-ready."""
+    cleaned = " ".join((text or "").strip().split())
+    lower = cleaned.lower()
+    for prefix in [
+        "the image shows ",
+        "this image shows ",
+        "in this image, ",
+        "in the image, ",
+        "this is an image of ",
+    ]:
+        if lower.startswith(prefix):
+            cleaned = cleaned[len(prefix):].strip()
+            break
+    return cleaned.strip('"').strip("'").strip()
 
 
 @app.get("/api/ollama/models")
@@ -436,13 +456,13 @@ async def ollama_caption_image(file: UploadFile = File(...), context: str = Form
         "prompt": _caption_prompt_for_context(context),
         "images": [img_b64],
         "stream": False,
-        "options": {"temperature": 0.55, "num_predict": 200},
+        "options": {"temperature": 0.2, "num_predict": 200},
     }
 
     try:
         r = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=90)
         r.raise_for_status()
-        caption = r.json().get("response", "").strip()
+        caption = _clean_caption_text(r.json().get("response", ""))
         return {"success": True, "caption": caption, "model": model}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Caption failed: {exc}")

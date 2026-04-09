@@ -15,7 +15,7 @@
  */
 
 import { useRef, useState, useCallback } from 'react';
-import type { DragEvent } from 'react';
+import type { DragEvent, ClipboardEvent } from 'react';
 import { Wand2, Sparkles, Loader2, ImageIcon, X } from 'lucide-react';
 import { BACKEND_API } from '../../config/api';
 
@@ -118,6 +118,20 @@ export const PromptAssistant = ({
   const [dragOver, setDragOver] = useState(false);
   const [captionModel, setCaptionModel] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const dragDepthRef = useRef(0);
+
+  const hasImageInDataTransfer = useCallback((dt: DataTransfer | null) => {
+    if (!dt) return false;
+    if (dt.files?.length) {
+      return Array.from(dt.files).some(file => file.type.startsWith('image/'));
+    }
+    if (dt.items?.length) {
+      return Array.from(dt.items).some(
+        item => item.kind === 'file' && item.type.startsWith('image/')
+      );
+    }
+    return false;
+  }, []);
 
   // ── Stream trigger ──────────────────────────────────────────────────────────
   const runStream = useCallback(async (reqMode: 'enhance' | 'inspire') => {
@@ -153,7 +167,7 @@ export const PromptAssistant = ({
   const captionFile = useCallback(async (file: File) => {
     abortRef.current?.abort();
     setMode('caption');
-    onChange('');
+    const prevPrompt = value;
 
     try {
       const fd = new FormData();
@@ -171,21 +185,46 @@ export const PromptAssistant = ({
       onChange(data.caption ?? '');
       if (data.model) setCaptionModel(data.model);
     } catch (err: any) {
+      onChange(prevPrompt);
       console.error('[PromptAssistant caption]', err.message);
     } finally {
       setMode(null);
     }
-  }, [onChange]);
+  }, [context, onChange, value]);
 
   const handleDrop = useCallback((e: DragEvent<HTMLElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = 0;
     setDragOver(false);
     if (!enableCaption) return;
-    const file = e.dataTransfer.files[0];
-    if (file?.type.startsWith('image/')) captionFile(file);
+    const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'));
+    if (file) captionFile(file);
   }, [enableCaption, captionFile]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+  const handleDragEnter = useCallback((e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (!enableCaption) return;
+    if (!hasImageInDataTransfer(e.dataTransfer)) return;
+    dragDepthRef.current += 1;
+    setDragOver(true);
+  }, [enableCaption, hasImageInDataTransfer]);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (!enableCaption) return;
+    if (!hasImageInDataTransfer(e.dataTransfer)) return;
+    if (!dragOver) setDragOver(true);
+  }, [enableCaption, hasImageInDataTransfer, dragOver]);
+
+  const handleDragLeave = useCallback((e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    if (!enableCaption) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragOver(false);
+  }, [enableCaption]);
+
+  const handlePaste = useCallback((e: ClipboardEvent<HTMLTextAreaElement>) => {
     if (!enableCaption) return;
     const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
     if (item) {
@@ -208,8 +247,9 @@ export const PromptAssistant = ({
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           rows={minRows}
-          onDragOver={e => { e.preventDefault(); if (enableCaption) setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onPaste={handlePaste}
           className={`w-full bg-black/30 border border-white/5 rounded-xl p-3 text-sm text-white/90
@@ -245,7 +285,7 @@ export const PromptAssistant = ({
         )}
         {/* Drop overlay */}
         {dragOver && enableCaption && (
-          <div className={`absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed bg-black/70 ${ACCENT_RING[accent]}`}>
+          <div className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed bg-black/70 ${ACCENT_RING[accent]}`}>
             <div className="flex items-center gap-2 text-white/60">
               <ImageIcon className="w-4 h-4" />
               <span className="text-[10px] font-black uppercase tracking-widest">Drop to caption</span>
@@ -303,8 +343,9 @@ export const PromptAssistant = ({
       {/* Textarea with drop zone */}
       <div
         className={`relative rounded-2xl transition-all ${ringClass}`}
-        onDragOver={e => { e.preventDefault(); if (enableCaption) setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         <textarea
@@ -337,7 +378,7 @@ export const PromptAssistant = ({
 
         {/* Drop image overlay */}
         {dragOver && enableCaption && (
-          <div className={`absolute inset-0 flex flex-col items-center justify-center rounded-2xl
+          <div className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center rounded-2xl
             border-2 border-dashed bg-black/75 backdrop-blur-sm gap-2`}>
             <ImageIcon className={`w-6 h-6 ${ACCENT_SPIN[accent]}`} />
             <span className="text-[10px] font-black uppercase tracking-widest text-white/60">

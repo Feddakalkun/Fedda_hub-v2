@@ -204,6 +204,18 @@
     "note": "Diffusers integration nodes for ComfyUI"
   },
   {
+    "name": "ComfyUI_IPAdapter_plus",
+    "url": "https://github.com/cubiq/ComfyUI_IPAdapter_plus.git",
+    "folder": "ComfyUI_IPAdapter_plus",
+    "note": "IPAdapter+ nodes for style and image conditioning"
+  },
+  {
+    "name": "ComfyUI_InstantID",
+    "url": "https://github.com/cubiq/ComfyUI_InstantID.git",
+    "folder": "ComfyUI_InstantID",
+    "note": "InstantID nodes for identity-preserving generation"
+  },
+  {
     "name": "ComfyUI-FishAudioS2",
     "url": "https://github.com/Saganaki22/ComfyUI-FishAudioS2.git",
     "folder": "ComfyUI-FishAudioS2",

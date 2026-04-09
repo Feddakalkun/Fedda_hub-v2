@@ -69,6 +69,7 @@ export const AgentChatPage = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRefreshingMemory, setIsRefreshingMemory] = useState(false);
   const [isPullingModel, setIsPullingModel] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(true);
   const [localReady, setLocalReady] = useState(false);
   const [ollamaOnline, setOllamaOnline] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
@@ -163,12 +164,20 @@ export const AgentChatPage = () => {
     try {
       const localRes = await fetch(`${BACKEND_API.BASE_URL}/api/ollama/models`);
       const localData = await localRes.json();
+      setBackendOnline(true);
       setLocalReady(Boolean(localData?.success && localData?.text_model));
       setOllamaOnline(Boolean(localData?.ollama_online ?? localData?.success));
       setRecommendedTextModel(String(localData?.recommended_text_model ?? DEFAULT_RECOMMENDED_TEXT_MODEL));
     } catch {
+      setBackendOnline(false);
       setLocalReady(false);
-      setOllamaOnline(false);
+      // Fallback probe so UI can still show true Ollama availability even if backend is down.
+      try {
+        const ollamaRes = await fetch('/ollama/tags');
+        setOllamaOnline(ollamaRes.ok);
+      } catch {
+        setOllamaOnline(false);
+      }
     }
   };
 
@@ -370,13 +379,15 @@ export const AgentChatPage = () => {
           <MessageSquare className="w-4 h-4 text-cyan-300" />
           <span className="font-semibold tracking-[0.12em] uppercase">Agent Chat</span>
           <span className={`px-2 py-0.5 rounded-full border text-[10px] ${
-            localReady
+            !backendOnline
+              ? 'border-red-400/40 text-red-300'
+              : localReady
               ? 'border-emerald-400/40 text-emerald-300'
               : ollamaOnline
                 ? 'border-amber-400/40 text-amber-300'
                 : 'border-red-400/40 text-red-300'
           }`}>
-            {localReady ? 'Local Ready' : (ollamaOnline ? 'No Text Model' : 'Ollama Offline')}
+            {!backendOnline ? 'Backend Offline' : (localReady ? 'Local Ready' : (ollamaOnline ? 'No Text Model' : 'Ollama Offline'))}
           </span>
         </div>
 
@@ -408,11 +419,13 @@ export const AgentChatPage = () => {
 
       <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4">
         <section className="min-h-0 flex flex-col rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-          {!localReady && (
+          {(!localReady || !backendOnline) && (
             <div className="border-b border-amber-300/20 bg-amber-500/5 p-3 text-xs text-amber-100 flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="font-semibold">
-                  {ollamaOnline
+                  {!backendOnline
+                    ? 'Backend appears offline. Start FEDDA backend (port 8000), then retry.'
+                    : ollamaOnline
                     ? `No local text model installed. Recommended: ${recommendedTextModel}`
                     : 'Ollama appears offline. Start Ollama first, then install a text model.'}
                 </span>
@@ -425,7 +438,7 @@ export const AgentChatPage = () => {
                   <RefreshCw className="w-3 h-3" />
                   Recheck
                 </button>
-                {ollamaOnline && (
+                {backendOnline && ollamaOnline && (
                   <button
                     onClick={() => void installRecommendedModel()}
                     disabled={isPullingModel}

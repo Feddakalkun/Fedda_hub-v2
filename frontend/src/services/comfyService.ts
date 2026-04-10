@@ -100,7 +100,7 @@ class ComfyUIService {
             }
         };
 
-        this.ws.onerror = (err) => {
+        this.ws.onerror = () => {
             // During startup/reconnect we expect transient WS failures; avoid noisy console spam.
             const elapsed = Date.now() - connectStartedAt;
             if (this.reconnectAttempts >= 2 && elapsed > 1500) {

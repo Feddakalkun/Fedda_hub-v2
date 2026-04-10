@@ -4,7 +4,6 @@ import {
   Video,
   Music,
   Sparkles,
-  Settings,
   Terminal,
   MessageSquare,
   Images,
@@ -103,7 +102,6 @@ const SECTIONS: NavSection[] = [
     label: 'SYSTEM',
     items: [
       { id: 'logs',      label: 'Console Logs', icon: Terminal },
-      { id: 'settings',  label: 'Settings',     icon: Settings },
     ],
   },
 ];

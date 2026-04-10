@@ -208,6 +208,18 @@
         "type": "number",
         "label": "Zoom"
       },
+      "default_prompts": {
+        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "input_key": "default_prompts",
+        "type": "boolean",
+        "label": "Default Prompts"
+      },
+      "camera_view": {
+        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "input_key": "camera_view",
+        "type": "boolean",
+        "label": "Camera View"
+      },
       "seed": {
         "node_ids": ["197:108", "213:271", "221:280", "229:289", "237:298", "245:307"],
         "input_key": "seed",

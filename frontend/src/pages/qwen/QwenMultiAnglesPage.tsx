@@ -1,67 +1,189 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { DragEvent as ReactDragEvent } from 'react';
 import { Camera, Loader2, RefreshCw, Upload } from 'lucide-react';
 import { BACKEND_API } from '../../config/api';
 import { useToast } from '../../components/ui/Toast';
 
-const WHEEL_SIZE = 220;
-const WHEEL_RADIUS = 90;
+const WHEEL_SIZE = 260;
+const WHEEL_RADIUS_X = 92;
+const WHEEL_RADIUS_Y = 34;
+const VERTICAL_RANGE = 60;
+const ORBIT_ROTATION_DEG = -90;
+
+type Preset = {
+  id: string;
+  label: string;
+  value: number;
+};
+
+const H_PRESETS: Preset[] = [
+  { id: 'front', label: 'front view', value: 0 },
+  { id: 'left-30', label: 'left 30 deg', value: -30 },
+  { id: 'right-30', label: 'right 30 deg', value: 30 },
+  { id: 'left-profile', label: 'left profile', value: -90 },
+  { id: 'right-profile', label: 'right profile', value: 90 },
+  { id: 'back', label: 'back view', value: 180 },
+];
+
+const V_PRESETS: Preset[] = [
+  { id: 'eye', label: 'eye-level shot', value: 0 },
+  { id: 'high', label: 'high-angle shot', value: 30 },
+  { id: 'low', label: 'low-angle shot', value: -30 },
+  { id: 'top', label: 'top-down shot', value: 55 },
+  { id: 'worm', label: 'worm-eye shot', value: -55 },
+];
+
+const Z_PRESETS: Preset[] = [
+  { id: 'close', label: 'close-up', value: 2 },
+  { id: 'medium', label: 'medium shot', value: 5 },
+  { id: 'full', label: 'full body', value: 8 },
+  { id: 'wide', label: 'wide shot', value: 10 },
+];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function normalizeDegrees(value: number): number {
+  let out = value;
+  while (out > 180) out -= 360;
+  while (out < -180) out += 360;
+  return out;
+}
+
+function nearestPresetId(value: number, presets: Preset[], tolerance: number): string {
+  let best = presets[0];
+  let bestDiff = Math.abs(value - best.value);
+  for (const preset of presets) {
+    const diff = Math.abs(value - preset.value);
+    if (diff < bestDiff) {
+      best = preset;
+      bestDiff = diff;
+    }
+  }
+  return bestDiff <= tolerance ? best.id : 'custom';
+}
+
+function labelFromPresetId(id: string, presets: Preset[], fallback: string): string {
+  const found = presets.find((p) => p.id === id);
+  return found ? found.label : fallback;
+}
+
 export const QwenMultiAnglesPage = () => {
   const { toast } = useToast();
   const wheelRef = useRef<HTMLDivElement | null>(null);
-  const [isDraggingWheel, setIsDraggingWheel] = useState(false);
-  const [horizontalAngle, setHorizontalAngle] = useState<number>(0);
-  const [verticalAngle, setVerticalAngle] = useState<number>(0);
-  const [zoom, setZoom] = useState<number>(5);
-  const [seed, setSeed] = useState<number>(-1);
-  const [outputCount, setOutputCount] = useState<number>(4);
+  const [dragTarget, setDragTarget] = useState<'h' | 'v' | 'z' | null>(null);
+  const [horizontalAngle, setHorizontalAngle] = useState(0);
+  const [verticalAngle, setVerticalAngle] = useState(0);
+  const [zoom, setZoom] = useState(5);
+  const [hPresetId, setHPresetId] = useState('front');
+  const [vPresetId, setVPresetId] = useState('eye');
+  const [zPresetId, setZPresetId] = useState('medium');
+  const [defaultPrompts, setDefaultPrompts] = useState(false);
+  const [cameraView, setCameraView] = useState(false);
+  const [seed, setSeed] = useState(-1);
+  const [outputCount, setOutputCount] = useState(4);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [uploadedImageName, setUploadedImageName] = useState<string>('');
-  const [uploadedPreview, setUploadedPreview] = useState<string>('');
+  const [uploadedImageName, setUploadedImageName] = useState('');
+  const [uploadedPreview, setUploadedPreview] = useState('');
   const [results, setResults] = useState<string[]>([]);
 
-  const updateWheelFromPointer = (clientX: number, clientY: number) => {
+  useEffect(() => {
+    setHPresetId(nearestPresetId(horizontalAngle, H_PRESETS, 5));
+    setVPresetId(nearestPresetId(verticalAngle, V_PRESETS, 4));
+  }, [horizontalAngle, verticalAngle]);
+
+  useEffect(() => {
+    setZPresetId(nearestPresetId(zoom, Z_PRESETS, 1));
+  }, [zoom]);
+
+  const promptText = useMemo(() => {
+    const hLabel = labelFromPresetId(hPresetId, H_PRESETS, `h-${horizontalAngle}`);
+    const vLabel = labelFromPresetId(vPresetId, V_PRESETS, `v-${verticalAngle}`);
+    const zLabel = labelFromPresetId(zPresetId, Z_PRESETS, `z-${zoom.toFixed(1)}`);
+    return `<sks> ${hLabel} ${vLabel} ${zLabel}`;
+  }, [hPresetId, vPresetId, zPresetId, horizontalAngle, verticalAngle, zoom]);
+
+  const updateHorizontalFromPointer = (clientX: number, clientY: number) => {
     const el = wheelRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    let dx = clientX - cx;
-    let dy = clientY - cy;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > WHEEL_RADIUS) {
-      const scale = WHEEL_RADIUS / len;
-      dx *= scale;
-      dy *= scale;
-    }
-    const nx = clamp(dx / WHEEL_RADIUS, -1, 1);
-    const ny = clamp(dy / WHEEL_RADIUS, -1, 1);
-    setHorizontalAngle(Math.round(nx * 180));
-    setVerticalAngle(Math.round(-ny * 60));
+    const cy = rect.top + rect.height / 2 + 8;
+    const dx = (clientX - cx) / Math.max(1, WHEEL_RADIUS_X);
+    const dy = (clientY - cy) / Math.max(1, WHEEL_RADIUS_Y);
+    const thetaDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const h = normalizeDegrees(thetaDeg - ORBIT_ROTATION_DEG);
+    setHorizontalAngle(Math.round(h));
+  };
+
+  const updateVerticalFromPointer = (clientY: number) => {
+    const el = wheelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cy = rect.top + rect.height / 2 + 8;
+    const arcTop = cy - 110;
+    const arcBottom = cy;
+    const t = clamp((clientY - arcTop) / Math.max(1, arcBottom - arcTop), 0, 1);
+    const value = VERTICAL_RANGE - t * (VERTICAL_RANGE * 2);
+    setVerticalAngle(Math.round(clamp(value, -VERTICAL_RANGE, VERTICAL_RANGE)));
+  };
+
+  const updateZoomFromPointer = (clientX: number) => {
+    const el = wheelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const left = rect.left + 36;
+    const right = rect.left + 224;
+    const t = clamp((clientX - left) / Math.max(1, right - left), 0, 1);
+    setZoom(Number((1 + t * 11).toFixed(1)));
   };
 
   useEffect(() => {
-    if (!isDraggingWheel) return;
-    const onMove = (ev: PointerEvent) => updateWheelFromPointer(ev.clientX, ev.clientY);
-    const onUp = () => setIsDraggingWheel(false);
+    if (!dragTarget) return;
+    const onMove = (ev: PointerEvent) => {
+      if (dragTarget === 'h') updateHorizontalFromPointer(ev.clientX, ev.clientY);
+      if (dragTarget === 'v') updateVerticalFromPointer(ev.clientY);
+      if (dragTarget === 'z') updateZoomFromPointer(ev.clientX);
+    };
+    const onUp = () => setDragTarget(null);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [isDraggingWheel]);
+  }, [dragTarget]);
 
-  const handleWheelPointerDown = (ev: ReactPointerEvent<HTMLDivElement>) => {
+  const onHorizontalDown = (ev: ReactPointerEvent<HTMLDivElement>) => {
     ev.preventDefault();
-    setIsDraggingWheel(true);
-    updateWheelFromPointer(ev.clientX, ev.clientY);
+    ev.stopPropagation();
+    setDragTarget('h');
+    updateHorizontalFromPointer(ev.clientX, ev.clientY);
+  };
+
+  const onHorizontalDownSvg = (ev: ReactPointerEvent<SVGEllipseElement>) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragTarget('h');
+    updateHorizontalFromPointer(ev.clientX, ev.clientY);
+  };
+
+  const onVerticalDown = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragTarget('v');
+    updateVerticalFromPointer(ev.clientY);
+  };
+
+  const onZoomDown = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragTarget('z');
+    updateZoomFromPointer(ev.clientX);
   };
 
   const uploadReference = async (file: File) => {
@@ -83,6 +205,18 @@ export const QwenMultiAnglesPage = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleFileDrop = async (ev: ReactDragEvent<HTMLDivElement>) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setIsDragOver(false);
+    const file = ev.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      toast('Drop an image file', 'error');
+      return;
+    }
+    await uploadReference(file);
   };
 
   const pollResults = async (promptId: string) => {
@@ -128,6 +262,8 @@ export const QwenMultiAnglesPage = () => {
           horizontal_angle: horizontalAngle,
           vertical_angle: verticalAngle,
           zoom,
+          default_prompts: defaultPrompts,
+          camera_view: cameraView,
           seed: chosenSeed,
         },
       };
@@ -149,132 +285,206 @@ export const QwenMultiAnglesPage = () => {
     }
   };
 
-  const knobLeft = WHEEL_SIZE / 2 + (horizontalAngle / 180) * WHEEL_RADIUS;
-  const knobTop = WHEEL_SIZE / 2 - (verticalAngle / 60) * WHEEL_RADIUS;
+  const cx = WHEEL_SIZE / 2;
+  const cy = WHEEL_SIZE / 2 + 8;
+  const orbitTheta = ((horizontalAngle + ORBIT_ROTATION_DEG) * Math.PI) / 180;
+  const knobX = cx + Math.cos(orbitTheta) * WHEEL_RADIUS_X;
+  const ringKnobY = cy + Math.sin(orbitTheta) * WHEEL_RADIUS_Y;
+  const zoomKnobX = 36 + ((zoom - 1) / 11) * 188;
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar px-6 py-5">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-5">
-        <section className="rounded-2xl border border-white/10 bg-black/30 p-4 space-y-4">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-5">
+        <section className="rounded-2xl border border-amber-300/35 bg-[#141018] p-4 space-y-4 shadow-[0_0_0_1px_rgba(245,158,11,0.08)]">
           <div>
-            <h3 className="text-sm font-semibold tracking-wide text-white">Qwen Multi Angles</h3>
-            <p className="text-xs text-slate-400 mt-1">Upload 1 image, choose a camera angle, generate variations.</p>
+            <h3 className="text-sm font-semibold tracking-wide text-amber-100">Qwen Multiangle Camera</h3>
+            <p className="text-xs text-slate-400 mt-1">Original-style camera control with X, Y and Zoom.</p>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-black/30 p-3">
-            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block mb-2">Reference Image</label>
-            <label className="w-full cursor-pointer rounded-lg border border-dashed border-cyan-400/35 bg-cyan-500/5 p-3 flex items-center justify-center gap-2 text-sm text-cyan-200 hover:bg-cyan-500/10">
-              {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {isUploading ? 'Uploading...' : 'Upload Image'}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void uploadReference(file);
-                }}
-              />
-            </label>
+          <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block mb-2">Image</label>
+            <div
+              onDragOver={(ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                setIsDragOver(true);
+              }}
+              onDragLeave={(ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                setIsDragOver(false);
+              }}
+              onDrop={(ev) => void handleFileDrop(ev)}
+              className={`w-full rounded-lg border border-dashed p-3 transition-colors ${
+                isDragOver
+                  ? 'border-cyan-300 bg-cyan-500/15'
+                  : 'border-cyan-400/35 bg-cyan-500/5'
+              }`}
+            >
+              <label className="w-full cursor-pointer flex items-center justify-center gap-2 text-sm text-cyan-200 hover:text-cyan-100">
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {isUploading ? 'Uploading...' : 'Drop Image Here or Click Upload'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadReference(file);
+                  }}
+                />
+              </label>
+            </div>
             {uploadedImageName && <p className="mt-2 text-[11px] text-emerald-300">Loaded: {uploadedImageName}</p>}
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-black/30 p-3">
-            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block mb-2">Camera Wheel</label>
-            <div className="flex justify-center mb-3">
-              <div
-                ref={wheelRef}
-                onPointerDown={handleWheelPointerDown}
-                className="relative rounded-full border border-cyan-400/45 bg-cyan-500/5 touch-none cursor-grab active:cursor-grabbing"
-                style={{ width: WHEEL_SIZE, height: WHEEL_SIZE }}
-              >
-                <div className="absolute left-1/2 top-0 h-full w-px bg-white/10 -translate-x-1/2" />
-                <div className="absolute top-1/2 left-0 w-full h-px bg-white/10 -translate-y-1/2" />
-                <div
-                  className="absolute w-4 h-4 rounded-full border border-cyan-200 bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.45)] -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: knobLeft, top: knobTop }}
+          <div className="rounded-xl border border-fuchsia-500/35 bg-[#0d0b12] p-3">
+            <div className="text-[11px] text-fuchsia-300 mb-2 font-mono">{promptText}</div>
+
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <label className="text-[11px] flex items-center justify-between rounded border border-white/10 px-2 py-1 text-slate-300">
+                <span>default_prompts</span>
+                <input type="checkbox" checked={defaultPrompts} onChange={(e) => setDefaultPrompts(e.target.checked)} />
+              </label>
+              <label className="text-[11px] flex items-center justify-between rounded border border-white/10 px-2 py-1 text-slate-300">
+                <span>camera_view</span>
+                <input type="checkbox" checked={cameraView} onChange={(e) => setCameraView(e.target.checked)} />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <label className="text-[11px] text-slate-400">
+                H
+                <select
+                  value={hPresetId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setHPresetId(id);
+                    const match = H_PRESETS.find((p) => p.id === id);
+                    if (match) setHorizontalAngle(match.value);
+                  }}
+                  className="mt-1 w-full rounded border border-white/10 bg-black/50 px-2 py-1 text-slate-100"
+                >
+                  {H_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  <option value="custom">custom</option>
+                </select>
+              </label>
+              <label className="text-[11px] text-slate-400">
+                V
+                <select
+                  value={vPresetId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setVPresetId(id);
+                    const match = V_PRESETS.find((p) => p.id === id);
+                    if (match) setVerticalAngle(match.value);
+                  }}
+                  className="mt-1 w-full rounded border border-white/10 bg-black/50 px-2 py-1 text-slate-100"
+                >
+                  {V_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  <option value="custom">custom</option>
+                </select>
+              </label>
+              <label className="text-[11px] text-slate-400">
+                Z
+                <select
+                  value={zPresetId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setZPresetId(id);
+                    const match = Z_PRESETS.find((p) => p.id === id);
+                    if (match) setZoom(match.value);
+                  }}
+                  className="mt-1 w-full rounded border border-white/10 bg-black/50 px-2 py-1 text-slate-100"
+                >
+                  {Z_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  <option value="custom">custom</option>
+                </select>
+              </label>
+            </div>
+
+            <div
+              ref={wheelRef}
+              className="relative mx-auto touch-none rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(17,24,39,0.65),rgba(2,6,23,0.95))]"
+              style={{ width: WHEEL_SIZE, height: WHEEL_SIZE }}
+            >
+              <svg width={WHEEL_SIZE} height={WHEEL_SIZE} className="absolute inset-0">
+                <defs>
+                  <linearGradient id="ringPink" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#ff2f92" />
+                    <stop offset="100%" stopColor="#ff66bd" />
+                  </linearGradient>
+                  <linearGradient id="arcCyan" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#22d3ee" />
+                    <stop offset="100%" stopColor="#34d399" />
+                  </linearGradient>
+                </defs>
+                <ellipse
+                  cx={cx}
+                  cy={cy}
+                  rx={WHEEL_RADIUS_X}
+                  ry={WHEEL_RADIUS_Y}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth="24"
+                  style={{ pointerEvents: 'stroke' }}
+                  onPointerDown={onHorizontalDownSvg}
                 />
+                <ellipse cx={cx} cy={cy} rx={WHEEL_RADIUS_X} ry={WHEEL_RADIUS_Y} fill="none" stroke="url(#ringPink)" strokeWidth="7" />
+                <path d={`M ${cx - 92} ${cy} Q ${cx - 116} ${cy - 58} ${cx - 96} ${cy - 110}`} fill="none" stroke="url(#arcCyan)" strokeWidth="5" />
+                <rect x={cx - 16} y={cy - 58} width="32" height="72" fill="rgba(148,163,184,0.2)" stroke="#f472b6" strokeWidth="1.5" />
+                <line x1={cx} y1={cy - 18} x2={cx + 30} y2={cy - 28} stroke="#fbbf24" strokeWidth="3" />
+              </svg>
+
+              <div
+                className="absolute w-4 h-4 rounded-full border border-fuchsia-100 bg-fuchsia-500 shadow-[0_0_16px_rgba(236,72,153,0.55)] -translate-x-1/2 -translate-y-1/2"
+                style={{ left: knobX, top: ringKnobY }}
+                onPointerDown={onHorizontalDown}
+              />
+              <div
+                className="absolute w-4 h-4 rounded-full border border-cyan-100 bg-cyan-400 shadow-[0_0_16px_rgba(34,211,238,0.55)] -translate-x-1/2 -translate-y-1/2"
+                style={{ left: cx - 98, top: cy - 110 + ((VERTICAL_RANGE - verticalAngle) / (VERTICAL_RANGE * 2)) * 110 }}
+                onPointerDown={onVerticalDown}
+              />
+
+              <div className="absolute left-5 right-5 bottom-5" onPointerDown={onZoomDown}>
+                <div className="h-2 rounded-full bg-white/10 relative">
+                  <div className="absolute top-0 left-0 h-full rounded-full bg-amber-300/70" style={{ width: `${((zoom - 1) / 11) * 100}%` }} />
+                  <div
+                    className="absolute top-1/2 w-3 h-3 rounded-full bg-amber-300 border border-amber-100 -translate-x-1/2 -translate-y-1/2"
+                    style={{ left: zoomKnobX }}
+                  />
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
-              <label className="text-slate-400">
-                X
-                <input
-                  type="number"
-                  value={horizontalAngle}
-                  min={-180}
-                  max={180}
-                  onChange={(e) => setHorizontalAngle(clamp(Number(e.target.value) || 0, -180, 180))}
-                  className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
-                />
-              </label>
-              <label className="text-slate-400">
-                Y
-                <input
-                  type="number"
-                  value={verticalAngle}
-                  min={-60}
-                  max={60}
-                  onChange={(e) => setVerticalAngle(clamp(Number(e.target.value) || 0, -60, 60))}
-                  className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
-                />
-              </label>
-              <label className="text-slate-400">
-                Zoom
-                <input
-                  type="number"
-                  value={zoom}
-                  min={1}
-                  max={12}
-                  onChange={(e) => setZoom(clamp(Number(e.target.value) || 1, 1, 12))}
-                  className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
-                />
-              </label>
+
+            <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
+              <div className="rounded border border-white/10 bg-black/40 px-2 py-1 text-center text-slate-300">H {horizontalAngle}deg</div>
+              <div className="rounded border border-white/10 bg-black/40 px-2 py-1 text-center text-slate-300">V {verticalAngle}deg</div>
+              <div className="rounded border border-white/10 bg-black/40 px-2 py-1 text-center text-amber-200">Z {zoom.toFixed(1)}</div>
             </div>
-            <input
-              type="range"
-              min={1}
-              max={12}
-              step={1}
-              value={zoom}
-              onChange={(e) => setZoom(clamp(Number(e.target.value) || 1, 1, 12))}
-              className="w-full mt-3"
-            />
-            <button
-              onClick={() => {
-                setHorizontalAngle(0);
-                setVerticalAngle(0);
-                setZoom(5);
-              }}
-              className="mt-2 text-[11px] px-2 py-1 rounded border border-white/10 text-slate-300"
-            >
-              Reset Camera
-            </button>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-black/30 p-3 space-y-2">
-            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block">Seed</label>
-            <input
-              type="number"
-              value={seed}
-              onChange={(e) => setSeed(Number(e.target.value))}
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-            />
-            <p className="text-[11px] text-slate-500">Use `-1` for random seed each run.</p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/30 p-3 space-y-2">
-            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block">Output Count</label>
-            <select
-              value={outputCount}
-              onChange={(e) => setOutputCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-            >
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-500">How many images to return from this run.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[11px] text-slate-400">
+              Seed
+              <input
+                type="number"
+                value={seed}
+                onChange={(e) => setSeed(Number(e.target.value))}
+                className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
+              />
+            </label>
+            <label className="text-[11px] text-slate-400">
+              Output Count
+              <select
+                value={outputCount}
+                onChange={(e) => setOutputCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
+                className="mt-1 w-full rounded border border-white/10 bg-black/40 px-2 py-1 text-slate-100"
+              >
+                {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
           </div>
 
           <button

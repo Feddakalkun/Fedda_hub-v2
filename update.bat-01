@@ -1,0 +1,86 @@
+@echo off
+chcp 65001 >nul
+setlocal EnableExtensions EnableDelayedExpansion
+cd /d "%~dp0"
+
+echo ================================================
+echo   FEDDA UPDATE 01
+echo ================================================
+echo.
+
+set "ROOT=%CD%"
+set "FRONTEND=%ROOT%\frontend"
+set "COMFY=%ROOT%\ComfyUI"
+set "CUSTOM=%COMFY%\custom_nodes"
+
+set "PY="
+if exist "%ROOT%\python_embeded\python.exe" set "PY=%ROOT%\python_embeded\python.exe"
+if exist "%ROOT%\venv\Scripts\python.exe" set "PY=%ROOT%\venv\Scripts\python.exe"
+
+where git >nul 2>nul
+if %errorlevel%==0 (
+  if exist "%ROOT%\.git" (
+    echo [1/5] Pulling latest repo changes...
+    git pull --ff-only
+  ) else (
+    echo [1/5] No .git folder found, skipping git pull.
+  )
+) else (
+  echo [1/5] Git not found, skipping git pull.
+)
+echo.
+
+if exist "%FRONTEND%\package.json" (
+  echo [2/5] Updating frontend dependencies...
+  pushd "%FRONTEND%"
+  call npm install
+  popd
+) else (
+  echo [2/5] No frontend folder, skipping npm install.
+)
+echo.
+
+if not exist "%COMFY%" (
+  echo [3/5] No ComfyUI folder found, skipping custom node updates.
+  goto :after_nodes
+)
+
+if not exist "%CUSTOM%" mkdir "%CUSTOM%"
+
+if "%PY%"=="" (
+  echo [3/5] Python env not found, skipping Comfy node dependency install.
+) else (
+  echo [3/5] Ensuring requested custom nodes...
+  call :ensure_node "https://github.com/flybirdxx/ComfyUI-Qwen-TTS.git" "ComfyUI-Qwen-TTS"
+  call :ensure_node "https://github.com/Enemyx-net/VibeVoice-ComfyUI.git" "VibeVoice-ComfyUI"
+  call :ensure_node "https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git" "ComfyUI-Custom-Scripts"
+
+  echo [4/5] Installing node dependencies...
+  if exist "%CUSTOM%\ComfyUI-Qwen-TTS\requirements.txt" "%PY%" -m pip install -r "%CUSTOM%\ComfyUI-Qwen-TTS\requirements.txt"
+  if exist "%CUSTOM%\VibeVoice-ComfyUI\requirements.txt" "%PY%" -m pip install -r "%CUSTOM%\VibeVoice-ComfyUI\requirements.txt"
+)
+
+:after_nodes
+echo.
+echo [5/5] Done.
+echo.
+echo If ComfyUI was running: restart it now.
+echo If frontend was running: restart run.bat.
+echo.
+pause
+exit /b 0
+
+:ensure_node
+set "NODE_URL=%~1"
+set "NODE_DIR=%~2"
+if exist "%CUSTOM%\%NODE_DIR%\.git" (
+  echo   - Updating %NODE_DIR%
+  pushd "%CUSTOM%\%NODE_DIR%"
+  git pull --ff-only
+  popd
+) else (
+  echo   - Installing %NODE_DIR%
+  git clone "%NODE_URL%" "%CUSTOM%\%NODE_DIR%"
+)
+exit /b 0
+

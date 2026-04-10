@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0"
 title FEDDA Launcher
 
@@ -12,7 +13,7 @@ set "INSIGHTFACE_ROOT=%BASE_DIR%\cache\insightface"
 set "PIP_CACHE_DIR=%BASE_DIR%\cache\pip"
 
 :: ============================================================================
-:: SERVICE DISPATCH — background services, output goes to logs/
+:: SERVICE DISPATCH - background services, output goes to logs/
 :: ============================================================================
 if "%1"==":svc_ollama" (
     if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
@@ -54,7 +55,7 @@ if "%MODE%"=="portable" (
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/5] Ollama not found — AI chat won't work
+        echo [2/5] Ollama not found - AI chat won't work
     )
 ) else (
     where ollama >nul 2>nul
@@ -63,7 +64,7 @@ if "%MODE%"=="portable" (
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/5] Ollama not found — AI chat won't work
+        echo [2/5] Ollama not found - AI chat won't work
     )
 )
 
@@ -187,7 +188,7 @@ timeout /t 1 /nobreak >nul
 
 cd /d "%COMFYUI_DIR%"
 echo [%date% %time%] Starting ComfyUI...
-"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch
+"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch --enable-manager --enable-manager-legacy-ui
 
 if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] ComfyUI crashed with error code %errorlevel%
@@ -224,3 +225,4 @@ if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] Backend crashed with error code %errorlevel%
 )
 exit /b
+

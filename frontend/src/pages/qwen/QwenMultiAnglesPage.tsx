@@ -26,6 +26,7 @@ export const QwenMultiAnglesPage = () => {
   const { toast } = useToast();
   const [selectedAngleId, setSelectedAngleId] = useState<string>(ANGLE_PRESETS[0].id);
   const [seed, setSeed] = useState<number>(-1);
+  const [outputCount, setOutputCount] = useState<number>(4);
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedImageName, setUploadedImageName] = useState<string>('');
@@ -73,7 +74,7 @@ export const QwenMultiAnglesPage = () => {
           (img: any) =>
             `/comfy/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder ?? '')}&type=${encodeURIComponent(img.type ?? 'output')}`,
         );
-        setResults(urls);
+        setResults(urls.slice(0, Math.max(1, Math.min(6, outputCount))));
         return;
       }
       if (state === 'not_found' || state === 'pending' || state === 'running') {
@@ -179,6 +180,20 @@ export const QwenMultiAnglesPage = () => {
               className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
             />
             <p className="text-[11px] text-slate-500">Use `-1` for random seed each run.</p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/30 p-3 space-y-2">
+            <label className="text-[11px] uppercase tracking-[0.12em] text-slate-400 block">Output Count</label>
+            <select
+              value={outputCount}
+              onChange={(e) => setOutputCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+            >
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-500">How many images to return from this run.</p>
           </div>
 
           <button

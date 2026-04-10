@@ -195,6 +195,21 @@ class WorkflowService:
                         print(f"  [OK] Injected {len(active_loras)} LoRA(s): {[l['name'] for l in active_loras]}")
                     continue
 
+                if input_info.get("type") == "seed_sequence":
+                    input_key = input_info.get("input_key") or param_key
+                    try:
+                        base_seed = int(param_value)
+                    except Exception:
+                        base_seed = 0
+                    for idx, node_id in enumerate(target_node_ids):
+                        if node_id in workflow:
+                            if "inputs" not in workflow[node_id]:
+                                workflow[node_id]["inputs"] = {}
+                            workflow[node_id]["inputs"][input_key] = base_seed + idx
+                        else:
+                            print(f"    [WARN] Node {node_id} NOT FOUND in workflow!")
+                    continue
+
                 if is_api:
                     # API Format Injection
                     input_key = input_info.get("input_key") or param_key

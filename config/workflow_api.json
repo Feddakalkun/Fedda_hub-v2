@@ -211,7 +211,7 @@
       "seed": {
         "node_ids": ["197:108", "213:271", "221:280", "229:289", "237:298", "245:307"],
         "input_key": "seed",
-        "type": "number",
+        "type": "seed_sequence",
         "label": "Seed"
       }
     }

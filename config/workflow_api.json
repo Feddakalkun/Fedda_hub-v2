@@ -485,6 +485,12 @@
     "filename": "audio/FISH-API.json",
     "description": "Local Fish S2 TTS for Agent Chat voice output.",
     "inputs": {
+      "model_path": {
+        "node_id": "42",
+        "input_key": "model_path",
+        "type": "string",
+        "label": "Model Path"
+      },
       "text": {
         "node_id": "42",
         "input_key": "text",

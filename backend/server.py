@@ -6,6 +6,7 @@ Additional services (audio, lora, video) will be added as needed.
 """
 import os
 import json
+import ast
 import subprocess
 import sys
 import sqlite3
@@ -64,6 +65,9 @@ TTS_VOICE_PROFILES: Dict[str, Dict[str, Any]] = {
     "Fenrir": {"temperature": 0.72, "top_p": 0.6, "repetition_penalty": 1.28, "seed": 2026},
     "Zephyr": {"temperature": 0.8, "top_p": 0.78, "repetition_penalty": 1.15, "seed": 314},
 }
+FISH_AUTO_DOWNLOAD_SUFFIX = " (auto download)"
+FISH_NODE_LOADER_PATH = COMFY_DIR / "custom_nodes" / "ComfyUI-FishAudioS2" / "nodes" / "loader.py"
+FISH_WARMUP_TEXT = "Fish model warmup download check."
 
 # ─────────────────────────────────────────────
 # Settings helpers
@@ -332,6 +336,129 @@ def _tts_params_for_voice(voice_name: str) -> Dict[str, Any]:
     }
 
 
+def _strip_fish_auto_download_suffix(value: str) -> str:
+    text = str(value or "").strip()
+    if text.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
+        return text[: -len(FISH_AUTO_DOWNLOAD_SUFFIX)]
+    return text
+
+
+def _read_fish_hf_models() -> Dict[str, Dict[str, Any]]:
+    if not FISH_NODE_LOADER_PATH.exists():
+        return {}
+    try:
+        source = FISH_NODE_LOADER_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(FISH_NODE_LOADER_PATH))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "HF_MODELS":
+                    value = ast.literal_eval(node.value)
+                    if isinstance(value, dict):
+                        return value
+        return {}
+    except Exception:
+        return {}
+
+
+def _extract_fish_model_options(payload: Any) -> List[str]:
+    if not isinstance(payload, dict):
+        return []
+
+    node_info = payload.get("FishS2TTS", payload)
+    if not isinstance(node_info, dict):
+        return []
+
+    model_path_info: Any = None
+    node_input = node_info.get("input")
+    if isinstance(node_input, dict):
+        required = node_input.get("required")
+        if isinstance(required, dict):
+            model_path_info = required.get("model_path")
+
+    if model_path_info is None:
+        inputs = node_info.get("inputs")
+        if isinstance(inputs, dict):
+            model_path_info = inputs.get("model_path")
+
+    if not isinstance(model_path_info, (list, tuple)) or not model_path_info:
+        return []
+
+    options = model_path_info[0]
+    if not isinstance(options, (list, tuple)):
+        return []
+
+    parsed: List[str] = []
+    for item in options:
+        value = str(item).strip()
+        if value:
+            parsed.append(value)
+    return parsed
+
+
+def _fetch_fish_models_state() -> Dict[str, Any]:
+    hf_models = _read_fish_hf_models()
+    try:
+        options: List[str] = []
+        primary_resp = requests.get(f"{COMFY_URL}/object_info/FishS2TTS", timeout=4)
+        if primary_resp.ok:
+            options = _extract_fish_model_options(primary_resp.json())
+        else:
+            fallback_resp = requests.get(f"{COMFY_URL}/object_info", timeout=4)
+            if fallback_resp.ok:
+                options = _extract_fish_model_options(fallback_resp.json())
+
+        if not options:
+            status_code = primary_resp.status_code if primary_resp is not None else "unknown"
+            return {
+                "success": False,
+                "comfy_online": True,
+                "fish_node_available": False,
+                "options": [],
+                "hf_models": hf_models,
+                "error": f"FishS2TTS options not found in ComfyUI object_info (status {status_code})",
+            }
+        return {
+            "success": True,
+            "comfy_online": True,
+            "fish_node_available": len(options) > 0,
+            "options": options,
+            "hf_models": hf_models,
+            "error": None,
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "comfy_online": False,
+            "fish_node_available": False,
+            "options": [],
+            "hf_models": hf_models,
+            "error": str(exc),
+        }
+
+
+def _select_fish_model_path(preferred: Optional[str] = None) -> Optional[str]:
+    state = _fetch_fish_models_state()
+    options = state.get("options", []) or []
+    if not options:
+        return None
+
+    wanted = str(preferred or "").strip()
+    if wanted:
+        if wanted in options:
+            return wanted
+        wanted_base = _strip_fish_auto_download_suffix(wanted)
+        for option in options:
+            if _strip_fish_auto_download_suffix(option) == wanted_base:
+                return option
+
+    for option in options:
+        if not option.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
+            return option
+    return options[0]
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -349,6 +476,11 @@ class ChatRequest(BaseModel):
 class TtsRequest(BaseModel):
     text: str
     voice_name: str = "Kore"
+    model_path: Optional[str] = None
+
+
+class FishModelDownloadRequest(BaseModel):
+    model_path: Optional[str] = None
 
 
 def _ollama_chat_text(
@@ -540,6 +672,79 @@ async def get_chat_voices():
     return {"success": True, "voices": voices}
 
 
+@app.get("/api/chat/fish/models")
+async def get_chat_fish_models():
+    state = _fetch_fish_models_state()
+    options: List[str] = state.get("options", []) or []
+    hf_models: Dict[str, Dict[str, Any]] = state.get("hf_models", {}) or {}
+
+    models: List[Dict[str, Any]] = []
+    for value in options:
+        model_name = _strip_fish_auto_download_suffix(value)
+        meta = hf_models.get(model_name, {}) if isinstance(hf_models, dict) else {}
+        is_auto = str(value).endswith(FISH_AUTO_DOWNLOAD_SUFFIX)
+        models.append(
+            {
+                "value": value,
+                "label": value,
+                "model_name": model_name,
+                "auto_download": is_auto,
+                "downloaded": not is_auto,
+                "repo_id": meta.get("repo_id"),
+                "description": meta.get("description"),
+                "base_model": meta.get("base_model"),
+            }
+        )
+
+    selected = _select_fish_model_path()
+    return {
+        "success": bool(state.get("success")),
+        "comfy_online": bool(state.get("comfy_online")),
+        "fish_node_available": bool(state.get("fish_node_available")),
+        "models": models,
+        "selected_model": selected,
+        "error": state.get("error"),
+    }
+
+
+@app.post("/api/chat/fish/download")
+async def download_chat_fish_model(req: FishModelDownloadRequest):
+    selected_model = _select_fish_model_path(req.model_path)
+    if not selected_model:
+        state = _fetch_fish_models_state()
+        msg = state.get("error") or "FishS2TTS node/model options unavailable in ComfyUI."
+        return {"success": False, "error": str(msg)}
+
+    payload = workflow_service.prepare_payload(
+        "audio-fish-tts",
+        {
+            "model_path": selected_model,
+            "text": FISH_WARMUP_TEXT,
+            "temperature": 0.7,
+            "top_p": 0.7,
+            "repetition_penalty": 1.2,
+            "seed": 42,
+        },
+    )
+    if not payload:
+        return {"success": False, "error": "Failed to prepare Fish TTS workflow payload."}
+
+    try:
+        submit = requests.post(
+            f"{COMFY_URL}/prompt",
+            json={"prompt": payload, "client_id": "fedda_fish_model_download"},
+            timeout=12,
+        )
+        if not submit.ok:
+            return {"success": False, "error": f"ComfyUI prompt error: {submit.text}"}
+        prompt_id = submit.json().get("prompt_id")
+        if not prompt_id:
+            return {"success": False, "error": "ComfyUI did not return prompt_id."}
+        return {"success": True, "prompt_id": prompt_id, "model_path": selected_model}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
 @app.post("/api/chat/tts")
 async def chat_tts(req: TtsRequest):
     text = req.text.strip()
@@ -548,9 +753,13 @@ async def chat_tts(req: TtsRequest):
 
     try:
         voice_params = _tts_params_for_voice(req.voice_name)
+        model_path = _select_fish_model_path(req.model_path)
+        if not model_path:
+            return {"success": False, "error": "FishS2TTS model options not available. Check ComfyUI + Fish node."}
         payload = workflow_service.prepare_payload(
             "audio-fish-tts",
             {
+                "model_path": model_path,
                 "text": text,
                 "temperature": voice_params["temperature"],
                 "top_p": voice_params["top_p"],
@@ -592,6 +801,7 @@ async def chat_tts(req: TtsRequest):
                     "provider": "local-fish",
                     "prompt_id": prompt_id,
                     "voice_name": voice_params["voice_name"],
+                    "model_path": model_path,
                     "audio": first,
                     "audio_url": view_url,
                 }

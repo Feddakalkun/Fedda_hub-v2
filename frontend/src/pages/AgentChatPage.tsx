@@ -10,6 +10,15 @@ interface ChatMessage {
   content: string;
 }
 
+interface FishModelOption {
+  value: string;
+  model_name?: string;
+  auto_download?: boolean;
+  downloaded?: boolean;
+  repo_id?: string;
+  description?: string;
+}
+
 const SESSION_KEY = 'fedda_agent_session_id_v1';
 const AUTO_SPEAK_KEY = 'fedda_agent_auto_speak_v1';
 const VOICE_KEY = 'fedda_agent_voice_v1';
@@ -79,6 +88,11 @@ export const AgentChatPage = () => {
   const [pullStatus, setPullStatus] = useState('');
   const [pullPercent, setPullPercent] = useState<number | null>(null);
   const [pullError, setPullError] = useState('');
+  const [fishModels, setFishModels] = useState<FishModelOption[]>([]);
+  const [selectedFishModel, setSelectedFishModel] = useState('');
+  const [fishModelError, setFishModelError] = useState('');
+  const [isDownloadingFishModel, setIsDownloadingFishModel] = useState(false);
+  const [fishDownloadStatus, setFishDownloadStatus] = useState('');
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUTO_SPEAK_KEY) === '1';
@@ -111,6 +125,7 @@ export const AgentChatPage = () => {
   useEffect(() => {
     const init = async () => {
       await refreshLocalModelState();
+      await fetchFishModels();
 
       try {
         const voiceRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/voices`);
@@ -178,6 +193,85 @@ export const AgentChatPage = () => {
       } catch {
         setOllamaOnline(false);
       }
+    }
+  };
+
+  const fetchFishModels = async () => {
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.CHAT_FISH_MODELS}`);
+      const data = await res.json();
+      if (!res.ok || !data) {
+        throw new Error('Failed to load Fish model list');
+      }
+      const models = Array.isArray(data.models) ? (data.models as FishModelOption[]) : [];
+      setFishModels(models);
+      const selected = String(data.selected_model ?? '');
+      if (selected) {
+        setSelectedFishModel(selected);
+      } else if (models.length > 0 && !models.some((m) => m.value === selectedFishModel)) {
+        setSelectedFishModel(models[0].value);
+      }
+      setFishModelError(String(data.error ?? ''));
+    } catch (error) {
+      setFishModelError(error instanceof Error ? error.message : 'Failed to load Fish model list');
+      setFishModels([]);
+    }
+  };
+
+  const pollFishDownload = async (promptId: string) => {
+    const started = Date.now();
+    while (Date.now() - started < 25 * 60 * 1000) {
+      try {
+        const statusRes = await fetch(
+          `${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.GENERATE_STATUS}/${encodeURIComponent(promptId)}`,
+        );
+        const statusData = await statusRes.json();
+        if (!statusRes.ok || !statusData?.success) {
+          throw new Error(statusData?.error || 'Failed to read download status');
+        }
+        const state = String(statusData.status ?? '');
+        if (state === 'completed') {
+          setFishDownloadStatus('Fish model ready.');
+          await fetchFishModels();
+          setIsDownloadingFishModel(false);
+          return;
+        }
+        if (state === 'running') {
+          setFishDownloadStatus('Downloading Fish model...');
+        } else if (state === 'pending') {
+          setFishDownloadStatus('Fish model download queued...');
+        } else {
+          setFishDownloadStatus('Waiting for Fish download...');
+        }
+      } catch (error) {
+        setFishDownloadStatus(error instanceof Error ? error.message : 'Fish model download status failed');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    setFishDownloadStatus('Fish model download timed out. Recheck status.');
+    setIsDownloadingFishModel(false);
+  };
+
+  const downloadFishModel = async () => {
+    if (isDownloadingFishModel) return;
+    setIsDownloadingFishModel(true);
+    setFishDownloadStatus('Starting Fish model download...');
+    setFishModelError('');
+    try {
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.CHAT_FISH_DOWNLOAD}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_path: selectedFishModel || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.prompt_id) {
+        throw new Error(data?.error || 'Fish download request failed');
+      }
+      setFishDownloadStatus(`Started: ${String(data.model_path ?? selectedFishModel)}`);
+      await pollFishDownload(String(data.prompt_id));
+    } catch (error) {
+      setFishModelError(error instanceof Error ? error.message : 'Fish model download failed');
+      setIsDownloadingFishModel(false);
     }
   };
 
@@ -318,7 +412,7 @@ export const AgentChatPage = () => {
       const res = await fetch(`${BACKEND_API.BASE_URL}/api/chat/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice_name: voiceName }),
+        body: JSON.stringify({ text, voice_name: voiceName, model_path: selectedFishModel || undefined }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) return;
@@ -432,7 +526,10 @@ export const AgentChatPage = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => void refreshLocalModelState()}
+                  onClick={() => {
+                    void refreshLocalModelState();
+                    void fetchFishModels();
+                  }}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/15 text-slate-200 bg-white/[0.03]"
                 >
                   <RefreshCw className="w-3 h-3" />
@@ -523,6 +620,47 @@ export const AgentChatPage = () => {
 
           <div className="text-[11px] text-slate-500 mb-4">
             Local chat only. Voice choice changes local TTS synthesis profile.
+          </div>
+
+          <div className="mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02]">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Fish TTS Model</h4>
+              <button
+                onClick={() => void fetchFishModels()}
+                className="text-[10px] px-2 py-1 rounded border border-white/10 text-slate-300"
+              >
+                Refresh
+              </button>
+            </div>
+            <select
+              value={selectedFishModel}
+              onChange={(e) => setSelectedFishModel(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-2"
+            >
+              {fishModels.length === 0 ? (
+                <option value="">No Fish models found</option>
+              ) : (
+                fishModels.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.value}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              onClick={() => void downloadFishModel()}
+              disabled={isDownloadingFishModel || !selectedFishModel}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-cyan-400/40 text-cyan-200 bg-cyan-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDownloadingFishModel ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              {isDownloadingFishModel ? 'Downloading...' : 'Download in UI'}
+            </button>
+            {fishDownloadStatus && (
+              <p className="mt-2 text-[10px] text-slate-300">{fishDownloadStatus}</p>
+            )}
+            {fishModelError && (
+              <p className="mt-1 text-[10px] text-red-300">{fishModelError}</p>
+            )}
           </div>
 
           <div className="mt-5 p-3 rounded-lg border border-white/10 bg-white/[0.02]">

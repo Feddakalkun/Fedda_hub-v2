@@ -48,6 +48,7 @@ class ComfyUIService {
         if (this.ws) return;
 
         const url = `${this.getComfyWsUrl()}?clientId=${this.clientId}`;
+        const connectStartedAt = Date.now();
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
@@ -86,7 +87,7 @@ class ComfyUIService {
                         break;
                 }
             } catch (e) {
-                console.error('Failed to parse WS message', e);
+                // Ignore occasional malformed messages during reconnect bursts.
             }
         };
 
@@ -100,7 +101,11 @@ class ComfyUIService {
         };
 
         this.ws.onerror = (err) => {
-            console.error('WS Error', err);
+            // During startup/reconnect we expect transient WS failures; avoid noisy console spam.
+            const elapsed = Date.now() - connectStartedAt;
+            if (this.reconnectAttempts >= 2 && elapsed > 1500) {
+                console.warn('Comfy WebSocket reconnecting...');
+            }
         };
     }
 

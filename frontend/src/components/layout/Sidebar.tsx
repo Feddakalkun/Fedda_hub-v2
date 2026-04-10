@@ -70,6 +70,7 @@ const SECTIONS: NavSection[] = [
             subitems: [
               { id: 'qwen-txt2img', label: 'Txt2Img' },
               { id: 'qwen-image-ref', label: 'Image Reference' },
+              { id: 'qwen-multi-angle', label: 'Multi Angles' },
             ],
           },
           { id: 'image-other', label: 'Other' }

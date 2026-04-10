@@ -179,6 +179,43 @@
       }
     }
   },
+  "qwen-multi-angles": {
+    "name": "Qwen Multi Angles",
+    "filename": "qwen/qwen-multi-angles.json",
+    "description": "Single reference image with selectable camera angle prompt transformation.",
+    "inputs": {
+      "image": {
+        "node_id": "41",
+        "input_key": "image",
+        "type": "string",
+        "label": "Reference Image"
+      },
+      "horizontal_angle": {
+        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "input_key": "horizontal_angle",
+        "type": "number",
+        "label": "Horizontal Angle"
+      },
+      "vertical_angle": {
+        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "input_key": "vertical_angle",
+        "type": "number",
+        "label": "Vertical Angle"
+      },
+      "zoom": {
+        "node_ids": ["93", "218", "226", "234", "242", "250"],
+        "input_key": "zoom",
+        "type": "number",
+        "label": "Zoom"
+      },
+      "seed": {
+        "node_ids": ["197:108", "213:271", "221:280", "229:289", "237:298", "245:307"],
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
+      }
+    }
+  },
   "wan22-vid2vid": {
     "name": "WAN 2.2 Vid2Vid",
     "filename": "wan22/vid2vid-4frames-wan22.json",

@@ -20,7 +20,7 @@ import {
 
 // ─── Tab registry ──────────────────────────────────────────────────────────
 const VALID_TABS = new Set([
-  'chat', 'image', 'z-image', 'z-image-txt2img', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'image-other',
+  'chat', 'image', 'z-image', 'z-image-txt2img', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'qwen-multi-angle', 'image-other',
   'video', 'wan22-vid2vid', 'wan22-img2vid',
   'ltx', 'ltx-flf', 'ltx-img-audio',
   'audio', 'gallery', 'videos', 'library', 'workflows',
@@ -37,6 +37,7 @@ const PAGE_META: Record<string, { label: string; description: string; Icon: any 
   qwen:        { label: 'Qwen Studio',   description: 'Qwen workflow family.', Icon: Sparkles },
   'qwen-txt2img': { label: 'Qwen (Txt2Img)', description: 'Txt2Img workspace for Qwen.', Icon: Sparkles },
   'qwen-image-ref': { label: 'Qwen (Image Reference)', description: 'Generate from a reference image to keep character identity.', Icon: Sparkles },
+  'qwen-multi-angle': { label: 'Qwen (Multi Angles)', description: 'Upload one image and generate camera-angle variants.', Icon: Sparkles },
   'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
   video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
   'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
@@ -101,6 +102,7 @@ function FeddaApp() {
       case 'qwen':
       case 'qwen-txt2img':
       case 'qwen-image-ref':
+      case 'qwen-multi-angle':
       case 'image-other':
         return <ImageStudioPage activeTab={activeTab} />;
       case 'video':

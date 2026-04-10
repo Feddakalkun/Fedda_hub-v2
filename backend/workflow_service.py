@@ -105,9 +105,13 @@ class WorkflowService:
         for param_key, param_value in user_params.items():
             if param_key in mapping["inputs"]:
                 input_info = mapping["inputs"][param_key]
-                node_id = str(input_info["node_id"])
+                node_ids_raw = input_info.get("node_ids")
+                if isinstance(node_ids_raw, list) and node_ids_raw:
+                    target_node_ids = [str(n) for n in node_ids_raw]
+                else:
+                    target_node_ids = [str(input_info["node_id"])]
                 
-                print(f"  > Injecting '{param_key}' -> Node {node_id} (value: {param_value})")
+                print(f"  > Injecting '{param_key}' -> Nodes {target_node_ids} (value: {param_value})")
 
                 if input_info.get("type") == "nsfw_toggle":
                     # When NSFW is disabled, turn off all non-base LoRA slots in every
@@ -129,6 +133,7 @@ class WorkflowService:
                 if input_info.get("type") == "loras" and isinstance(param_value, list):
                     # Dynamic LoRA chain: replace the placeholder node with a chain of
                     # LoraLoader / LoraLoaderModelOnly nodes, then rewire downstream refs.
+                    node_id = target_node_ids[0]
                     if node_id not in workflow:
                         print(f"  [WARN] LoRA placeholder node {node_id} not found")
                         continue
@@ -193,26 +198,28 @@ class WorkflowService:
                 if is_api:
                     # API Format Injection
                     input_key = input_info.get("input_key") or param_key
-                    if node_id in workflow:
-                        if "inputs" not in workflow[node_id]:
-                            workflow[node_id]["inputs"] = {}
-                        workflow[node_id]["inputs"][input_key] = param_value
-                    else:
-                        print(f"    [WARN] Node {node_id} NOT FOUND in workflow!")
+                    for node_id in target_node_ids:
+                        if node_id in workflow:
+                            if "inputs" not in workflow[node_id]:
+                                workflow[node_id]["inputs"] = {}
+                            workflow[node_id]["inputs"][input_key] = param_value
+                        else:
+                            print(f"    [WARN] Node {node_id} NOT FOUND in workflow!")
                 else:
                     # UI Format Injection
                     w_idx = input_info.get("widget_index")
-                    found = False
-                    for node in workflow.get("nodes", []):
-                        if str(node["id"]) == node_id:
-                            found = True
-                            if "widgets_values" in node and w_idx is not None:
-                                if w_idx < len(node["widgets_values"]):
-                                    node["widgets_values"][w_idx] = param_value
-                                    print(f"    [OK] Updated widget[{w_idx}]")
-                            break
-                    if not found:
-                        print(f"    [WARN] Node {node_id} NOT FOUND in UI nodes!")
+                    for node_id in target_node_ids:
+                        found = False
+                        for node in workflow.get("nodes", []):
+                            if str(node["id"]) == node_id:
+                                found = True
+                                if "widgets_values" in node and w_idx is not None:
+                                    if w_idx < len(node["widgets_values"]):
+                                        node["widgets_values"][w_idx] = param_value
+                                        print(f"    [OK] Updated widget[{w_idx}]")
+                                break
+                        if not found:
+                            print(f"    [WARN] Node {node_id} NOT FOUND in UI nodes!")
         
         # 2. Convert to final API format for ComfyUI if needed
         if not is_api:

@@ -522,5 +522,60 @@
         "label": "Seed"
       }
     }
+  },
+  "audio-fish-voiceclone": {
+    "name": "Audio Fish Voice Clone",
+    "filename": "audio/FISH-VOICE-CLONE-API.json",
+    "description": "Local Fish S2 voice clone for Agent Chat.",
+    "inputs": {
+      "model_path": {
+        "node_id": "42",
+        "input_key": "model_path",
+        "type": "string",
+        "label": "Model Path"
+      },
+      "text": {
+        "node_id": "42",
+        "input_key": "text",
+        "type": "string",
+        "label": "Text"
+      },
+      "reference_audio_file": {
+        "node_id": "41",
+        "input_key": "audio",
+        "type": "string",
+        "label": "Reference Audio"
+      },
+      "reference_text": {
+        "node_id": "42",
+        "input_key": "reference_text",
+        "type": "string",
+        "label": "Reference Transcript"
+      },
+      "temperature": {
+        "node_id": "42",
+        "input_key": "temperature",
+        "type": "number",
+        "label": "Temperature"
+      },
+      "top_p": {
+        "node_id": "42",
+        "input_key": "top_p",
+        "type": "number",
+        "label": "Top P"
+      },
+      "repetition_penalty": {
+        "node_id": "42",
+        "input_key": "repetition_penalty",
+        "type": "number",
+        "label": "Repetition Penalty"
+      },
+      "seed": {
+        "node_id": "42",
+        "input_key": "seed",
+        "type": "number",
+        "label": "Seed"
+      }
+    }
   }
 }

@@ -93,6 +93,11 @@ export const AgentChatPage = () => {
   const [fishModelError, setFishModelError] = useState('');
   const [isDownloadingFishModel, setIsDownloadingFishModel] = useState(false);
   const [fishDownloadStatus, setFishDownloadStatus] = useState('');
+  const [useVoiceClone, setUseVoiceClone] = useState(false);
+  const [referenceAudioFile, setReferenceAudioFile] = useState('');
+  const [referenceText, setReferenceText] = useState('');
+  const [isUploadingReference, setIsUploadingReference] = useState(false);
+  const [voiceCloneError, setVoiceCloneError] = useState('');
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUTO_SPEAK_KEY) === '1';
@@ -275,6 +280,30 @@ export const AgentChatPage = () => {
     }
   };
 
+  const uploadReferenceAudio = async (file: File) => {
+    if (!file) return;
+    setIsUploadingReference(true);
+    setVoiceCloneError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.CHAT_VOICE_CLONE_REFERENCE}`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Reference upload failed');
+      }
+      setReferenceAudioFile(String(data.filename || ''));
+    } catch (error) {
+      setVoiceCloneError(error instanceof Error ? error.message : 'Reference upload failed');
+      setReferenceAudioFile('');
+    } finally {
+      setIsUploadingReference(false);
+    }
+  };
+
   const installRecommendedModel = async () => {
     if (isPullingModel) return;
     setIsPullingModel(true);
@@ -408,11 +437,22 @@ export const AgentChatPage = () => {
   };
 
   const playTts = async (text: string) => {
+    if (useVoiceClone && !referenceAudioFile) {
+      setVoiceCloneError('Upload a reference audio file before using voice clone.');
+      return;
+    }
     try {
       const res = await fetch(`${BACKEND_API.BASE_URL}/api/chat/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice_name: voiceName, model_path: selectedFishModel || undefined }),
+        body: JSON.stringify({
+          text,
+          voice_name: voiceName,
+          model_path: selectedFishModel || undefined,
+          use_voice_clone: useVoiceClone,
+          reference_audio: referenceAudioFile || undefined,
+          reference_text: referenceText || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) return;
@@ -661,6 +701,44 @@ export const AgentChatPage = () => {
             {fishModelError && (
               <p className="mt-1 text-[10px] text-red-300">{fishModelError}</p>
             )}
+          </div>
+
+          <div className="mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02]">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Voice Clone</h4>
+              <label className="inline-flex items-center gap-2 text-[11px] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={useVoiceClone}
+                  onChange={(e) => setUseVoiceClone(e.target.checked)}
+                />
+                Enable
+              </label>
+            </div>
+            <label className="block text-[11px] text-slate-400 mb-1">Reference Audio</label>
+            <input
+              type="file"
+              accept=".wav,.mp3,.flac,.m4a,.ogg,audio/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void uploadReferenceAudio(file);
+              }}
+              className="w-full text-[11px] text-slate-300 mb-2"
+            />
+            {isUploadingReference && <p className="text-[10px] text-slate-400">Uploading reference...</p>}
+            {referenceAudioFile && (
+              <p className="text-[10px] text-emerald-300 mb-2">Ready: {referenceAudioFile}</p>
+            )}
+
+            <label className="block text-[11px] text-slate-400 mb-1">Reference Transcript (optional but recommended)</label>
+            <textarea
+              value={referenceText}
+              onChange={(e) => setReferenceText(e.target.value)}
+              rows={3}
+              placeholder="Exact words spoken in the reference audio"
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-slate-100"
+            />
+            {voiceCloneError && <p className="mt-1 text-[10px] text-red-300">{voiceCloneError}</p>}
           </div>
 
           <div className="mt-5 p-3 rounded-lg border border-white/10 bg-white/[0.02]">

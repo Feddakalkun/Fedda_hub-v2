@@ -68,6 +68,7 @@ TTS_VOICE_PROFILES: Dict[str, Dict[str, Any]] = {
 FISH_AUTO_DOWNLOAD_SUFFIX = " (auto download)"
 FISH_NODE_LOADER_PATH = COMFY_DIR / "custom_nodes" / "ComfyUI-FishAudioS2" / "nodes" / "loader.py"
 FISH_WARMUP_TEXT = "Fish model warmup download check."
+VOICE_CLONE_REF_DIR = COMFY_DIR / "input" / "AGENT_CHAT"
 
 # ─────────────────────────────────────────────
 # Settings helpers
@@ -453,6 +454,16 @@ def _select_fish_model_path(preferred: Optional[str] = None) -> Optional[str]:
             if _strip_fish_auto_download_suffix(option) == wanted_base:
                 return option
 
+    preferred_order = ["s2-pro", "s2-pro-fp8", "s2-pro-bnb-int8", "s2-pro-bnb-nf4"]
+    for model_name in preferred_order:
+        for option in options:
+            if _strip_fish_auto_download_suffix(option) == model_name and not option.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
+                return option
+    for model_name in preferred_order:
+        for option in options:
+            if _strip_fish_auto_download_suffix(option) == model_name:
+                return option
+
     for option in options:
         if not option.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
             return option
@@ -477,6 +488,9 @@ class TtsRequest(BaseModel):
     text: str
     voice_name: str = "Kore"
     model_path: Optional[str] = None
+    use_voice_clone: bool = False
+    reference_audio: Optional[str] = None
+    reference_text: Optional[str] = None
 
 
 class FishModelDownloadRequest(BaseModel):
@@ -745,6 +759,27 @@ async def download_chat_fish_model(req: FishModelDownloadRequest):
         return {"success": False, "error": str(exc)}
 
 
+@app.post("/api/chat/voice-clone/reference")
+async def upload_voice_clone_reference(file: UploadFile = File(...)):
+    try:
+        original_name = Path(file.filename or "reference.wav").name
+        suffix = Path(original_name).suffix.lower()
+        if suffix not in {".wav", ".mp3", ".flac", ".m4a", ".ogg"}:
+            return {"success": False, "error": "Unsupported audio format. Use wav/mp3/flac/m4a/ogg."}
+
+        VOICE_CLONE_REF_DIR.mkdir(parents=True, exist_ok=True)
+        safe_stem = re.sub(r"[^a-zA-Z0-9._-]+", "_", Path(original_name).stem)[:48] or "reference"
+        saved_name = f"{int(time.time())}_{safe_stem}{suffix}"
+        save_path = VOICE_CLONE_REF_DIR / saved_name
+
+        content = await file.read()
+        save_path.write_bytes(content)
+        relative_name = f"AGENT_CHAT/{saved_name}"
+        return {"success": True, "filename": relative_name, "size": len(content)}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
 @app.post("/api/chat/tts")
 async def chat_tts(req: TtsRequest):
     text = req.text.strip()
@@ -756,17 +791,30 @@ async def chat_tts(req: TtsRequest):
         model_path = _select_fish_model_path(req.model_path)
         if not model_path:
             return {"success": False, "error": "FishS2TTS model options not available. Check ComfyUI + Fish node."}
-        payload = workflow_service.prepare_payload(
-            "audio-fish-tts",
-            {
-                "model_path": model_path,
-                "text": text,
-                "temperature": voice_params["temperature"],
-                "top_p": voice_params["top_p"],
-                "repetition_penalty": voice_params["repetition_penalty"],
-                "seed": voice_params["seed"],
-            },
-        )
+
+        use_voice_clone = bool(req.use_voice_clone)
+        workflow_id = "audio-fish-voiceclone" if use_voice_clone else "audio-fish-tts"
+        params: Dict[str, Any] = {
+            "model_path": model_path,
+            "text": text,
+            "temperature": voice_params["temperature"],
+            "top_p": voice_params["top_p"],
+            "repetition_penalty": voice_params["repetition_penalty"],
+            "seed": voice_params["seed"],
+        }
+
+        if use_voice_clone:
+            reference_audio = (req.reference_audio or "").strip()
+            if not reference_audio:
+                return {"success": False, "error": "Voice clone enabled but no reference audio uploaded."}
+            reference_path = (COMFY_DIR / "input" / reference_audio).resolve()
+            comfy_input_root = (COMFY_DIR / "input").resolve()
+            if not str(reference_path).startswith(str(comfy_input_root)) or not reference_path.exists():
+                return {"success": False, "error": "Reference audio file not found in ComfyUI input folder."}
+            params["reference_audio_file"] = reference_audio.replace("\\", "/")
+            params["reference_text"] = str(req.reference_text or "").strip()
+
+        payload = workflow_service.prepare_payload(workflow_id, params)
         if not payload:
             return {"success": False, "error": "Failed to prepare local TTS workflow."}
 
@@ -798,10 +846,11 @@ async def chat_tts(req: TtsRequest):
                 view_url = f"{COMFY_URL}/view?filename={filename}&subfolder={subfolder}&type={file_type}"
                 return {
                     "success": True,
-                    "provider": "local-fish",
+                    "provider": "local-fish-voiceclone" if use_voice_clone else "local-fish",
                     "prompt_id": prompt_id,
                     "voice_name": voice_params["voice_name"],
                     "model_path": model_path,
+                    "use_voice_clone": use_voice_clone,
                     "audio": first,
                     "audio_url": view_url,
                 }

@@ -49,6 +49,7 @@ export const BACKEND_API = {
         CHAT_RESET: '/api/chat/reset',
         CHAT_FISH_MODELS: '/api/chat/fish/models',
         CHAT_FISH_DOWNLOAD: '/api/chat/fish/download',
+        CHAT_VOICE_CLONE_REFERENCE: '/api/chat/voice-clone/reference',
         CHAT_TTS: '/api/chat/tts',
         CHAT_LTX_COPILOT: '/api/chat/ltx-copilot',
         COMFY_REFRESH_MODELS: '/api/comfy/refresh-models',

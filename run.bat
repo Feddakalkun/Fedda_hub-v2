@@ -90,7 +90,7 @@ if not exist "node_modules" (
     call npm install
 )
 
-start "" cmd /c "timeout /t 3 /nobreak >nul && start \"\" \"http://127.0.0.1:5173\""
+start "" "http://127.0.0.1:5173"
 call npm run dev
 pause
 exit /b

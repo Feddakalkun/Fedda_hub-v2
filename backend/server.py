@@ -21,6 +21,7 @@ if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
 import requests
+from requests import exceptions as requests_exceptions
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -429,13 +430,17 @@ def _fetch_fish_models_state() -> Dict[str, Any]:
             "error": None,
         }
     except Exception as exc:
+        if isinstance(exc, requests_exceptions.ConnectionError):
+            msg = "ComfyUI is offline on 127.0.0.1:8199. Start ComfyUI first."
+        else:
+            msg = str(exc)
         return {
             "success": False,
             "comfy_online": False,
             "fish_node_available": False,
             "options": [],
             "hf_models": hf_models,
-            "error": str(exc),
+            "error": msg,
         }
 
 

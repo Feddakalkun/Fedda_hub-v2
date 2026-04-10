@@ -93,6 +93,7 @@ export const AgentChatPage = () => {
   const [fishModelError, setFishModelError] = useState('');
   const [isDownloadingFishModel, setIsDownloadingFishModel] = useState(false);
   const [fishDownloadStatus, setFishDownloadStatus] = useState('');
+  const [fishDownloadProgress, setFishDownloadProgress] = useState<number>(0);
   const [useVoiceClone, setUseVoiceClone] = useState(false);
   const [referenceAudioFile, setReferenceAudioFile] = useState('');
   const [referenceText, setReferenceText] = useState('');
@@ -237,23 +238,31 @@ export const AgentChatPage = () => {
         const state = String(statusData.status ?? '');
         if (state === 'completed') {
           setFishDownloadStatus('Fish model ready.');
+          setFishDownloadProgress(100);
           await fetchFishModels();
           setIsDownloadingFishModel(false);
           return;
         }
+        const elapsedSec = Math.floor((Date.now() - started) / 1000);
         if (state === 'running') {
           setFishDownloadStatus('Downloading Fish model...');
+          const estimated = Math.min(95, 20 + Math.floor((elapsedSec / 600) * 75));
+          setFishDownloadProgress(Math.max(20, estimated));
         } else if (state === 'pending') {
           setFishDownloadStatus('Fish model download queued...');
+          setFishDownloadProgress(Math.max(8, fishDownloadProgress));
         } else {
           setFishDownloadStatus('Waiting for Fish download...');
+          setFishDownloadProgress(Math.max(5, fishDownloadProgress));
         }
       } catch (error) {
         setFishDownloadStatus(error instanceof Error ? error.message : 'Fish model download status failed');
+        setFishDownloadProgress(Math.max(5, fishDownloadProgress));
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
     setFishDownloadStatus('Fish model download timed out. Recheck status.');
+    setFishDownloadProgress(0);
     setIsDownloadingFishModel(false);
   };
 
@@ -261,6 +270,7 @@ export const AgentChatPage = () => {
     if (isDownloadingFishModel) return;
     setIsDownloadingFishModel(true);
     setFishDownloadStatus('Starting Fish model download...');
+    setFishDownloadProgress(5);
     setFishModelError('');
     try {
       const res = await fetch(`${BACKEND_API.BASE_URL}${BACKEND_API.ENDPOINTS.CHAT_FISH_DOWNLOAD}`, {
@@ -273,9 +283,11 @@ export const AgentChatPage = () => {
         throw new Error(data?.error || 'Fish download request failed');
       }
       setFishDownloadStatus(`Started: ${String(data.model_path ?? selectedFishModel)}`);
+      setFishDownloadProgress(10);
       await pollFishDownload(String(data.prompt_id));
     } catch (error) {
       setFishModelError(error instanceof Error ? error.message : 'Fish model download failed');
+      setFishDownloadProgress(0);
       setIsDownloadingFishModel(false);
     }
   };
@@ -647,7 +659,7 @@ export const AgentChatPage = () => {
         <aside className={`rounded-2xl border border-white/10 bg-black/25 p-4 overflow-y-auto custom-scrollbar ${panelOpen ? 'block' : 'hidden xl:block'}`}>
           <h3 className="text-xs uppercase tracking-[0.16em] text-slate-400 mb-3">Chat Settings</h3>
 
-          <label className="block text-[11px] text-slate-400 mb-1">Voice</label>
+          <label className="block text-[11px] text-slate-400 mb-1">Voice Preset</label>
           <select
             value={voiceName}
             onChange={(e) => setVoiceName(e.target.value)}
@@ -659,7 +671,7 @@ export const AgentChatPage = () => {
           </select>
 
           <div className="text-[11px] text-slate-500 mb-4">
-            Local chat only. Voice choice changes local TTS synthesis profile.
+            Presets are still active. They control TTS sampling (temperature/top-p/repetition), including voice clone mode.
           </div>
 
           <div className="mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02]">
@@ -697,6 +709,17 @@ export const AgentChatPage = () => {
             </button>
             {fishDownloadStatus && (
               <p className="mt-2 text-[10px] text-slate-300">{fishDownloadStatus}</p>
+            )}
+            {isDownloadingFishModel && (
+              <div className="mt-2">
+                <div className="h-1.5 w-full rounded bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full bg-cyan-400 transition-all duration-500"
+                    style={{ width: `${Math.max(0, Math.min(100, fishDownloadProgress))}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-slate-400">{Math.round(fishDownloadProgress)}%</p>
+              </div>
             )}
             {fishModelError && (
               <p className="mt-1 text-[10px] text-red-300">{fishModelError}</p>

@@ -1,8 +1,8 @@
 # ============================================================================
-# FEDDA Lite Installer - Non-Portable (System Tools + venv)
+# FEDDA Lite Installer - Hybrid (Embedded Python + System Git/Node)
 # ============================================================================
-# Assumes: Python 3.10+, Git, Node.js 18+, Ollama already on system
-# Creates: venv, ComfyUI, custom nodes, frontend, backend - ready to run
+# Assumes: Git, Node.js 18+, npm (Python is embedded automatically)
+# Creates: embedded Python runtime + ComfyUI + custom nodes + frontend + backend
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -162,7 +162,7 @@ Write-Host ""
 Write-Host "  ========================================================" -ForegroundColor Cyan
 Write-Host "                                                          " -ForegroundColor Cyan
 Write-Host "         FEDDA LITE INSTALLER" -ForegroundColor Cyan
-Write-Host "         Uses your system Python, Git, Node" -ForegroundColor Cyan
+Write-Host "         Uses embedded Python + system Git/Node" -ForegroundColor Cyan
 Write-Host "                                                          " -ForegroundColor Cyan
 Write-Host "  ========================================================" -ForegroundColor Cyan
 Write-Host ""
@@ -699,7 +699,7 @@ $TimeStr = "{0:mm}m {0:ss}s" -f $Elapsed
 
 $LiteReport = @()
 $LiteReport += "Install Date:    $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-$LiteReport += "Install Mode:    Lite (System Python + venv)"
+$LiteReport += "Install Mode:    Lite (Embedded Python + system Git/Node)"
 $LiteReport += "Install Path:    $RootPath"
 $LiteReport += "Install Time:    $TimeStr"
 $LiteReport += ""

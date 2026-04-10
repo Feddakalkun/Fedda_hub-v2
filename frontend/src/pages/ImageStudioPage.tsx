@@ -4,6 +4,7 @@ import { PlaceholderPage } from './PlaceholderPage';
 import { FluxTxt2Img } from './flux/FluxTxt2Img';
 import { QwenTxt2Img } from './qwen/QwenTxt2Img';
 import { QwenImageReferencePage } from './qwen/QwenImageReferencePage';
+import { QwenMultiAnglesPage } from './qwen/QwenMultiAnglesPage';
 
 interface ImageStudioPageProps {
   activeTab?: string;
@@ -26,6 +27,10 @@ export const ImageStudioPage = ({ activeTab = 'z-image' }: ImageStudioPageProps)
 
   if (activeTab === 'qwen-image-ref') {
     return <QwenImageReferencePage />;
+  }
+
+  if (activeTab === 'qwen-multi-angle') {
+    return <QwenMultiAnglesPage />;
   }
 
   if (activeTab === 'image-other') {

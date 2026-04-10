@@ -15,16 +15,15 @@ import {
   LayoutDashboard,
   Wand2,
   Terminal,
-  Settings,
 } from 'lucide-react';
 
 // ─── Tab registry ──────────────────────────────────────────────────────────
 const VALID_TABS = new Set([
-  'chat', 'image', 'z-image', 'z-image-txt2img', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'image-other',
+  'chat', 'image', 'z-image', 'z-image-txt2img', 'flux', 'flux-txt2img', 'qwen', 'qwen-txt2img', 'qwen-image-ref', 'qwen-multi-angle', 'image-other',
   'video', 'wan22-vid2vid', 'wan22-img2vid',
   'ltx', 'ltx-flf', 'ltx-img-audio',
   'audio', 'gallery', 'videos', 'library', 'workflows',
-  'logs', 'settings',
+  'logs',
 ]);
 
 const PAGE_META: Record<string, { label: string; description: string; Icon: any }> = {
@@ -37,6 +36,7 @@ const PAGE_META: Record<string, { label: string; description: string; Icon: any 
   qwen:        { label: 'Qwen Studio',   description: 'Qwen workflow family.', Icon: Sparkles },
   'qwen-txt2img': { label: 'Qwen (Txt2Img)', description: 'Txt2Img workspace for Qwen.', Icon: Sparkles },
   'qwen-image-ref': { label: 'Qwen (Image Reference)', description: 'Generate from a reference image to keep character identity.', Icon: Sparkles },
+  'qwen-multi-angle': { label: 'Qwen (Multi Angles)', description: 'Upload one image and generate camera-angle variants.', Icon: Sparkles },
   'image-other': { label: 'Other Workflows', description: 'Uncategorized image processing capabilities.', Icon: Sparkles },
   video:          { label: 'Video Studio',   description: 'Create and animate video sequences with WAN.',        Icon: Video           },
   'wan22-vid2vid': { label: 'WAN 2.2 Vid2Vid', description: 'Extend and transform video with WAN 2.2.',            Icon: Video           },
@@ -50,7 +50,6 @@ const PAGE_META: Record<string, { label: string; description: string; Icon: any 
   library:     { label: 'LoRA Library',  description: 'Manage your installed LoRA models.',                  Icon: LayoutDashboard },
   workflows:   { label: 'Workflows',     description: 'Build and run custom ComfyUI generation pipelines.',  Icon: Wand2           },
   logs:        { label: 'Console Logs',  description: 'Monitor backend logs and debug information.',          Icon: Terminal        },
-  settings:    { label: 'Settings',      description: 'Configure models, API keys, and system preferences.', Icon: Settings        },
 };
 
 // ─── Persistence ───────────────────────────────────────────────────────────
@@ -67,7 +66,6 @@ function readActiveTab(): string {
 import { ImageStudioPage } from './pages/ImageStudioPage';
 import { VideoStudioPage } from './pages/VideoStudioPage';
 import { LibraryPage } from './pages/LibraryPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { AgentChatPage } from './pages/AgentChatPage';
 
 // ─── App ───────────────────────────────────────────────────────────────────
@@ -101,6 +99,7 @@ function FeddaApp() {
       case 'qwen':
       case 'qwen-txt2img':
       case 'qwen-image-ref':
+      case 'qwen-multi-angle':
       case 'image-other':
         return <ImageStudioPage activeTab={activeTab} />;
       case 'video':
@@ -112,8 +111,6 @@ function FeddaApp() {
         return <VideoStudioPage activeTab={activeTab} />;
       case 'library':
         return <LibraryPage />;
-      case 'settings':
-        return <SettingsPage />;
       default:
         return (
           <PlaceholderPage

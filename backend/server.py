@@ -6,6 +6,7 @@ Additional services (audio, lora, video) will be added as needed.
 """
 import os
 import json
+import ast
 import subprocess
 import sys
 import sqlite3
@@ -20,6 +21,7 @@ if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
 import requests
+from requests import exceptions as requests_exceptions
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,6 +57,19 @@ OUTPUT_DIR = COMFY_DIR / "output"
 
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8199")
 AGENT_DB_PATH = CONFIG_DIR / "agent_memory.db"
+MEMORY_REFRESH_EVERY_TURNS = 2
+
+TTS_VOICE_PROFILES: Dict[str, Dict[str, Any]] = {
+    "Kore": {"temperature": 0.65, "top_p": 0.65, "repetition_penalty": 1.2, "seed": 42},
+    "Puck": {"temperature": 0.85, "top_p": 0.85, "repetition_penalty": 1.1, "seed": 7},
+    "Charon": {"temperature": 0.5, "top_p": 0.55, "repetition_penalty": 1.25, "seed": 99},
+    "Fenrir": {"temperature": 0.72, "top_p": 0.6, "repetition_penalty": 1.28, "seed": 2026},
+    "Zephyr": {"temperature": 0.8, "top_p": 0.78, "repetition_penalty": 1.15, "seed": 314},
+}
+FISH_AUTO_DOWNLOAD_SUFFIX = " (auto download)"
+FISH_NODE_LOADER_PATH = COMFY_DIR / "custom_nodes" / "ComfyUI-FishAudioS2" / "nodes" / "loader.py"
+FISH_WARMUP_TEXT = "Fish model warmup download check."
+VOICE_CLONE_REF_DIR = COMFY_DIR / "input" / "AGENT_CHAT"
 
 # ─────────────────────────────────────────────
 # Settings helpers
@@ -311,6 +326,155 @@ def _normalize_for_tts(text: str) -> str:
     return cleaned
 
 
+def _tts_params_for_voice(voice_name: str) -> Dict[str, Any]:
+    profile_name = (voice_name or "").strip() or "Kore"
+    profile = TTS_VOICE_PROFILES.get(profile_name, TTS_VOICE_PROFILES["Kore"])
+    return {
+        "voice_name": profile_name,
+        "temperature": profile["temperature"],
+        "top_p": profile["top_p"],
+        "repetition_penalty": profile["repetition_penalty"],
+        "seed": profile["seed"],
+    }
+
+
+def _strip_fish_auto_download_suffix(value: str) -> str:
+    text = str(value or "").strip()
+    if text.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
+        return text[: -len(FISH_AUTO_DOWNLOAD_SUFFIX)]
+    return text
+
+
+def _read_fish_hf_models() -> Dict[str, Dict[str, Any]]:
+    if not FISH_NODE_LOADER_PATH.exists():
+        return {}
+    try:
+        source = FISH_NODE_LOADER_PATH.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(FISH_NODE_LOADER_PATH))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "HF_MODELS":
+                    value = ast.literal_eval(node.value)
+                    if isinstance(value, dict):
+                        return value
+        return {}
+    except Exception:
+        return {}
+
+
+def _extract_fish_model_options(payload: Any) -> List[str]:
+    if not isinstance(payload, dict):
+        return []
+
+    node_info = payload.get("FishS2TTS", payload)
+    if not isinstance(node_info, dict):
+        return []
+
+    model_path_info: Any = None
+    node_input = node_info.get("input")
+    if isinstance(node_input, dict):
+        required = node_input.get("required")
+        if isinstance(required, dict):
+            model_path_info = required.get("model_path")
+
+    if model_path_info is None:
+        inputs = node_info.get("inputs")
+        if isinstance(inputs, dict):
+            model_path_info = inputs.get("model_path")
+
+    if not isinstance(model_path_info, (list, tuple)) or not model_path_info:
+        return []
+
+    options = model_path_info[0]
+    if not isinstance(options, (list, tuple)):
+        return []
+
+    parsed: List[str] = []
+    for item in options:
+        value = str(item).strip()
+        if value:
+            parsed.append(value)
+    return parsed
+
+
+def _fetch_fish_models_state() -> Dict[str, Any]:
+    hf_models = _read_fish_hf_models()
+    try:
+        options: List[str] = []
+        primary_resp = requests.get(f"{COMFY_URL}/object_info/FishS2TTS", timeout=4)
+        if primary_resp.ok:
+            options = _extract_fish_model_options(primary_resp.json())
+        else:
+            fallback_resp = requests.get(f"{COMFY_URL}/object_info", timeout=4)
+            if fallback_resp.ok:
+                options = _extract_fish_model_options(fallback_resp.json())
+
+        if not options:
+            status_code = primary_resp.status_code if primary_resp is not None else "unknown"
+            return {
+                "success": False,
+                "comfy_online": True,
+                "fish_node_available": False,
+                "options": [],
+                "hf_models": hf_models,
+                "error": f"FishS2TTS options not found in ComfyUI object_info (status {status_code})",
+            }
+        return {
+            "success": True,
+            "comfy_online": True,
+            "fish_node_available": len(options) > 0,
+            "options": options,
+            "hf_models": hf_models,
+            "error": None,
+        }
+    except Exception as exc:
+        if isinstance(exc, requests_exceptions.ConnectionError):
+            msg = "ComfyUI is offline on 127.0.0.1:8199. Start ComfyUI first."
+        else:
+            msg = str(exc)
+        return {
+            "success": False,
+            "comfy_online": False,
+            "fish_node_available": False,
+            "options": [],
+            "hf_models": hf_models,
+            "error": msg,
+        }
+
+
+def _select_fish_model_path(preferred: Optional[str] = None) -> Optional[str]:
+    state = _fetch_fish_models_state()
+    options = state.get("options", []) or []
+    if not options:
+        return None
+
+    wanted = str(preferred or "").strip()
+    if wanted:
+        if wanted in options:
+            return wanted
+        wanted_base = _strip_fish_auto_download_suffix(wanted)
+        for option in options:
+            if _strip_fish_auto_download_suffix(option) == wanted_base:
+                return option
+
+    preferred_order = ["s2-pro", "s2-pro-fp8", "s2-pro-bnb-int8", "s2-pro-bnb-nf4"]
+    for model_name in preferred_order:
+        for option in options:
+            if _strip_fish_auto_download_suffix(option) == model_name and not option.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
+                return option
+    for model_name in preferred_order:
+        for option in options:
+            if _strip_fish_auto_download_suffix(option) == model_name:
+                return option
+
+    for option in options:
+        if not option.endswith(FISH_AUTO_DOWNLOAD_SUFFIX):
+            return option
+    return options[0]
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -328,6 +492,14 @@ class ChatRequest(BaseModel):
 class TtsRequest(BaseModel):
     text: str
     voice_name: str = "Kore"
+    model_path: Optional[str] = None
+    use_voice_clone: bool = False
+    reference_audio: Optional[str] = None
+    reference_text: Optional[str] = None
+
+
+class FishModelDownloadRequest(BaseModel):
+    model_path: Optional[str] = None
 
 
 def _ollama_chat_text(
@@ -429,8 +601,8 @@ async def chat(req: ChatRequest):
         turn_count = int(state.get("turn_count", 0)) + 1
         memory = str(state.get("memory", "") or "")
 
-        # Refresh memory every 5 turns to keep context fresh.
-        if turn_count % 5 == 0:
+        # Refresh memory every few turns to keep context fresh without slowing chat too much.
+        if turn_count % MEMORY_REFRESH_EVERY_TURNS == 0:
             try:
                 recent_for_memory = _get_session_history(req.session_id, limit=40)
                 memory = _update_memory_summary(memory, recent_for_memory)
@@ -444,6 +616,8 @@ async def chat(req: ChatRequest):
             "response": response_text,
             "tts_text": _normalize_for_tts(response_text),
             "memory": memory,
+            "turn_count": turn_count,
+            "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
         }
         return result
 
@@ -484,6 +658,8 @@ async def get_chat_history(session_id: str):
     return {
         "success": True,
         "memory": state.get("memory", ""),
+        "turn_count": int(state.get("turn_count", 0) or 0),
+        "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
         "history": history,
     }
 
@@ -494,6 +670,121 @@ async def reset_chat_history(session_id: str):
     return {"success": True}
 
 
+@app.post("/api/chat/memory/refresh/{session_id}")
+async def refresh_chat_memory(session_id: str):
+    state = _ensure_session(session_id)
+    history = _get_session_history(session_id, limit=40)
+    memory = _update_memory_summary(str(state.get("memory", "") or ""), history)
+    turn_count = int(state.get("turn_count", 0) or 0)
+    _set_session_memory_and_turns(session_id, memory, turn_count)
+    return {
+        "success": True,
+        "memory": memory,
+        "turn_count": turn_count,
+        "memory_refresh_every_turns": MEMORY_REFRESH_EVERY_TURNS,
+    }
+
+
+@app.get("/api/chat/voices")
+async def get_chat_voices():
+    voices = [{"id": key, "name": key} for key in TTS_VOICE_PROFILES.keys()]
+    return {"success": True, "voices": voices}
+
+
+@app.get("/api/chat/fish/models")
+async def get_chat_fish_models():
+    state = _fetch_fish_models_state()
+    options: List[str] = state.get("options", []) or []
+    hf_models: Dict[str, Dict[str, Any]] = state.get("hf_models", {}) or {}
+
+    models: List[Dict[str, Any]] = []
+    for value in options:
+        model_name = _strip_fish_auto_download_suffix(value)
+        meta = hf_models.get(model_name, {}) if isinstance(hf_models, dict) else {}
+        is_auto = str(value).endswith(FISH_AUTO_DOWNLOAD_SUFFIX)
+        models.append(
+            {
+                "value": value,
+                "label": value,
+                "model_name": model_name,
+                "auto_download": is_auto,
+                "downloaded": not is_auto,
+                "repo_id": meta.get("repo_id"),
+                "description": meta.get("description"),
+                "base_model": meta.get("base_model"),
+            }
+        )
+
+    selected = _select_fish_model_path()
+    return {
+        "success": bool(state.get("success")),
+        "comfy_online": bool(state.get("comfy_online")),
+        "fish_node_available": bool(state.get("fish_node_available")),
+        "models": models,
+        "selected_model": selected,
+        "error": state.get("error"),
+    }
+
+
+@app.post("/api/chat/fish/download")
+async def download_chat_fish_model(req: FishModelDownloadRequest):
+    selected_model = _select_fish_model_path(req.model_path)
+    if not selected_model:
+        state = _fetch_fish_models_state()
+        msg = state.get("error") or "FishS2TTS node/model options unavailable in ComfyUI."
+        return {"success": False, "error": str(msg)}
+
+    payload = workflow_service.prepare_payload(
+        "audio-fish-tts",
+        {
+            "model_path": selected_model,
+            "text": FISH_WARMUP_TEXT,
+            "temperature": 0.7,
+            "top_p": 0.7,
+            "repetition_penalty": 1.2,
+            "seed": 42,
+        },
+    )
+    if not payload:
+        return {"success": False, "error": "Failed to prepare Fish TTS workflow payload."}
+
+    try:
+        submit = requests.post(
+            f"{COMFY_URL}/prompt",
+            json={"prompt": payload, "client_id": "fedda_fish_model_download"},
+            timeout=12,
+        )
+        if not submit.ok:
+            return {"success": False, "error": f"ComfyUI prompt error: {submit.text}"}
+        prompt_id = submit.json().get("prompt_id")
+        if not prompt_id:
+            return {"success": False, "error": "ComfyUI did not return prompt_id."}
+        return {"success": True, "prompt_id": prompt_id, "model_path": selected_model}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@app.post("/api/chat/voice-clone/reference")
+async def upload_voice_clone_reference(file: UploadFile = File(...)):
+    try:
+        original_name = Path(file.filename or "reference.wav").name
+        suffix = Path(original_name).suffix.lower()
+        if suffix not in {".wav", ".mp3", ".flac", ".m4a", ".ogg"}:
+            return {"success": False, "error": "Unsupported audio format. Use wav/mp3/flac/m4a/ogg."}
+
+        VOICE_CLONE_REF_DIR.mkdir(parents=True, exist_ok=True)
+        safe_stem = re.sub(r"[^a-zA-Z0-9._-]+", "_", Path(original_name).stem)[:48] or "reference"
+        saved_name = f"{int(time.time())}_{safe_stem}{suffix}"
+        save_path = VOICE_CLONE_REF_DIR / saved_name
+
+        content = await file.read()
+        save_path.write_bytes(content)
+        relative_name = f"AGENT_CHAT/{saved_name}"
+        return {"success": True, "filename": relative_name, "size": len(content)}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+
+
 @app.post("/api/chat/tts")
 async def chat_tts(req: TtsRequest):
     text = req.text.strip()
@@ -501,7 +792,34 @@ async def chat_tts(req: TtsRequest):
         return {"success": False, "error": "Text is required."}
 
     try:
-        payload = workflow_service.prepare_payload("audio-fish-tts", {"text": text})
+        voice_params = _tts_params_for_voice(req.voice_name)
+        model_path = _select_fish_model_path(req.model_path)
+        if not model_path:
+            return {"success": False, "error": "FishS2TTS model options not available. Check ComfyUI + Fish node."}
+
+        use_voice_clone = bool(req.use_voice_clone)
+        workflow_id = "audio-fish-voiceclone" if use_voice_clone else "audio-fish-tts"
+        params: Dict[str, Any] = {
+            "model_path": model_path,
+            "text": text,
+            "temperature": voice_params["temperature"],
+            "top_p": voice_params["top_p"],
+            "repetition_penalty": voice_params["repetition_penalty"],
+            "seed": voice_params["seed"],
+        }
+
+        if use_voice_clone:
+            reference_audio = (req.reference_audio or "").strip()
+            if not reference_audio:
+                return {"success": False, "error": "Voice clone enabled but no reference audio uploaded."}
+            reference_path = (COMFY_DIR / "input" / reference_audio).resolve()
+            comfy_input_root = (COMFY_DIR / "input").resolve()
+            if not str(reference_path).startswith(str(comfy_input_root)) or not reference_path.exists():
+                return {"success": False, "error": "Reference audio file not found in ComfyUI input folder."}
+            params["reference_audio_file"] = reference_audio.replace("\\", "/")
+            params["reference_text"] = str(req.reference_text or "").strip()
+
+        payload = workflow_service.prepare_payload(workflow_id, params)
         if not payload:
             return {"success": False, "error": "Failed to prepare local TTS workflow."}
 
@@ -533,8 +851,11 @@ async def chat_tts(req: TtsRequest):
                 view_url = f"{COMFY_URL}/view?filename={filename}&subfolder={subfolder}&type={file_type}"
                 return {
                     "success": True,
-                    "provider": "local-fish",
+                    "provider": "local-fish-voiceclone" if use_voice_clone else "local-fish",
                     "prompt_id": prompt_id,
+                    "voice_name": voice_params["voice_name"],
+                    "model_path": model_path,
+                    "use_voice_clone": use_voice_clone,
                     "audio": first,
                     "audio_url": view_url,
                 }
@@ -610,6 +931,7 @@ async def refresh_models():
 # Ollama — Prompt Assistant & Image Captioning
 # ─────────────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434"
+OLLAMA_RECOMMENDED_TEXT_MODEL = os.environ.get("OLLAMA_RECOMMENDED_TEXT_MODEL", "llama3.2")
 
 OLLAMA_SYSTEM_PROMPTS: Dict[str, str] = {
     "zimage": (
@@ -779,22 +1101,74 @@ async def get_ollama_all_models():
     try:
         resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
         if not resp.ok:
-            return {"success": False, "models": [], "text_model": None, "vision_model": None}
+            return {
+                "success": False,
+                "ollama_online": False,
+                "models": [],
+                "text_model": None,
+                "vision_model": None,
+                "recommended_text_model": OLLAMA_RECOMMENDED_TEXT_MODEL,
+            }
         models = [m["name"] for m in resp.json().get("models", [])]
         return {
             "success": True,
+            "ollama_online": True,
             "models": models,
             "text_model": _get_ollama_text_model(),
             "vision_model": _get_ollama_vision_model(),
+            "recommended_text_model": OLLAMA_RECOMMENDED_TEXT_MODEL,
         }
-    except Exception:
-        return {"success": False, "models": [], "text_model": None, "vision_model": None}
+    except Exception as exc:
+        return {
+            "success": False,
+            "ollama_online": False,
+            "models": [],
+            "text_model": None,
+            "vision_model": None,
+            "recommended_text_model": OLLAMA_RECOMMENDED_TEXT_MODEL,
+            "error": str(exc),
+        }
 
 
 class OllamaPromptRequest(BaseModel):
     context: str = "zimage"
     mode: str = "enhance"       # "enhance" | "inspire"
     current_prompt: str = ""
+
+
+class OllamaPullRequest(BaseModel):
+    name: str = OLLAMA_RECOMMENDED_TEXT_MODEL
+
+
+@app.post("/api/ollama/pull")
+async def ollama_pull_model(req: OllamaPullRequest):
+    model_name = (req.name or "").strip() or OLLAMA_RECOMMENDED_TEXT_MODEL
+    payload = {"name": model_name, "stream": True}
+
+    def generate():
+        try:
+            with requests.post(
+                f"{OLLAMA_URL}/api/pull",
+                json=payload,
+                stream=True,
+                timeout=1800,
+            ) as resp:
+                if not resp.ok:
+                    detail = (resp.text or "").strip() or f"Ollama pull failed ({resp.status_code})"
+                    yield json.dumps({"status": "error", "error": detail}) + "\n"
+                    return
+                for line in resp.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+                    yield f"{line}\n"
+        except Exception as exc:
+            yield json.dumps({"status": "error", "error": str(exc)}) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/ollama/prompt")

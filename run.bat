@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0"
 title FEDDA Launcher
 
@@ -12,7 +13,7 @@ set "INSIGHTFACE_ROOT=%BASE_DIR%\cache\insightface"
 set "PIP_CACHE_DIR=%BASE_DIR%\cache\pip"
 
 :: ============================================================================
-:: SERVICE DISPATCH — background services, output goes to logs/
+:: SERVICE DISPATCH - background services, output goes to logs/
 :: ============================================================================
 if "%1"==":svc_ollama" (
     if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
@@ -54,7 +55,7 @@ if "%MODE%"=="portable" (
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/5] Ollama not found — AI chat won't work
+        echo [2/5] Ollama not found - AI chat won't work
     )
 ) else (
     where ollama >nul 2>nul
@@ -63,7 +64,7 @@ if "%MODE%"=="portable" (
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/5] Ollama not found — AI chat won't work
+        echo [2/5] Ollama not found - AI chat won't work
     )
 )
 
@@ -75,9 +76,9 @@ start "FEDDA ComfyUI Console" cmd /k ""%~f0" :svc_comfy"
 echo [4/5] Starting Backend (Port 8000)...
 start "" /B "%~f0" :svc_backend
 
-:: 5. Start Frontend immediately (landing sequence handles warm-up state)
+:: 5. Start Frontend
 echo [5/5] Starting FEDDA UI (Port 5173)...
-echo     Opening UI immediately while services finish booting...
+echo     Opening landing page immediately...
 echo.
 echo   Logs:  %BASE_DIR%\logs\
 echo   Close this window to stop all services.
@@ -187,7 +188,7 @@ timeout /t 1 /nobreak >nul
 
 cd /d "%COMFYUI_DIR%"
 echo [%date% %time%] Starting ComfyUI...
-"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch
+"%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch --enable-manager --enable-manager-legacy-ui
 
 if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] ComfyUI crashed with error code %errorlevel%
@@ -211,6 +212,12 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8000"') do (taskkill
 timeout /t 1 /nobreak >nul
 
 cd /d "%BACKEND_DIR%"
+echo [%date% %time%] Checking backend Python dependencies...
+"%PYTHON%" -c "import uvicorn, fastapi, requests, pydantic" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [%date% %time%] Installing missing backend dependencies...
+    "%PYTHON%" -m pip install uvicorn fastapi requests python-multipart pydantic
+)
 echo [%date% %time%] Starting Backend...
 "%PYTHON%" -u server.py
 
@@ -218,3 +225,4 @@ if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] Backend crashed with error code %errorlevel%
 )
 exit /b
+

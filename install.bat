@@ -77,6 +77,15 @@ if %errorlevel% equ 0 (
     for /f "tokens=*" %%v in ('node --version 2^>^&1') do set "NODE_VERSION=%%v"
 )
 
+:: Check for system npm
+set "HAS_NPM=0"
+set "NPM_VERSION="
+where npm >nul 2>nul
+if %errorlevel% equ 0 (
+    set "HAS_NPM=1"
+    for /f "tokens=*" %%v in ('npm --version 2^>^&1') do set "NPM_VERSION=%%v"
+)
+
 :: Check for system Ollama
 set "HAS_OLLAMA=0"
 where ollama >nul 2>nul
@@ -87,17 +96,9 @@ if %errorlevel% equ 0 (
 echo.
 echo   System Tools Found:
 if "%HAS_PYTHON%"=="1" (
-    if "!PY_VERSION_OK!"=="1" (
-        if "!PY_VERSION_WARN!"=="1" (
-            echo     Python:   %PY_VERSION%  [OK - 3.11+ recommended for best compatibility]
-        ) else (
-            echo     Python:   %PY_VERSION%  [OK]
-        )
-    ) else (
-        echo     Python:   %PY_VERSION%  [INCOMPATIBLE - 3.10+ required, see note below]
-    )
+    echo     Python:   %PY_VERSION%  [optional for Lite; embedded 3.11.9 will be used]
 ) else (
-    echo     Python:   not installed
+    echo     Python:   not installed  [OK for Lite - embedded 3.11.9 will be downloaded]
 )
 if "%HAS_GIT%"=="1" (
     echo     Git:      %GIT_VERSION%
@@ -108,6 +109,11 @@ if "%HAS_NODE%"=="1" (
     echo     Node.js:  %NODE_VERSION%
 ) else (
     echo     Node.js:  not installed
+)
+if "%HAS_NPM%"=="1" (
+    echo     npm:      v%NPM_VERSION%
+) else (
+    echo     npm:      not installed
 )
 if "%HAS_OLLAMA%"=="1" (
     echo     Ollama:   installed
@@ -164,35 +170,16 @@ echo       Nothing else needed. Fully portable.
 echo       ~15 GB total, takes longer.
 echo.
 
-if "%HAS_PYTHON%"=="1" if "%HAS_GIT%"=="1" if "%HAS_NODE%"=="1" (
-    if "!PY_VERSION_OK!"=="0" (
-        echo   [2] LITE INSTALL  (NOT RECOMMENDED - Python version incompatible^)
-        echo       Your Python %PY_VERSION% is below the required 3.10 minimum.
-        echo       ComfyUI will fail to start with your current Python.
-        echo       Use FULL INSTALL instead, or upgrade Python to 3.11/3.12 first.
-        echo.
-        set "LITE_AVAILABLE=1"
-        set "LITE_PYTHON_WARN=1"
-    ) else if "!PY_VERSION_WARN!"=="1" (
-        echo   [2] LITE INSTALL  (Faster - Python version OK but not optimal^)
-        echo       Uses your existing Python %PY_VERSION%, Git, Node.
-        echo       Works, but Python 3.11+ is recommended for best node compatibility.
-        echo       Smaller download, faster install.
-        echo.
-        set "LITE_AVAILABLE=1"
-        set "LITE_PYTHON_WARN=0"
-    ) else (
-        echo   [2] LITE INSTALL  (Faster^)
-        echo       Uses your existing Python %PY_VERSION%, Git, Node.
-        echo       Smaller download, faster install.
-        echo       Creates a venv for Python packages.
-        echo.
-        set "LITE_AVAILABLE=1"
-        set "LITE_PYTHON_WARN=0"
-    )
+if "%HAS_GIT%"=="1" if "%HAS_NODE%"=="1" if "%HAS_NPM%"=="1" (
+    echo   [2] LITE INSTALL  (Faster^)
+    echo       Uses embedded Python 3.11.9 (auto-download^).
+    echo       Uses your system Git + Node/npm.
+    echo       Smaller download, faster install.
+    echo.
+    set "LITE_AVAILABLE=1"
 ) else (
     echo   [2] LITE INSTALL  (Unavailable - missing system tools^)
-    echo       Requires Python 3.10+, Git, and Node.js 18+ installed.
+    echo       Requires Git, Node.js 18+, and npm installed.
     echo.
     set "LITE_AVAILABLE=0"
 )
@@ -254,7 +241,7 @@ goto :done
 :do_lite
 if "%LITE_AVAILABLE%"=="0" (
     echo.
-    echo   Lite install requires Python, Git, and Node.js.
+    echo   Lite install requires Git, Node.js, and npm.
     echo   Install the missing tools or choose Full Install.
     echo.
     goto :ask_choice

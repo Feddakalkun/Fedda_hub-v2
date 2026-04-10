@@ -75,15 +75,9 @@ start "FEDDA ComfyUI Console" cmd /k ""%~f0" :svc_comfy"
 echo [4/5] Starting Backend (Port 8000)...
 start "" /B "%~f0" :svc_backend
 
-:: Wait for services to become reachable before opening frontend
-echo     Waiting for ComfyUI to become ready...
-call :wait_for_port 8199 90 "ComfyUI"
-echo     Waiting for Backend to become ready...
-call :wait_for_port 8000 60 "Backend"
-
 :: 5. Start Frontend
 echo [5/5] Starting FEDDA UI (Port 5173)...
-echo     Services ready. Opening UI...
+echo     Opening landing page immediately...
 echo.
 echo   Logs:  %BASE_DIR%\logs\
 echo   Close this window to stop all services.
@@ -96,6 +90,7 @@ if not exist "node_modules" (
     call npm install
 )
 
+start "" cmd /c "timeout /t 3 /nobreak >nul && start \"\" \"http://127.0.0.1:5173\""
 call npm run dev
 pause
 exit /b

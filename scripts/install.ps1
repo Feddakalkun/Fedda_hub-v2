@@ -828,6 +828,12 @@ if (Test-Path $AudioScript) {
     Write-Log "Audio assets configured (ComfyUI + Mockingbird speaker)."
 }
 
+$MathAliasScript = Join-Path $ScriptPath "patch_custom_scripts_math_expression.py"
+if (Test-Path $MathAliasScript) {
+    Write-Log "[Custom Nodes] Patching ComfyUI-Custom-Scripts math alias..."
+    Start-Process -FilePath $PyExe -ArgumentList "$MathAliasScript" -NoNewWindow -Wait
+}
+
 Pause-Step
 
 

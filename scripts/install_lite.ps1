@@ -643,6 +643,12 @@ if (Test-Path $AudioScript) {
     Write-Step "TTS audio assets configured (ComfyUI + Mockingbird speaker)." "Green"
 }
 
+$MathAliasScript = Join-Path $ScriptPath "patch_custom_scripts_math_expression.py"
+if (Test-Path $MathAliasScript) {
+    & $VenvPy "$MathAliasScript" 2>&1 | Out-Null
+    Write-Step "ComfyUI-Custom-Scripts math alias patched." "Green"
+}
+
 # ComfyUI-Manager config (weak security for auto-install)
 $MgrDir = Join-Path $ComfyDir "user\__manager"
 if (-not (Test-Path $MgrDir)) { New-Item -ItemType Directory -Path $MgrDir -Force | Out-Null }

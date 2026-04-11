@@ -1,0 +1,25 @@
+{
+  "runtimeVersion": "2026.04.11",
+  "artifacts": [
+    {
+      "id": "python_embed_3_10_11",
+      "url": "https://www.nuget.org/api/v2/package/python/3.10.11",
+      "fileName": "python.3.10.11.nupkg",
+      "sha256": "7C6F99B160A36A7E09492DFCFF2B0A3A60BB5229CA44CDCC3ECB32871A6144D0",
+      "minBytes": 15000000,
+      "type": "zip",
+      "extractRoot": "tools",
+      "sanityPath": "tools/python.exe"
+    },
+    {
+      "id": "xtts_api_server_repo",
+      "url": "https://codeload.github.com/daswer123/xtts-api-server/zip/5e8bc93d674fed0f5849e03db28f5e5216320d99",
+      "fileName": "xtts-api-server-5e8bc93d674fed0f5849e03db28f5e5216320d99.zip",
+      "sha256": "5B8A1B2D25E7E3B925B1C32DDDFAADC42887D1254BA53EFD230C06C730C80951",
+      "minBytes": 1000000,
+      "type": "zip",
+      "extractRoot": "xtts-api-server-5e8bc93d674fed0f5849e03db28f5e5216320d99",
+      "sanityPath": "xtts_api_server/__main__.py"
+    }
+  ]
+}

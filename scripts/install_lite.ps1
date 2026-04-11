@@ -56,123 +56,7 @@ function Test-Command {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
-function Install-MockingbirdRuntime {
-    param(
-        [string]$RootPath,
-        [string]$SpeakerSource
-    )
-
-    $GitExe = (Get-Command git -ErrorAction Stop).Source
-    $MockDir = Join-Path $RootPath "mockingbird_tts"
-    $PythonRoot = Join-Path $MockDir "python310"
-    $PythonExe = Join-Path $PythonRoot "python.exe"
-    $VenvDir = Join-Path $MockDir "venv"
-    $VenvPy = Join-Path $VenvDir "Scripts\python.exe"
-    $RepoDir = Join-Path $MockDir "xtts-api-server"
-    $SpeakersDir = Join-Path $MockDir "speakers"
-    $OutputDir = Join-Path $MockDir "output"
-    $ModelsDir = Join-Path $MockDir "xtts_models"
-    $InstallerDir = Join-Path $MockDir "downloads"
-    $PythonZip = Join-Path $InstallerDir "python-3.10.11-embed-amd64.zip"
-    $GetPipPy = Join-Path $InstallerDir "get-pip.py"
-    $PythonPth = Join-Path $PythonRoot "python310._pth"
-
-    Write-Header "STEP 3.5/7 - Mockingbird XTTS Runtime"
-    New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir, $InstallerDir -Force | Out-Null
-
-    if (-not (Test-Path $PythonExe)) {
-        Write-Step "Downloading portable Python 3.10 for Mockingbird..." "Yellow"
-        & curl.exe -L -o "$PythonZip" "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip" --retry 3 --retry-delay 2 --progress-bar
-        if ($LASTEXITCODE -ne 0) { throw "Failed to download portable Python 3.10 for Mockingbird" }
-
-        if (Test-Path $PythonRoot) {
-            Remove-Item -Recurse -Force $PythonRoot
-        }
-        New-Item -ItemType Directory -Path $PythonRoot -Force | Out-Null
-
-        Write-Step "Extracting portable Python 3.10 runtime..." "Yellow"
-        Expand-Archive -Path $PythonZip -DestinationPath $PythonRoot -Force
-        if (-not (Test-Path $PythonExe)) {
-            throw "Portable Python extraction did not produce python.exe"
-        }
-
-        if (Test-Path $PythonPth) {
-            $PthContent = Get-Content $PythonPth
-            $PthContent = $PthContent | ForEach-Object {
-                if ($_ -match '^\s*#\s*import site\s*$') { 'import site' } else { $_ }
-            }
-            Set-Content -Path $PythonPth -Value $PthContent
-        }
-
-    } else {
-        Write-Step "Dedicated Mockingbird Python already installed." "Green"
-    }
-
-    if (Test-Path $PythonPth) {
-        $PthContent = Get-Content $PythonPth
-        $PthContent = $PthContent | ForEach-Object {
-            if ($_ -match '^\s*#\s*import site\s*$') { 'import site' } else { $_ }
-        }
-        Set-Content -Path $PythonPth -Value $PthContent
-    }
-
-    $PipCheckOut = Join-Path $InstallerDir "python_pip_check_stdout.log"
-    $PipCheckErr = Join-Path $InstallerDir "python_pip_check_stderr.log"
-    $PipCheck = Start-Process -FilePath $PythonExe -ArgumentList "-m pip --version" -NoNewWindow -Wait -PassThru -RedirectStandardOutput $PipCheckOut -RedirectStandardError $PipCheckErr
-    if ($PipCheck.ExitCode -ne 0) {
-        Write-Step "Bootstrapping pip for Mockingbird Python..." "Yellow"
-        & curl.exe -L -o "$GetPipPy" "https://bootstrap.pypa.io/pip/3.10/get-pip.py" --retry 3 --retry-delay 2 --progress-bar
-        if ($LASTEXITCODE -ne 0) { throw "Failed to download get-pip.py for Mockingbird" }
-        $PipBootstrap = Start-Process -FilePath $PythonExe -ArgumentList "`"$GetPipPy`" --no-warn-script-location" -NoNewWindow -Wait -PassThru
-        if ($PipBootstrap.ExitCode -ne 0) { throw "Failed to bootstrap pip for Mockingbird Python" }
-    }
-
-    if (-not (Test-Path $VenvPy)) {
-        Write-Step "Creating Mockingbird virtual environment..." "Yellow"
-        $VirtualenvInstall = Start-Process -FilePath $PythonExe -ArgumentList "-m pip install virtualenv --no-warn-script-location" -NoNewWindow -Wait -PassThru
-        if ($VirtualenvInstall.ExitCode -ne 0) {
-            throw "Failed to install virtualenv for Mockingbird Python"
-        }
-        $VenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m virtualenv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
-        if ($VenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
-            throw "Failed to create Mockingbird virtual environment"
-        }
-    } else {
-        Write-Step "Mockingbird virtual environment already exists." "Green"
-    }
-
-    if (-not (Test-Path $RepoDir)) {
-        Write-Step "Cloning xtts-api-server..." "Yellow"
-        $GitStdOut = Join-Path $InstallerDir "xtts_git_stdout.log"
-        $GitStdErr = Join-Path $InstallerDir "xtts_git_stderr.log"
-        $GitProc = Start-Process -FilePath $GitExe -ArgumentList @("clone", "--depth", "1", "https://github.com/daswer123/xtts-api-server.git", $RepoDir) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $GitStdOut -RedirectStandardError $GitStdErr
-        if ($GitProc.ExitCode -ne 0) {
-            $GitError = ""
-            if (Test-Path $GitStdErr) { $GitError = (Get-Content $GitStdErr -Raw -ErrorAction SilentlyContinue).Trim() }
-            if (-not $GitError -and (Test-Path $GitStdOut)) { $GitError = (Get-Content $GitStdOut -Raw -ErrorAction SilentlyContinue).Trim() }
-            throw ("Failed to clone xtts-api-server" + $(if ($GitError) { ": $GitError" } else { "" }))
-        }
-    } else {
-        Write-Step "xtts-api-server already present." "Green"
-    }
-
-    Write-Step "Installing Mockingbird XTTS dependencies..." "Yellow"
-    $PipBootProc = Start-Process -FilePath $VenvPy -ArgumentList "-m pip install --upgrade pip wheel setuptools --no-warn-script-location" -NoNewWindow -Wait -PassThru
-    if ($PipBootProc.ExitCode -ne 0) { throw "Mockingbird pip bootstrap failed" }
-    $ReqProc = Start-Process -FilePath $VenvPy -ArgumentList "-m pip install -r `"$RepoDir\requirements.txt`" --no-warn-script-location" -NoNewWindow -Wait -PassThru
-    if ($ReqProc.ExitCode -ne 0) { throw "Mockingbird requirements install failed" }
-    $TorchProc = Start-Process -FilePath $VenvPy -ArgumentList "-m pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --no-warn-script-location" -NoNewWindow -Wait -PassThru
-    if ($TorchProc.ExitCode -ne 0) { throw "Mockingbird torch install failed" }
-
-    if (Test-Path $SpeakerSource) {
-        Copy-Item -Path $SpeakerSource -Destination (Join-Path $SpeakersDir "charlotte.wav") -Force
-        Write-Step "Mockingbird default speaker installed." "Green"
-    } else {
-        Write-Step "WARNING: Mockingbird speaker source missing: $SpeakerSource" "Yellow"
-    }
-
-    Write-Step "Mockingbird XTTS runtime ready." "Green"
-}
+. (Join-Path $PSScriptRoot "mockingbird_runtime.ps1")
 
 function Install-EmbeddedOllama {
     param([string]$RootPath, [string]$LogFile)
@@ -657,7 +541,8 @@ try {
 } catch {}
 
 Write-Step "All Python dependencies installed." "Green"
-Install-MockingbirdRuntime -RootPath $RootPath -SpeakerSource (Join-Path $RootPath "assets\audio-tts\charlotte\charlotte.wav")
+Write-Header "STEP 3.5/7 - Mockingbird XTTS Runtime"
+Install-MockingbirdRuntimeShared -RootPath $RootPath -SpeakerSource (Join-Path $RootPath "assets\audio-tts\charlotte\charlotte.wav")
 
 # ============================================================================
 # 4. CUSTOM NODES

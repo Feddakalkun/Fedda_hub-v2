@@ -86,8 +86,13 @@ call :is_port_listening 8020
 if errorlevel 1 (
     echo     Mockingbird already running.
 ) else (
-    start "" /B "%~f0" :svc_mockingbird
-    start "" /B "%~f0" :svc_mockingbird_warmup
+    call :mockingbird_health
+    if errorlevel 1 (
+        echo     [WARN] Mockingbird runtime is missing or needs repair. Re-run INSTALL.bat or INSTALL-LITE.bat.
+    ) else (
+        start "" /B "%~f0" :svc_mockingbird
+        start "" /B "%~f0" :svc_mockingbird_warmup
+    )
 )
 timeout /t 2 /nobreak >nul
 
@@ -340,6 +345,12 @@ if exist "%BASE_DIR%\scripts\setup_tts_audio.py" (
     "%PYTHON%" "%BASE_DIR%\scripts\setup_tts_audio.py" >nul 2>&1
 )
 
+call :mockingbird_health
+if errorlevel 1 (
+    echo [%date% %time%] [WARN] Internal Mockingbird runtime failed health check. Re-run installer to repair XTTS voice support.
+    exit /b 1
+)
+
 if exist "%INTERNAL_MOCKINGBIRD_PY%" if exist "%INTERNAL_MOCKINGBIRD_REPO%" (
     echo [%date% %time%] Found internal Mockingbird runtime.
     cd /d "%INTERNAL_MOCKINGBIRD_REPO%"
@@ -367,4 +378,11 @@ if exist "%EXTERNAL_MOCKINGBIRD_PY%" (
 
 echo [%date% %time%] [WARN] No Mockingbird runtime installed. Re-run INSTALL.bat to install XTTS voice support.
 exit /b
+
+:mockingbird_health
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference='Stop';" ^
+  ". '%BASE_DIR%\\scripts\\mockingbird_runtime.ps1';" ^
+  "if (Test-MockingbirdRuntimeReady -RootPath '%BASE_DIR%') { exit 0 } else { exit 1 }" >nul 2>&1
+exit /b %errorlevel%
 

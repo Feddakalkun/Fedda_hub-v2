@@ -104,20 +104,35 @@ function Install-MockingbirdRuntime {
             Set-Content -Path $PythonPth -Value $PthContent
         }
 
-        Write-Step "Bootstrapping pip for Mockingbird Python..." "Yellow"
-        & curl.exe -L -o "$GetPipPy" "https://bootstrap.pypa.io/pip/3.10/get-pip.py" --retry 3 --retry-delay 2 --progress-bar
-        if ($LASTEXITCODE -ne 0) { throw "Failed to download get-pip.py for Mockingbird" }
-        & $PythonExe "$GetPipPy" --no-warn-script-location
-        if ($LASTEXITCODE -ne 0) { throw "Failed to bootstrap pip for Mockingbird Python" }
     } else {
         Write-Step "Dedicated Mockingbird Python already installed." "Green"
     }
 
+    if (Test-Path $PythonPth) {
+        $PthContent = Get-Content $PythonPth
+        $PthContent = $PthContent | ForEach-Object {
+            if ($_ -match '^\s*#\s*import site\s*$') { 'import site' } else { $_ }
+        }
+        Set-Content -Path $PythonPth -Value $PthContent
+    }
+
+    & $PythonExe -m pip --version > $null 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Step "Bootstrapping pip for Mockingbird Python..." "Yellow"
+        & curl.exe -L -o "$GetPipPy" "https://bootstrap.pypa.io/pip/3.10/get-pip.py" --retry 3 --retry-delay 2 --progress-bar
+        if ($LASTEXITCODE -ne 0) { throw "Failed to download get-pip.py for Mockingbird" }
+        $PipBootstrap = Start-Process -FilePath $PythonExe -ArgumentList "`"$GetPipPy`" --no-warn-script-location" -NoNewWindow -Wait -PassThru
+        if ($PipBootstrap.ExitCode -ne 0) { throw "Failed to bootstrap pip for Mockingbird Python" }
+    }
+
     if (-not (Test-Path $VenvPy)) {
         Write-Step "Creating Mockingbird virtual environment..." "Yellow"
-        & $PythonExe -m pip install virtualenv --no-warn-script-location 2>&1 | Out-Null
-        & $PythonExe -m virtualenv "$VenvDir"
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $VenvPy)) {
+        $VirtualenvInstall = Start-Process -FilePath $PythonExe -ArgumentList "-m pip install virtualenv --no-warn-script-location" -NoNewWindow -Wait -PassThru
+        if ($VirtualenvInstall.ExitCode -ne 0) {
+            throw "Failed to install virtualenv for Mockingbird Python"
+        }
+        $VenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m virtualenv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
+        if ($VenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
             throw "Failed to create Mockingbird virtual environment"
         }
     } else {
@@ -140,11 +155,12 @@ function Install-MockingbirdRuntime {
     }
 
     Write-Step "Installing Mockingbird XTTS dependencies..." "Yellow"
-    & $VenvPy -m pip install --upgrade pip wheel setuptools --no-warn-script-location 2>&1 | Out-Null
-    & $VenvPy -m pip install -r "$RepoDir\requirements.txt" --no-warn-script-location 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Mockingbird requirements install failed" }
-    & $VenvPy -m pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --no-warn-script-location 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Mockingbird torch install failed" }
+    $PipBootProc = Start-Process -FilePath $VenvPy -ArgumentList "-m pip install --upgrade pip wheel setuptools --no-warn-script-location" -NoNewWindow -Wait -PassThru
+    if ($PipBootProc.ExitCode -ne 0) { throw "Mockingbird pip bootstrap failed" }
+    $ReqProc = Start-Process -FilePath $VenvPy -ArgumentList "-m pip install -r `"$RepoDir\requirements.txt`" --no-warn-script-location" -NoNewWindow -Wait -PassThru
+    if ($ReqProc.ExitCode -ne 0) { throw "Mockingbird requirements install failed" }
+    $TorchProc = Start-Process -FilePath $VenvPy -ArgumentList "-m pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --no-warn-script-location" -NoNewWindow -Wait -PassThru
+    if ($TorchProc.ExitCode -ne 0) { throw "Mockingbird torch install failed" }
 
     if (Test-Path $SpeakerSource) {
         Copy-Item -Path $SpeakerSource -Destination (Join-Path $SpeakersDir "charlotte.wav") -Force

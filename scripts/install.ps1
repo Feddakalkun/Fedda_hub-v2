@@ -151,14 +151,26 @@ function Install-MockingbirdRuntime {
             Set-Content -Path $PythonPth -Value $PthContent
         }
 
+    } else {
+        Write-Log "[Mockingbird] Dedicated Python already present."
+    }
+
+    if (Test-Path $PythonPth) {
+        $PthContent = Get-Content $PythonPth
+        $PthContent = $PthContent | ForEach-Object {
+            if ($_ -match '^\s*#\s*import site\s*$') { 'import site' } else { $_ }
+        }
+        Set-Content -Path $PythonPth -Value $PthContent
+    }
+
+    $PipCheck = Start-Process -FilePath $PythonExe -ArgumentList "-m pip --version" -NoNewWindow -Wait -PassThru
+    if ($PipCheck.ExitCode -ne 0) {
         Download-File -Url "https://bootstrap.pypa.io/pip/3.10/get-pip.py" -Dest $GetPipPy
         Write-Log "[Mockingbird] Bootstrapping pip..."
         $PipProc = Start-Process -FilePath $PythonExe -ArgumentList "`"$GetPipPy`" --no-warn-script-location" -NoNewWindow -Wait -PassThru
         if ($PipProc.ExitCode -ne 0) {
             throw "Failed to bootstrap pip for Mockingbird Python"
         }
-    } else {
-        Write-Log "[Mockingbird] Dedicated Python already present."
     }
 
     if (-not (Test-Path $VenvPy)) {

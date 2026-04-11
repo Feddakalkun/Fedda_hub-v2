@@ -840,6 +840,15 @@ if (Test-Path $LtxVaePatchScript) {
     Start-Process -FilePath $PyExe -ArgumentList "$LtxVaePatchScript" -NoNewWindow -Wait
 }
 
+$LtxAvPatchScript = Join-Path $ScriptPath "patch_ltx23_av_model.py"
+if (Test-Path $LtxAvPatchScript) {
+    Write-Log "[Custom Nodes] Patching LTX 2.3 AV model compatibility..."
+    $LtxAvPatchProc = Start-Process -FilePath $PyExe -ArgumentList "$LtxAvPatchScript" -NoNewWindow -Wait -PassThru
+    if ($LtxAvPatchProc.ExitCode -ne 0) { throw "LTX 2.3 AV compatibility patch failed" }
+    $LtxAvHealthProc = Start-Process -FilePath $PyExe -ArgumentList "$LtxAvPatchScript --check" -NoNewWindow -Wait -PassThru
+    if ($LtxAvHealthProc.ExitCode -ne 0) { throw "LTX 2.3 AV compatibility health check failed" }
+}
+
 Pause-Step
 
 

@@ -655,6 +655,15 @@ if (Test-Path $LtxVaePatchScript) {
     Write-Step "LTX 2.3 video VAE compatibility patched." "Green"
 }
 
+$LtxAvPatchScript = Join-Path $ScriptPath "patch_ltx23_av_model.py"
+if (Test-Path $LtxAvPatchScript) {
+    & $VenvPy "$LtxAvPatchScript" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "LTX 2.3 AV compatibility patch failed" }
+    & $VenvPy "$LtxAvPatchScript" --check 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "LTX 2.3 AV compatibility health check failed" }
+    Write-Step "LTX 2.3 AV model compatibility patched." "Green"
+}
+
 # ComfyUI-Manager config (weak security for auto-install)
 $MgrDir = Join-Path $ComfyDir "user\__manager"
 if (-not (Test-Path $MgrDir)) { New-Item -ItemType Directory -Path $MgrDir -Force | Out-Null }

@@ -125,30 +125,37 @@ function Install-MockingbirdRuntime {
     $OutputDir = Join-Path $MockDir "output"
     $ModelsDir = Join-Path $MockDir "xtts_models"
     $InstallerDir = Join-Path $MockDir "downloads"
-    $InstallerExe = Join-Path $InstallerDir "python-3.10.11-amd64.exe"
+    $PythonZip = Join-Path $InstallerDir "python-3.10.11-embed-amd64.zip"
+    $GetPipPy = Join-Path $InstallerDir "get-pip.py"
+    $PythonPth = Join-Path $PythonRoot "python310._pth"
 
     New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir, $InstallerDir -Force | Out-Null
 
     if (-not (Test-Path $PythonExe)) {
-        Download-File -Url "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe" -Dest $InstallerExe
-        Write-Log "[Mockingbird] Installing dedicated Python 3.10 runtime..."
-        $Args = @(
-            "/quiet",
-            "InstallAllUsers=0",
-            "PrependPath=0",
-            "Include_pip=1",
-            "Include_dev=1",
-            "Include_test=0",
-            "Include_tcltk=0",
-            "Include_doc=0",
-            "Include_launcher=0",
-            "AssociateFiles=0",
-            "Shortcuts=0",
-            "TargetDir=$PythonRoot"
-        )
-        $Proc = Start-Process -FilePath $InstallerExe -ArgumentList $Args -Wait -PassThru
-        if ($Proc.ExitCode -ne 0 -or -not (Test-Path $PythonExe)) {
-            throw "Mockingbird Python install failed with exit code $($Proc.ExitCode)"
+        Download-File -Url "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip" -Dest $PythonZip
+        Write-Log "[Mockingbird] Extracting portable Python 3.10 runtime..."
+        if (Test-Path $PythonRoot) {
+            Remove-Item -Recurse -Force $PythonRoot
+        }
+        New-Item -ItemType Directory -Path $PythonRoot -Force | Out-Null
+        Expand-ArchiveSafe -ZipFile $PythonZip -DestDir $PythonRoot
+        if (-not (Test-Path $PythonExe)) {
+            throw "Portable Python extraction did not produce python.exe"
+        }
+
+        if (Test-Path $PythonPth) {
+            $PthContent = Get-Content $PythonPth
+            $PthContent = $PthContent | ForEach-Object {
+                if ($_ -match '^\s*#\s*import site\s*$') { 'import site' } else { $_ }
+            }
+            Set-Content -Path $PythonPth -Value $PthContent
+        }
+
+        Download-File -Url "https://bootstrap.pypa.io/pip/3.10/get-pip.py" -Dest $GetPipPy
+        Write-Log "[Mockingbird] Bootstrapping pip..."
+        $PipProc = Start-Process -FilePath $PythonExe -ArgumentList "`"$GetPipPy`" --no-warn-script-location" -NoNewWindow -Wait -PassThru
+        if ($PipProc.ExitCode -ne 0) {
+            throw "Failed to bootstrap pip for Mockingbird Python"
         }
     } else {
         Write-Log "[Mockingbird] Dedicated Python already present."
@@ -156,7 +163,11 @@ function Install-MockingbirdRuntime {
 
     if (-not (Test-Path $VenvPy)) {
         Write-Log "[Mockingbird] Creating virtual environment..."
-        $VenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m venv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
+        $VirtualenvInstall = Start-Process -FilePath $PythonExe -ArgumentList "-m pip install virtualenv --no-warn-script-location" -NoNewWindow -Wait -PassThru
+        if ($VirtualenvInstall.ExitCode -ne 0) {
+            throw "Failed to install virtualenv for Mockingbird Python"
+        }
+        $VenvProc = Start-Process -FilePath $PythonExe -ArgumentList "-m virtualenv `"$VenvDir`"" -NoNewWindow -Wait -PassThru
         if ($VenvProc.ExitCode -ne 0 -or -not (Test-Path $VenvPy)) {
             throw "Failed to create Mockingbird virtual environment"
         }

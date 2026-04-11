@@ -556,7 +556,8 @@ if (-not (Test-Path $CustomNodesDir)) { New-Item -ItemType Directory -Path $Cust
 $Installed = 0; $Skipped = 0; $Failed = 0
 
 foreach ($Node in $NodesConfig) {
-    if ($Node.local -eq $true) {
+    $IsLocalNode = ($Node.PSObject.Properties.Name -contains 'local') -and ($Node.local -eq $true)
+    if ($IsLocalNode) {
         Write-Step "  [$($Node.name)] Local - skipped" "Gray"
         continue
     }

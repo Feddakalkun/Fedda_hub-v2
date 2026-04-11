@@ -683,7 +683,8 @@ foreach ($Node in $NodesConfig) {
         continue
     }
     # Skip local nodes (e.g., AutoModelFetcher)
-    if ($Node.local -eq $true) {
+    $IsLocalNode = ($Node.PSObject.Properties.Name -contains 'local') -and ($Node.local -eq $true)
+    if ($IsLocalNode) {
         Write-Log "[$($Node.name)] - Local node, skipping git clone"
         continue
     }

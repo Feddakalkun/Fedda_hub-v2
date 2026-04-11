@@ -116,8 +116,10 @@ function Install-MockingbirdRuntime {
         Set-Content -Path $PythonPth -Value $PthContent
     }
 
-    & $PythonExe -m pip --version > $null 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $PipCheckOut = Join-Path $InstallerDir "python_pip_check_stdout.log"
+    $PipCheckErr = Join-Path $InstallerDir "python_pip_check_stderr.log"
+    $PipCheck = Start-Process -FilePath $PythonExe -ArgumentList "-m pip --version" -NoNewWindow -Wait -PassThru -RedirectStandardOutput $PipCheckOut -RedirectStandardError $PipCheckErr
+    if ($PipCheck.ExitCode -ne 0) {
         Write-Step "Bootstrapping pip for Mockingbird Python..." "Yellow"
         & curl.exe -L -o "$GetPipPy" "https://bootstrap.pypa.io/pip/3.10/get-pip.py" --retry 3 --retry-delay 2 --progress-bar
         if ($LASTEXITCODE -ne 0) { throw "Failed to download get-pip.py for Mockingbird" }

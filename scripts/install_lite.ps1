@@ -16,6 +16,26 @@ $LogsDir = Join-Path $RootPath "logs"
 if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-Null }
 $LogFile = Join-Path $LogsDir "install_fast_log.txt"
 
+# Keep caches and temp inside install folder as much as possible
+$CacheRoot = Join-Path $RootPath "cache"
+$TempRoot = Join-Path $RootPath "temp"
+foreach ($Dir in @(
+    $CacheRoot,
+    $TempRoot,
+    (Join-Path $CacheRoot "huggingface"),
+    (Join-Path $CacheRoot "torch"),
+    (Join-Path $CacheRoot "pip"),
+    (Join-Path $CacheRoot "insightface")
+)) {
+    if (-not (Test-Path $Dir)) { New-Item -ItemType Directory -Path $Dir -Force | Out-Null }
+}
+$env:HF_HOME = Join-Path $CacheRoot "huggingface"
+$env:TORCH_HOME = Join-Path $CacheRoot "torch"
+$env:PIP_CACHE_DIR = Join-Path $CacheRoot "pip"
+$env:INSIGHTFACE_ROOT = Join-Path $CacheRoot "insightface"
+$env:TEMP = $TempRoot
+$env:TMP = $TempRoot
+
 function Write-Step {
     param([string]$Message, [string]$Color = "White")
     $ts = Get-Date -Format "HH:mm:ss"

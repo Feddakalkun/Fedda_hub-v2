@@ -118,8 +118,15 @@ function Install-MockingbirdRuntime {
 
     if (-not (Test-Path $RepoDir)) {
         Write-Step "Cloning xtts-api-server..." "Yellow"
-        & $GitExe clone --depth 1 https://github.com/daswer123/xtts-api-server.git "$RepoDir" 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Failed to clone xtts-api-server" }
+        $GitStdOut = Join-Path $InstallerDir "xtts_git_stdout.log"
+        $GitStdErr = Join-Path $InstallerDir "xtts_git_stderr.log"
+        $GitProc = Start-Process -FilePath $GitExe -ArgumentList @("clone", "--depth", "1", "https://github.com/daswer123/xtts-api-server.git", $RepoDir) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $GitStdOut -RedirectStandardError $GitStdErr
+        if ($GitProc.ExitCode -ne 0) {
+            $GitError = ""
+            if (Test-Path $GitStdErr) { $GitError = (Get-Content $GitStdErr -Raw -ErrorAction SilentlyContinue).Trim() }
+            if (-not $GitError -and (Test-Path $GitStdOut)) { $GitError = (Get-Content $GitStdOut -Raw -ErrorAction SilentlyContinue).Trim() }
+            throw ("Failed to clone xtts-api-server" + $(if ($GitError) { ": $GitError" } else { "" }))
+        }
     } else {
         Write-Step "xtts-api-server already present." "Green"
     }

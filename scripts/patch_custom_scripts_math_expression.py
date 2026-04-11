@@ -17,6 +17,25 @@ if "MathExpression|pysssss" in NODE_CLASS_MAPPINGS and "ComfyMathExpression" not
     )
 """.strip("\n")
 
+KWARG_COMPAT_BLOCK = """
+
+# FEDDA compatibility wrapper for newer Comfy input names like values.a / values.b / values.c
+if not getattr(MathExpression, "_fedda_values_kwarg_compat", False):
+    _fedda_original_evaluate = MathExpression.evaluate
+
+    def _fedda_compat_evaluate(self, expression, prompt, extra_pnginfo={}, a=None, b=None, c=None, **kwargs):
+        if a is None and "values.a" in kwargs:
+            a = kwargs["values.a"]
+        if b is None and "values.b" in kwargs:
+            b = kwargs["values.b"]
+        if c is None and "values.c" in kwargs:
+            c = kwargs["values.c"]
+        return _fedda_original_evaluate(self, expression, prompt, extra_pnginfo=extra_pnginfo, a=a, b=b, c=c)
+
+    MathExpression.evaluate = _fedda_compat_evaluate
+    MathExpression._fedda_values_kwarg_compat = True
+""".strip("\n")
+
 
 def apply_patch() -> None:
     root = Path(__file__).resolve().parent.parent
@@ -27,16 +46,22 @@ def apply_patch() -> None:
         return
 
     content = target.read_text(encoding="utf-8")
-    if 'NODE_CLASS_MAPPINGS["ComfyMathExpression"]' in content:
-        print("ComfyMathExpression alias already present.")
-        return
-
     if "NODE_DISPLAY_NAME_MAPPINGS = {" not in content:
         raise RuntimeError("Could not find expected NODE_DISPLAY_NAME_MAPPINGS block in math_expression.py")
 
-    updated = content.rstrip() + "\n\n" + ALIAS_BLOCK + "\n"
+    blocks_to_add = []
+    if 'NODE_CLASS_MAPPINGS["ComfyMathExpression"]' not in content:
+        blocks_to_add.append(ALIAS_BLOCK)
+    if "MathExpression._fedda_values_kwarg_compat" not in content:
+        blocks_to_add.append(KWARG_COMPAT_BLOCK)
+
+    if not blocks_to_add:
+        print("MathExpression compatibility patches already present.")
+        return
+
+    updated = content.rstrip() + "\n\n" + "\n\n".join(blocks_to_add) + "\n"
     target.write_text(updated, encoding="utf-8")
-    print("Added ComfyMathExpression compatibility alias.")
+    print("Added MathExpression compatibility patches.")
 
 
 if __name__ == "__main__":

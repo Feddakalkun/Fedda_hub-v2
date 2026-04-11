@@ -108,3 +108,4 @@ cache/
 .gitconfig
 config/agent_chat_store.json
 config/agent_memory.db
+mockingbird_tts/

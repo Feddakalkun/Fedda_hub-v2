@@ -26,7 +26,17 @@ if "%1"==":svc_comfy" (
 )
 if "%1"==":svc_backend" (
     if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
-    call :launch_backend > "%BASE_DIR%\logs\backend.log" 2>&1
+    call :launch_backend > "%BASE_DIR%\logs\backend_%RANDOM%_%RANDOM%.log" 2>&1
+    exit
+)
+if "%1"==":svc_mockingbird" (
+    if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
+    call :launch_mockingbird > "%BASE_DIR%\logs\mockingbird.log" 2>&1
+    exit
+)
+if "%1"==":svc_mockingbird_warmup" (
+    if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
+    call :warmup_mockingbird > "%BASE_DIR%\logs\mockingbird_warmup.log" 2>&1
     exit
 )
 
@@ -41,12 +51,14 @@ echo   FEDDA LAUNCHER  (%MODE% mode)
 echo ============================================================================
 echo.
 
-echo [1/5] Auto-update disabled (updates are distributed manually)
+echo [1/6] Auto-update disabled (updates are distributed manually)
 echo.
 
 :: ============================================================================
 :: MAIN LAUNCHER: Start services
 :: ============================================================================
+
+call :cleanup_stale_services
 
 :: 2. Start Ollama
 if "%MODE%"=="portable" (
@@ -55,29 +67,52 @@ if "%MODE%"=="portable" (
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/5] Ollama not found - AI chat won't work
+        echo [2/6] Ollama not found - AI chat won't work
     )
 ) else (
     where ollama >nul 2>nul
     if not errorlevel 1 (
-        echo [2/5] Starting Ollama...
+        echo [2/6] Starting Ollama...
         start "" /B "%~f0" :svc_ollama
         timeout /t 2 /nobreak >nul
     ) else (
-        echo [2/5] Ollama not found - AI chat won't work
+        echo [2/6] Ollama not found - AI chat won't work
     )
 )
 
-:: 3. Start ComfyUI
-echo [3/5] Starting ComfyUI (Port 8199)...
-start "FEDDA ComfyUI Console" cmd /k ""%~f0" :svc_comfy"
+:: 3. Start Mockingbird XTTS
+echo [3/6] Starting Mockingbird XTTS (Port 8020)...
+call :is_port_listening 8020
+if errorlevel 1 (
+    echo     Mockingbird already running.
+) else (
+    start "" /B "%~f0" :svc_mockingbird
+    start "" /B "%~f0" :svc_mockingbird_warmup
+)
+timeout /t 2 /nobreak >nul
 
-:: 4. Start FastAPI Backend
-echo [4/5] Starting Backend (Port 8000)...
-start "" /B "%~f0" :svc_backend
+:: 4. Start ComfyUI
+echo [4/6] Starting ComfyUI (Port 8199)...
+call :is_port_listening 8199
+if errorlevel 1 (
+    echo     ComfyUI already running.
+) else (
+    start "FEDDA ComfyUI Console" cmd /k ""%~f0" :svc_comfy"
+)
+call :wait_for_port 8199 60 ComfyUI
 
-:: 5. Start Frontend
-echo [5/5] Starting FEDDA UI (Port 5173)...
+:: 5. Start FastAPI Backend
+echo [5/6] Starting Backend (Port 8000)...
+call :is_port_listening 8000
+if errorlevel 1 (
+    echo     Backend already running.
+) else (
+    start "" /B "%~f0" :svc_backend
+)
+call :wait_for_port 8000 30 Backend
+
+:: 6. Start Frontend
+echo [6/6] Starting FEDDA UI (Port 5173)...
 echo     Opening landing page immediately...
 echo.
 echo   Logs:  %BASE_DIR%\logs\
@@ -93,6 +128,40 @@ if not exist "node_modules" (
 
 call npm run dev
 pause
+exit /b
+
+:: ============================================================================
+:: SUBROUTINE: CHECK IF TCP PORT IS LISTENING
+:: Returns errorlevel 1 when listening, 0 when not listening.
+:: ============================================================================
+:is_port_listening
+setlocal
+set "CHECK_PORT=%~1"
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /R /C:":%CHECK_PORT% .*LISTENING"') do (
+    endlocal
+    exit /b 1
+)
+endlocal
+exit /b 0
+
+:: ============================================================================
+:: SUBROUTINE: CLEAN UP STALE FEDDA SERVICE PROCESSES
+:: ============================================================================
+:cleanup_stale_services
+if not exist "%BASE_DIR%\logs" mkdir "%BASE_DIR%\logs"
+echo     Cleaning stale FEDDA service processes...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$base = [IO.Path]::GetFullPath('%BASE_DIR%');" ^
+  "$procs = Get-CimInstance Win32_Process | Where-Object {" ^
+  "  $_.CommandLine -and (" ^
+  "    $_.CommandLine -like ('*' + $base + '\\python_embeded\\python.exe* -u server.py*') -or " ^
+  "    $_.CommandLine -like ('*' + $base + '\\python_embeded\\python.exe* main.py*') -or " ^
+  "    $_.CommandLine -like ('*' + $base + '\\mockingbird_tts\\venv\\Scripts\\python.exe*xtts_api_server*') -or " ^
+  "    $_.CommandLine -like ('*' + $base + '\\frontend\\*vite*')" ^
+  "  )" ^
+  "};" ^
+  "foreach ($p in $procs) { try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {} }" >nul 2>&1
+timeout /t 1 /nobreak >nul
 exit /b
 
 :: ============================================================================
@@ -224,5 +293,78 @@ echo [%date% %time%] Starting Backend...
 if %errorlevel% neq 0 (
     echo [%date% %time%] [ERROR] Backend crashed with error code %errorlevel%
 )
+exit /b
+
+:: ============================================================================
+:: SUBROUTINE: MOCKINGBIRD WARMUP
+:: ============================================================================
+:warmup_mockingbird
+set "BASE_DIR=%~dp0"
+if "%BASE_DIR:~-1%"=="\" set "BASE_DIR=%BASE_DIR:~0,-1%"
+
+echo [%date% %time%] Waiting for Mockingbird on port 8020...
+call :wait_for_port 8020 45 Mockingbird
+
+echo [%date% %time%] Prewarming Mockingbird voice cache...
+powershell -NoProfile -Command "$body = @{ text = 'Hello! How can I assist you today?'; speaker_wav = 'charlotte'; language = 'en' } | ConvertTo-Json; try { Invoke-RestMethod -Uri 'http://127.0.0.1:8020/tts_to_audio/' -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 120 | Out-Null; Write-Host '[Warmup] Mockingbird prewarm complete.' } catch { Write-Host ('[Warmup] Mockingbird prewarm failed: ' + $_.Exception.Message); exit 1 }"
+exit /b
+
+:: ============================================================================
+:: SUBROUTINE: MOCKINGBIRD XTTS
+:: ============================================================================
+:launch_mockingbird
+set "BASE_DIR=%~dp0"
+if "%BASE_DIR:~-1%"=="\" set "BASE_DIR=%BASE_DIR:~0,-1%"
+set "MOCKINGBIRD_DIR=%BASE_DIR%\mockingbird_tts"
+set "INTERNAL_MOCKINGBIRD_PY=%MOCKINGBIRD_DIR%\venv\Scripts\python.exe"
+set "INTERNAL_MOCKINGBIRD_REPO=%MOCKINGBIRD_DIR%\xtts-api-server"
+set "MOCKINGBIRD_SPEAKERS=%MOCKINGBIRD_DIR%\speakers"
+set "MOCKINGBIRD_OUTPUT=%MOCKINGBIRD_DIR%\output"
+set "MOCKINGBIRD_MODELS=%MOCKINGBIRD_DIR%\xtts_models"
+set "EXTERNAL_MOCKINGBIRD_ROOT=%BASE_DIR%\..\Mockingbird-TTS-One-Click-Install-v2\MOCKINGBIRD-TTS"
+set "EXTERNAL_MOCKINGBIRD_PY=%EXTERNAL_MOCKINGBIRD_ROOT%\venv\Scripts\python.exe"
+
+call :detect_env
+
+echo [%date% %time%] Checking Mockingbird XTTS...
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr /R /C:":8020 .*LISTENING"') do (
+    echo [%date% %time%] Mockingbird already running on port 8020.
+    exit /b 0
+)
+
+if not exist "%MOCKINGBIRD_SPEAKERS%" mkdir "%MOCKINGBIRD_SPEAKERS%"
+if not exist "%MOCKINGBIRD_OUTPUT%" mkdir "%MOCKINGBIRD_OUTPUT%"
+if not exist "%MOCKINGBIRD_MODELS%" mkdir "%MOCKINGBIRD_MODELS%"
+
+if exist "%BASE_DIR%\scripts\setup_tts_audio.py" (
+    "%PYTHON%" "%BASE_DIR%\scripts\setup_tts_audio.py" >nul 2>&1
+)
+
+if exist "%INTERNAL_MOCKINGBIRD_PY%" if exist "%INTERNAL_MOCKINGBIRD_REPO%" (
+    echo [%date% %time%] Found internal Mockingbird runtime.
+    cd /d "%INTERNAL_MOCKINGBIRD_REPO%"
+    echo [%date% %time%] Starting Mockingbird XTTS from internal runtime...
+    "%INTERNAL_MOCKINGBIRD_PY%" -m xtts_api_server --host 127.0.0.1 --port 8020 --device cuda --speaker-folder "%MOCKINGBIRD_SPEAKERS%" --output "%MOCKINGBIRD_OUTPUT%" --model-folder "%MOCKINGBIRD_MODELS%" --use-cache --lowvram
+    if %errorlevel% neq 0 (
+        echo [%date% %time%] [WARN] Internal Mockingbird XTTS exited with error code %errorlevel%.
+    )
+    exit /b
+)
+
+if exist "%EXTERNAL_MOCKINGBIRD_PY%" (
+    echo [%date% %time%] Found external Mockingbird install: "%EXTERNAL_MOCKINGBIRD_ROOT%"
+    if not exist "%EXTERNAL_MOCKINGBIRD_ROOT%\speakers\charlotte.wav" (
+        copy /Y "%MOCKINGBIRD_SPEAKERS%\charlotte.wav" "%EXTERNAL_MOCKINGBIRD_ROOT%\speakers\charlotte.wav" >nul 2>&1
+    )
+    cd /d "%EXTERNAL_MOCKINGBIRD_ROOT%"
+    echo [%date% %time%] Starting Mockingbird XTTS from external install...
+    "%EXTERNAL_MOCKINGBIRD_PY%" -m xtts_api_server --host 127.0.0.1 --port 8020 --device cuda --speaker-folder "%EXTERNAL_MOCKINGBIRD_ROOT%\speakers" --output "%EXTERNAL_MOCKINGBIRD_ROOT%\output" --model-folder "%EXTERNAL_MOCKINGBIRD_ROOT%\xtts_models" --use-cache --lowvram
+    if %errorlevel% neq 0 (
+        echo [%date% %time%] [WARN] External Mockingbird XTTS exited with error code %errorlevel%.
+    )
+    exit /b
+)
+
+echo [%date% %time%] [WARN] No Mockingbird runtime installed. Re-run INSTALL.bat to install XTTS voice support.
 exit /b
 

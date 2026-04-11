@@ -19,12 +19,58 @@ interface FishModelOption {
   description?: string;
 }
 
+interface ChatModelPreset {
+  name: string;
+  label: string;
+  description: string;
+}
+
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onresult: ((event: { resultIndex?: number; results?: ArrayLike<ArrayLike<{ transcript?: string; confidence?: number }>> }) => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
 const SESSION_KEY = 'fedda_agent_session_id_v1';
 const AUTO_SPEAK_KEY = 'fedda_agent_auto_speak_v1';
 const VOICE_KEY = 'fedda_agent_voice_v1';
+const TTS_ENGINE_KEY = 'fedda_agent_tts_engine_v1';
+const CHAT_MODEL_KEY = 'fedda_agent_chat_model_v1';
+const DEFAULT_MOCKINGBIRD_VOICE = 'charlotte.wav';
 const FALLBACK_VOICES = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
 const DEFAULT_MEMORY_REFRESH_TURNS = 2;
-const DEFAULT_RECOMMENDED_TEXT_MODEL = 'llama3.2';
+const DEFAULT_RECOMMENDED_TEXT_MODEL = 'zarigata/unfiltered-llama3';
+const CHAT_MODEL_PRESETS: ChatModelPreset[] = [
+  {
+    name: 'zarigata/unfiltered-llama3',
+    label: 'Unfiltered Llama 3',
+    description: 'Best all-round local companion brain. Less sterile, more natural.',
+  },
+  {
+    name: 'dolphin-llama3',
+    label: 'Dolphin Llama 3',
+    description: 'Solid uncensored backup with a cleaner tone.',
+  },
+  {
+    name: 'goonsai/qwen2.5-3B-goonsai-nsfw-100k',
+    label: 'Goonsai Qwen NSFW',
+    description: 'Small NSFW-focused model. Faster, but weaker personality.',
+  },
+  {
+    name: 'llama3.2',
+    label: 'Llama 3.2',
+    description: 'Safer default fallback if you want a more neutral assistant.',
+  },
+];
 
 function getSessionId(): string {
   try {
@@ -76,6 +122,9 @@ export const AgentChatPage = () => {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState('');
   const [isRefreshingMemory, setIsRefreshingMemory] = useState(false);
   const [isPullingModel, setIsPullingModel] = useState(false);
   const [backendOnline, setBackendOnline] = useState(true);
@@ -83,8 +132,17 @@ export const AgentChatPage = () => {
   const [ollamaOnline, setOllamaOnline] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
   const [memoryRefreshEveryTurns, setMemoryRefreshEveryTurns] = useState(DEFAULT_MEMORY_REFRESH_TURNS);
+  const [availableTextModels, setAvailableTextModels] = useState<string[]>([]);
   const [availableVoices, setAvailableVoices] = useState<string[]>(FALLBACK_VOICES);
   const [recommendedTextModel, setRecommendedTextModel] = useState(DEFAULT_RECOMMENDED_TEXT_MODEL);
+  const [selectedTextModel, setSelectedTextModel] = useState<string>(() => {
+    try {
+      return localStorage.getItem(CHAT_MODEL_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [downloadModelName, setDownloadModelName] = useState('');
   const [pullStatus, setPullStatus] = useState('');
   const [pullPercent, setPullPercent] = useState<number | null>(null);
   const [pullError, setPullError] = useState('');
@@ -99,6 +157,13 @@ export const AgentChatPage = () => {
   const [referenceText, setReferenceText] = useState('');
   const [isUploadingReference, setIsUploadingReference] = useState(false);
   const [voiceCloneError, setVoiceCloneError] = useState('');
+  const [ttsEngine, setTtsEngine] = useState<string>(() => {
+    try {
+      return localStorage.getItem(TTS_ENGINE_KEY) || 'mockingbird';
+    } catch {
+      return 'mockingbird';
+    }
+  });
   const [autoSpeak, setAutoSpeak] = useState<boolean>(() => {
     try {
       return localStorage.getItem(AUTO_SPEAK_KEY) === '1';
@@ -116,6 +181,11 @@ export const AgentChatPage = () => {
   const [panelOpen, setPanelOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const speechKeepAliveRef = useRef(false);
+  const speechBaseInputRef = useRef('');
+  const speechTranscriptRef = useRef('');
+  const isHoldToTalkActiveRef = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -125,34 +195,16 @@ export const AgentChatPage = () => {
     try {
       localStorage.setItem(AUTO_SPEAK_KEY, autoSpeak ? '1' : '0');
       localStorage.setItem(VOICE_KEY, voiceName);
+      localStorage.setItem(TTS_ENGINE_KEY, ttsEngine);
+      localStorage.setItem(CHAT_MODEL_KEY, selectedTextModel);
     } catch {}
-  }, [autoSpeak, voiceName]);
+  }, [autoSpeak, voiceName, ttsEngine, selectedTextModel]);
 
   useEffect(() => {
     const init = async () => {
       await refreshLocalModelState();
       await fetchFishModels();
-
-      try {
-        const voiceRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/voices`);
-        const voiceData = await voiceRes.json();
-        const voices = Array.isArray(voiceData?.voices)
-          ? voiceData.voices
-              .map((v: unknown) => {
-                const voice = v as { id?: string; name?: string };
-                return String(voice?.id || voice?.name || '').trim();
-              })
-              .filter((v: string) => v.length > 0)
-          : [];
-        if (voices.length > 0) {
-          setAvailableVoices(voices);
-          if (!voices.includes(voiceName)) {
-            setVoiceName(voices[0]);
-          }
-        }
-      } catch {
-        setAvailableVoices(FALLBACK_VOICES);
-      }
+      await fetchVoices(ttsEngine);
 
       try {
         const historyRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/history/${encodeURIComponent(sessionId)}`);
@@ -181,17 +233,114 @@ export const AgentChatPage = () => {
     void init();
   }, [sessionId]);
 
+  useEffect(() => {
+    void fetchVoices(ttsEngine);
+  }, [ttsEngine]);
+
+  useEffect(() => {
+    const speechWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const RecognitionCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!RecognitionCtor) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    const recognition = new RecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.onstart = () => {
+      setSpeechError('');
+      speechTranscriptRef.current = '';
+      setIsListening(true);
+    };
+    recognition.onend = () => {
+      if (speechKeepAliveRef.current) {
+        try {
+          recognition.start();
+          return;
+        } catch {
+          setTimeout(() => {
+            if (!speechKeepAliveRef.current) return;
+            try {
+              recognition.start();
+            } catch {}
+          }, 150);
+        }
+      }
+      setIsListening(false);
+    };
+    recognition.onerror = (event) => {
+      const nextError = String(event?.error || 'Speech recognition failed.');
+      if (nextError !== 'aborted') {
+        setSpeechError(nextError);
+      }
+      setIsListening(false);
+    };
+    recognition.onresult = (event) => {
+      const results = event.results;
+      if (!results) return;
+      let transcript = '';
+      for (let i = 0; i < results.length; i += 1) {
+        const chunk = results[i]?.[0]?.transcript ?? '';
+        transcript += chunk;
+      }
+      speechTranscriptRef.current = transcript.trim();
+      const nextText = `${speechBaseInputRef.current} ${transcript}`.trim();
+      setInput(nextText);
+    };
+
+    speechRecognitionRef.current = recognition;
+    setSpeechSupported(true);
+
+    return () => {
+      recognition.onstart = null;
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+      try {
+        recognition.abort();
+      } catch {}
+      speechRecognitionRef.current = null;
+    };
+  }, []);
+
   const refreshLocalModelState = async () => {
     try {
       const localRes = await fetch(`${BACKEND_API.BASE_URL}/api/ollama/models`);
       const localData = await localRes.json();
+      const models = Array.isArray(localData?.models)
+        ? localData.models
+            .map((model: unknown) => String(model ?? '').trim())
+            .filter((model: string) => model.length > 0)
+        : [];
+      const preferredModel = String(localData?.text_model ?? '');
+      const recommendedModel = String(localData?.recommended_text_model ?? DEFAULT_RECOMMENDED_TEXT_MODEL);
       setBackendOnline(true);
       setLocalReady(Boolean(localData?.success && localData?.text_model));
       setOllamaOnline(Boolean(localData?.ollama_online ?? localData?.success));
-      setRecommendedTextModel(String(localData?.recommended_text_model ?? DEFAULT_RECOMMENDED_TEXT_MODEL));
+      setAvailableTextModels(models);
+      setRecommendedTextModel(recommendedModel);
+      setSelectedTextModel((current) => {
+        if (current && models.includes(current)) {
+          return current;
+        }
+        if (preferredModel && models.includes(preferredModel)) {
+          return preferredModel;
+        }
+        if (models.length > 0) {
+          return models[0];
+        }
+        return current || '';
+      });
+      setDownloadModelName((current) => current || recommendedModel);
     } catch {
       setBackendOnline(false);
       setLocalReady(false);
+      setAvailableTextModels([]);
       // Fallback probe so UI can still show true Ollama availability even if backend is down.
       try {
         const ollamaRes = await fetch('/ollama/tags');
@@ -221,6 +370,43 @@ export const AgentChatPage = () => {
     } catch (error) {
       setFishModelError(error instanceof Error ? error.message : 'Failed to load Fish model list');
       setFishModels([]);
+    }
+  };
+
+  const fetchVoices = async (engine: string) => {
+    try {
+      const voiceRes = await fetch(`${BACKEND_API.BASE_URL}/api/chat/voices?engine=${encodeURIComponent(engine)}`);
+      const voiceData = await voiceRes.json();
+      const voices = Array.isArray(voiceData?.voices)
+        ? voiceData.voices
+            .map((v: unknown) => {
+              const voice = v as { id?: string; name?: string };
+              return String(voice?.id || voice?.name || '').trim();
+            })
+            .filter((v: string) => v.length > 0)
+        : [];
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+        if (!voices.includes(voiceName)) {
+          setVoiceName(voices[0]);
+        }
+        return;
+      }
+    } catch {
+      // Fall through to engine-specific fallback.
+    }
+
+    if (engine === 'mockingbird') {
+      setAvailableVoices([DEFAULT_MOCKINGBIRD_VOICE]);
+      if (voiceName !== DEFAULT_MOCKINGBIRD_VOICE) {
+        setVoiceName(DEFAULT_MOCKINGBIRD_VOICE);
+      }
+      return;
+    }
+
+    setAvailableVoices(FALLBACK_VOICES);
+    if (!FALLBACK_VOICES.includes(voiceName)) {
+      setVoiceName(FALLBACK_VOICES[0]);
     }
   };
 
@@ -316,18 +502,23 @@ export const AgentChatPage = () => {
     }
   };
 
-  const installRecommendedModel = async () => {
+  const installModel = async () => {
     if (isPullingModel) return;
+    const targetModel = (downloadModelName || recommendedTextModel).trim();
+    if (!targetModel) {
+      setPullError('Enter an Ollama model name to download.');
+      return;
+    }
     setIsPullingModel(true);
     setPullError('');
-    setPullStatus(`Starting download: ${recommendedTextModel}`);
+    setPullStatus(`Starting download: ${targetModel}`);
     setPullPercent(null);
 
     try {
       const res = await fetch(`${BACKEND_API.BASE_URL}/api/ollama/pull`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: recommendedTextModel }),
+        body: JSON.stringify({ name: targetModel }),
       });
 
       if (!res.ok || !res.body) {
@@ -379,6 +570,7 @@ export const AgentChatPage = () => {
         setPullStatus('Download completed. Checking model availability...');
       }
       await refreshLocalModelState();
+      setSelectedTextModel(targetModel);
     } catch (error) {
       setPullError(error instanceof Error ? error.message : 'Model download failed');
     } finally {
@@ -386,12 +578,16 @@ export const AgentChatPage = () => {
     }
   };
 
-  const sendMessage = async (evt?: FormEvent) => {
+  const sendMessage = async (evt?: FormEvent, overrideText?: string) => {
     evt?.preventDefault();
-    const text = input.trim();
+    const text = (overrideText ?? input).trim();
     if (!text || isSending) return;
 
-    setInput('');
+    if (overrideText !== undefined) {
+      setInput('');
+    } else {
+      setInput('');
+    }
     setIsSending(true);
     const userMsg: ChatMessage = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -403,9 +599,10 @@ export const AgentChatPage = () => {
         body: JSON.stringify({
           session_id: sessionId,
           message: text,
-          model: '',
+          model: selectedTextModel,
           voice_name: voiceName,
           speak: autoSpeak,
+          tts_engine: ttsEngine,
         }),
       });
 
@@ -435,10 +632,21 @@ export const AgentChatPage = () => {
   };
 
   const playTtsFromBase64 = async (audioBase64: string, mimeType: string) => {
-    const rateMatch = /rate=(\d+)/i.exec(mimeType);
-    const sampleRate = rateMatch ? Number.parseInt(rateMatch[1], 10) : 24000;
-    const wavBlob = pcm16ToWavBlob(audioBase64, sampleRate);
-    const url = URL.createObjectURL(wavBlob);
+    const binary = atob(audioBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    const isWav = mimeType.toLowerCase().includes('wav');
+    const blob = isWav
+      ? new Blob([bytes], { type: mimeType || 'audio/wav' })
+      : pcm16ToWavBlob(audioBase64, (() => {
+          const rateMatch = /rate=(\d+)/i.exec(mimeType);
+          return rateMatch ? Number.parseInt(rateMatch[1], 10) : 24000;
+        })());
+
+    const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     setIsSpeaking(true);
     await audio.play();
@@ -460,6 +668,7 @@ export const AgentChatPage = () => {
         body: JSON.stringify({
           text,
           voice_name: voiceName,
+          tts_engine: ttsEngine,
           model_path: selectedFishModel || undefined,
           use_voice_clone: useVoiceClone,
           reference_audio: referenceAudioFile || undefined,
@@ -467,7 +676,11 @@ export const AgentChatPage = () => {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data?.success) return;
+      if (!res.ok || !data?.success) {
+        const errorMessage = String(data?.error || 'TTS failed');
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Voice error: ${errorMessage}` }]);
+        return;
+      }
       if (data?.audio_base64) {
         await playTtsFromBase64(String(data.audio_base64), String(data.mime_type ?? 'audio/L16;rate=24000'));
         return;
@@ -494,6 +707,43 @@ export const AgentChatPage = () => {
     }
   };
 
+  const startHoldToTalk = () => {
+    if (!speechRecognitionRef.current || isSending) {
+      if (!speechRecognitionRef.current) {
+        setSpeechError('Speech-to-text is not supported in this browser.');
+      }
+      return;
+    }
+    if (isHoldToTalkActiveRef.current) return;
+    setSpeechError('');
+    speechBaseInputRef.current = input.trim();
+    speechTranscriptRef.current = '';
+    speechKeepAliveRef.current = true;
+    isHoldToTalkActiveRef.current = true;
+    try {
+      speechRecognitionRef.current.start();
+    } catch (error) {
+      setSpeechError(error instanceof Error ? error.message : 'Speech-to-text failed to start.');
+      speechKeepAliveRef.current = false;
+      isHoldToTalkActiveRef.current = false;
+      setIsListening(false);
+    }
+  };
+
+  const stopHoldToTalk = () => {
+    if (!speechRecognitionRef.current || !isHoldToTalkActiveRef.current) return;
+    speechKeepAliveRef.current = false;
+    isHoldToTalkActiveRef.current = false;
+    try {
+      speechRecognitionRef.current.stop();
+    } catch {}
+    const combinedText = `${speechBaseInputRef.current} ${speechTranscriptRef.current}`.trim();
+    setInput(combinedText);
+    if (combinedText && !isSending) {
+      void sendMessage(undefined, combinedText);
+    }
+  };
+
   const refreshMemory = async () => {
     if (isRefreshingMemory) return;
     setIsRefreshingMemory(true);
@@ -517,6 +767,11 @@ export const AgentChatPage = () => {
     const remainder = turnCount % every;
     return remainder === 0 ? every : every - remainder;
   }, [turnCount, memoryRefreshEveryTurns]);
+  const normalizedDownloadModelName = useMemo(() => downloadModelName.trim().toLowerCase(), [downloadModelName]);
+  const activePreset = useMemo(
+    () => CHAT_MODEL_PRESETS.find((preset) => preset.name.toLowerCase() === selectedTextModel.trim().toLowerCase()),
+    [selectedTextModel],
+  );
 
   return (
     <div className="h-full flex flex-col p-5 gap-4 overflow-hidden">
@@ -589,7 +844,7 @@ export const AgentChatPage = () => {
                 </button>
                 {backendOnline && ollamaOnline && (
                   <button
-                    onClick={() => void installRecommendedModel()}
+                    onClick={() => void installModel()}
                     disabled={isPullingModel}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-cyan-400/40 text-cyan-200 bg-cyan-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -646,6 +901,25 @@ export const AgentChatPage = () => {
               className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-cyan-400/60"
             />
             <button
+              type="button"
+              onMouseDown={startHoldToTalk}
+              onMouseUp={stopHoldToTalk}
+              onMouseLeave={stopHoldToTalk}
+              onTouchStart={startHoldToTalk}
+              onTouchEnd={stopHoldToTalk}
+              onTouchCancel={stopHoldToTalk}
+              disabled={!speechSupported}
+              className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                isListening
+                  ? 'bg-red-500/15 border-red-400/50 text-red-200'
+                  : 'bg-white/[0.02] border-white/10 text-slate-300'
+              }`}
+              title={speechSupported ? 'Hold to talk, release to send' : 'Speech-to-text not supported'}
+            >
+              <Mic className="w-4 h-4" />
+              {isListening ? 'Release' : 'Hold to Talk'}
+            </button>
+            <button
               type="submit"
               disabled={!canSend}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -654,10 +928,146 @@ export const AgentChatPage = () => {
               {isSending ? 'Sending' : 'Send'}
             </button>
           </form>
+          {(isListening || speechError || !speechSupported) && (
+            <div className="px-3 pb-3 text-[11px]">
+              {isListening && <div className="text-emerald-300">Listening... speak naturally and it will fill the input box.</div>}
+              {!speechSupported && <div className="text-slate-500">Speech-to-text is only available in supported browsers.</div>}
+              {speechError && <div className="text-red-300">{speechError}</div>}
+            </div>
+          )}
         </section>
 
         <aside className={`rounded-2xl border border-white/10 bg-black/25 p-4 overflow-y-auto custom-scrollbar ${panelOpen ? 'block' : 'hidden xl:block'}`}>
           <h3 className="text-xs uppercase tracking-[0.16em] text-slate-400 mb-3">Chat Settings</h3>
+
+          <label className="block text-[11px] text-slate-400 mb-1">Chat Model</label>
+          <select
+            value={selectedTextModel}
+            onChange={(e) => setSelectedTextModel(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-2"
+          >
+            {availableTextModels.length === 0 ? (
+              <option value="">No local chat models found</option>
+            ) : (
+              availableTextModels.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))
+            )}
+          </select>
+          <p className="text-[11px] text-slate-500 mb-3">
+            Pick which Ollama model Agent Chat should use for replies.
+          </p>
+          {selectedTextModel && (
+            <div className="mb-4 rounded-lg border border-emerald-400/20 bg-emerald-500/5 px-3 py-2">
+              <div className="text-[11px] text-emerald-300 font-medium">
+                Active model: {activePreset?.label || selectedTextModel}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1">
+                {activePreset?.description || 'Installed local model selected for chat replies.'}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-4">
+            <div className="text-[11px] text-slate-400 mb-2">Recommended Models</div>
+            <div className="space-y-2">
+              {CHAT_MODEL_PRESETS.map((preset) => {
+                const isInstalled = availableTextModels.some((model) => model.toLowerCase() === preset.name.toLowerCase());
+                const isSelected = selectedTextModel.trim().toLowerCase() === preset.name.toLowerCase();
+                const isQueued = normalizedDownloadModelName === preset.name.toLowerCase();
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => {
+                      setDownloadModelName(preset.name);
+                      if (isInstalled) {
+                        setSelectedTextModel(
+                          availableTextModels.find((model) => model.toLowerCase() === preset.name.toLowerCase()) || preset.name,
+                        );
+                      }
+                    }}
+                    className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                      isSelected
+                        ? 'border-cyan-400/40 bg-cyan-500/10'
+                        : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[12px] text-slate-100">{preset.label}</div>
+                      <div className="text-[10px]">
+                        {isSelected ? (
+                          <span className="text-cyan-300">Active</span>
+                        ) : isInstalled ? (
+                          <span className="text-emerald-300">Installed</span>
+                        ) : isQueued ? (
+                          <span className="text-amber-300">Ready to download</span>
+                        ) : (
+                          <span className="text-slate-500">Not installed</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-slate-400">{preset.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <label className="block text-[11px] text-slate-400 mb-1">Download / Pull Model</label>
+          <input
+            value={downloadModelName}
+            onChange={(e) => setDownloadModelName(e.target.value)}
+            placeholder={recommendedTextModel}
+            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-2"
+          />
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => void installModel()}
+              disabled={isPullingModel || !ollamaOnline}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-cyan-400/40 text-cyan-200 bg-cyan-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPullingModel ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              {isPullingModel ? 'Downloading...' : 'Download Model'}
+            </button>
+            <button
+              onClick={() => void refreshLocalModelState()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 text-slate-300 bg-white/[0.02]"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Refresh
+            </button>
+          </div>
+          {(isPullingModel || pullStatus) && (
+            <div className="mb-3 rounded-lg border border-cyan-400/20 bg-cyan-500/5 p-3">
+              <div className="flex items-center justify-between gap-2 text-[11px] text-slate-200">
+                <span className="truncate">{pullStatus || 'Preparing download...'}</span>
+                <span>{typeof pullPercent === 'number' ? `${pullPercent}%` : '...'}</span>
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-cyan-400 transition-all duration-300"
+                  style={{ width: `${Math.max(6, Math.min(100, pullPercent ?? 8))}%` }}
+                />
+              </div>
+              <div className="mt-2 text-[10px] text-slate-400">
+                Downloads happen through local Ollama and become selectable here when finished.
+              </div>
+            </div>
+          )}
+          {pullError && <div className="text-[11px] text-red-300 mb-4">{pullError}</div>}
+
+          <label className="block text-[11px] text-slate-400 mb-1">TTS Engine</label>
+          <select
+            value={ttsEngine}
+            onChange={(e) => setTtsEngine(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-100 mb-3"
+          >
+            <option value="fish">Fish TTS</option>
+            <option value="mockingbird">Mockingbird XTTS</option>
+          </select>
 
           <label className="block text-[11px] text-slate-400 mb-1">Voice Preset</label>
           <select
@@ -671,10 +1081,12 @@ export const AgentChatPage = () => {
           </select>
 
           <div className="text-[11px] text-slate-500 mb-4">
-            Presets are still active. They control TTS sampling (temperature/top-p/repetition), including voice clone mode.
+            {ttsEngine === 'mockingbird'
+              ? 'Mockingbird uses XTTS speakers from your local install on port 8020.'
+              : 'Presets are still active. They control TTS sampling (temperature/top-p/repetition), including voice clone mode.'}
           </div>
 
-          <div className="mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02]">
+          <div className={`mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02] ${ttsEngine === 'fish' ? 'block' : 'hidden'}`}>
             <div className="flex items-center justify-between gap-2 mb-2">
               <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Fish TTS Model</h4>
               <button
@@ -726,7 +1138,7 @@ export const AgentChatPage = () => {
             )}
           </div>
 
-          <div className="mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02]">
+          <div className={`mb-4 p-3 rounded-lg border border-white/10 bg-white/[0.02] ${ttsEngine === 'fish' ? 'block' : 'hidden'}`}>
             <div className="flex items-center justify-between gap-2 mb-2">
               <h4 className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Voice Clone</h4>
               <label className="inline-flex items-center gap-2 text-[11px] text-slate-300">

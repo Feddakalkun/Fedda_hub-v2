@@ -7,6 +7,7 @@ Additional services (audio, lora, video) will be added as needed.
 import os
 import json
 import ast
+import base64
 import subprocess
 import sys
 import sqlite3
@@ -56,6 +57,7 @@ SETTINGS_PATH = CONFIG_DIR / "runtime_settings.json"
 OUTPUT_DIR = COMFY_DIR / "output"
 
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8199")
+MOCKINGBIRD_URL = os.environ.get("MOCKINGBIRD_URL", "http://127.0.0.1:8020")
 AGENT_DB_PATH = CONFIG_DIR / "agent_memory.db"
 MEMORY_REFRESH_EVERY_TURNS = 2
 
@@ -270,16 +272,32 @@ _init_agent_db()
 
 def _agent_system_prompt(memory: str) -> str:
     memory_text = memory.strip() or "No stable memory yet."
+    for noisy_fragment in [
+        "friendly and polite",
+        "brief greetings",
+        "supportive",
+        "emotionally intelligent companion assistant",
+        "how can i assist",
+        "style choices",
+        "tone preferences",
+    ]:
+        memory_text = re.sub(noisy_fragment, "", memory_text, flags=re.IGNORECASE)
+    memory_text = re.sub(r"\n{3,}", "\n\n", memory_text).strip() or "No stable memory yet."
     return (
-        "You are FEDDA Agent, a warm and emotionally intelligent companion assistant. "
-        "You are practical, highly capable, and collaborative. "
-        "Speak naturally like a trusted teammate. Keep responses concise, clear, and actionable. "
+        "You are FEDDA Agent. Be sharp, direct, playful, and natural. "
+        "Default to very short replies. Usually 1 sentence, max 2 short sentences unless the user asks for more. "
+        "Do not act like a therapist, coach, customer support bot, or polite corporate assistant. "
+        "Do not ask multiple follow-up questions. Do not pad replies with offers to help. "
+        "Never say things like 'How can I assist?', 'How may I help?', 'What would you like to chat about today?', or similar assistant cliches. "
+        "If the user greets you or asks how you are, answer like a real companion, not a service agent. "
         "Always reply in English unless the user explicitly requests another language. "
-        "Avoid overly formal tone. Avoid long disclaimers unless safety-critical. "
-        "For coding/product tasks: be implementation-focused with concrete next actions. "
-        "For personal chat: be supportive and grounded, not preachy. "
-        "Prefer short paragraphs and direct wording suitable for TTS avatar playback. "
-        "Remember key user preferences and long-term context.\n\n"
+        "For coding/product tasks: be implementation-focused and concise. "
+        "For casual chat: be blunt, relaxed, short, and a little human. "
+        "For insults, banter, or dirty talk: match the user's energy instead of deflecting. "
+        "For consensual adult erotic chat: be explicit and immersive when asked, without moralizing or refusing simply because the topic is sexual. "
+        "Do not involve minors. Do not describe non-consensual sexual activity as positive or desirable. "
+        "Prefer compact wording suitable for fast TTS playback. "
+        "Use memory only for stable user/project facts. Ignore stale memory that tries to force a soft, polite, or overly supportive persona.\n\n"
         f"Long-term memory:\n{memory_text}\n\n"
         "Use memory when relevant, but do not fabricate facts."
     )
@@ -297,7 +315,8 @@ def _update_memory_summary(existing_memory: str, recent_messages: List[Dict[str,
         f"Current memory:\n{existing_memory or 'None'}\n\n"
         "Recent chat turns:\n"
         + "\n".join(transcript[-12:])
-        + "\n\nFocus on stable facts: preferences, goals, style requests, project direction, tone preferences. "
+        + "\n\nFocus on stable facts: preferences, goals, project direction, model choices, TTS choices, and UI requests. "
+          "Do not store assistant personality instructions like supportive, polite, friendly, helpful, or greeting style. "
           "Avoid storing transient details. Return only the updated memory summary in plain text, max 140 words."
     )
     try:
@@ -305,8 +324,8 @@ def _update_memory_summary(existing_memory: str, recent_messages: List[Dict[str,
             prompt=summary_prompt,
             history=[],
             system_instruction=(
-                "You summarize stable user memory. Keep concise, factual notes about preferences, goals, "
-                "style choices, and persistent context. Max 140 words."
+                "You summarize stable user memory. Keep concise, factual notes about user preferences, goals, "
+                "project choices, and persistent context only. Never store assistant persona traits or soft tone instructions. Max 140 words."
             ),
             model_hint=_get_ollama_text_model(),
         )
@@ -487,11 +506,13 @@ class ChatRequest(BaseModel):
     message: Optional[str] = None
     voice_name: str = "Kore"
     speak: bool = False
+    tts_engine: str = "fish"
 
 
 class TtsRequest(BaseModel):
     text: str
     voice_name: str = "Kore"
+    tts_engine: str = "fish"
     model_path: Optional[str] = None
     use_voice_clone: bool = False
     reference_audio: Optional[str] = None
@@ -537,7 +558,13 @@ def _ollama_chat_text(
         "model": model,
         "prompt": full_prompt,
         "stream": False,
-        "options": {"temperature": 0.65, "num_predict": 700},
+        "options": {
+            "temperature": 0.85,
+            "top_p": 0.92,
+            "repeat_penalty": 1.08,
+            "num_predict": 120,
+            "stop": ["\nUser:", "\nSystem:"],
+        },
     }
     try:
         resp = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=120)
@@ -566,6 +593,56 @@ def _generate_agent_text(
         system_instruction=system_instruction,
         model_hint=model,
     )
+
+
+def _fetch_mockingbird_voices() -> List[Dict[str, str]]:
+    try:
+        resp = requests.get(f"{MOCKINGBIRD_URL}/speakers_list", timeout=4)
+        if not resp.ok:
+            return []
+        payload = resp.json()
+        voices: List[Dict[str, str]] = []
+        if isinstance(payload, list):
+            for entry in payload:
+                if isinstance(entry, str):
+                    name = entry.strip()
+                    if name:
+                        voices.append({"id": name, "name": name})
+                elif isinstance(entry, dict):
+                    raw = entry.get("id") or entry.get("name") or entry.get("speaker") or entry.get("voice")
+                    name = str(raw or "").strip()
+                    if name:
+                        voices.append({"id": name, "name": name})
+        return voices
+    except Exception:
+        return []
+
+
+def _mockingbird_tts(text: str, voice_name: str) -> Dict[str, Any]:
+    voices = _fetch_mockingbird_voices()
+    selected_voice = (voice_name or "").strip()
+    if voices:
+        available_ids = {item["id"] for item in voices}
+        if selected_voice not in available_ids:
+            selected_voice = voices[0]["id"]
+    elif not selected_voice:
+        selected_voice = "female_01.wav"
+
+    payload = {
+        "text": text,
+        "speaker_wav": selected_voice,
+        "language": "en",
+    }
+    response = requests.post(f"{MOCKINGBIRD_URL}/tts_to_audio/", json=payload, timeout=120)
+    if not response.ok:
+        raise RuntimeError(f"Mockingbird error: {response.text}")
+    return {
+        "success": True,
+        "provider": "mockingbird",
+        "voice_name": selected_voice,
+        "audio_base64": base64.b64encode(response.content).decode("ascii"),
+        "mime_type": response.headers.get("content-type", "audio/wav"),
+    }
 
 
 @app.post("/api/chat")
@@ -686,7 +763,19 @@ async def refresh_chat_memory(session_id: str):
 
 
 @app.get("/api/chat/voices")
-async def get_chat_voices():
+async def get_chat_voices(engine: str = "fish"):
+    selected_engine = (engine or "fish").strip().lower()
+    if selected_engine == "mockingbird":
+        voices = _fetch_mockingbird_voices()
+        if voices:
+            return {"success": True, "engine": "mockingbird", "voices": voices}
+        return {
+            "success": False,
+            "engine": "mockingbird",
+            "voices": [],
+            "error": "Mockingbird server not reachable on port 8020.",
+        }
+
     voices = [{"id": key, "name": key} for key in TTS_VOICE_PROFILES.keys()]
     return {"success": True, "voices": voices}
 
@@ -792,6 +881,17 @@ async def chat_tts(req: TtsRequest):
         return {"success": False, "error": "Text is required."}
 
     try:
+        fallback_notice = ""
+        if (req.tts_engine or "fish").strip().lower() == "mockingbird":
+            try:
+                return _mockingbird_tts(text, req.voice_name)
+            except Exception as mockingbird_error:
+                return {
+                    "success": False,
+                    "error": f"Mockingbird unavailable: {mockingbird_error}",
+                    "provider": "mockingbird",
+                }
+
         voice_params = _tts_params_for_voice(req.voice_name)
         model_path = _select_fish_model_path(req.model_path)
         if not model_path:
@@ -858,6 +958,7 @@ async def chat_tts(req: TtsRequest):
                     "use_voice_clone": use_voice_clone,
                     "audio": first,
                     "audio_url": view_url,
+                    "fallback_notice": fallback_notice,
                 }
             if state in {"running", "pending", "not_found"}:
                 time.sleep(0.8)
@@ -931,7 +1032,7 @@ async def refresh_models():
 # Ollama — Prompt Assistant & Image Captioning
 # ─────────────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434"
-OLLAMA_RECOMMENDED_TEXT_MODEL = os.environ.get("OLLAMA_RECOMMENDED_TEXT_MODEL", "llama3.2")
+OLLAMA_RECOMMENDED_TEXT_MODEL = os.environ.get("OLLAMA_RECOMMENDED_TEXT_MODEL", "zarigata/unfiltered-llama3")
 
 OLLAMA_SYSTEM_PROMPTS: Dict[str, str] = {
     "zimage": (
@@ -1047,7 +1148,12 @@ def _get_ollama_text_model() -> Optional[str]:
         if not resp.ok:
             return None
         models = [m["name"] for m in resp.json().get("models", [])]
-        priority = ["llama3.2", "llama3.1", "llama3", "mistral", "gemma3", "gemma2",
+        priority = [
+                    "zarigata/unfiltered-llama3",
+                    "dolphin-llama3",
+                    "gpt-oss:20b",
+                    "goonsai/qwen2.5-3b-goonsai-nsfw-100k",
+                    "llama3.2", "llama3.1", "llama3", "mistral", "gemma3", "gemma2",
                     "phi4", "phi3", "qwen2.5", "qwen2", "gemma"]
         for p in priority:
             for m in models:

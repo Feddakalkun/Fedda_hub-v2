@@ -519,6 +519,7 @@ try {
 } catch {}
 
 Write-Step "All Python dependencies installed." "Green"
+Install-MockingbirdRuntime -RootPath $RootPath -SpeakerSource (Join-Path $RootPath "assets\audio-tts\charlotte\charlotte.wav")
 
 # ============================================================================
 # 4. CUSTOM NODES
@@ -615,7 +616,92 @@ if (Test-Path $SrcLoras) {
 $AudioScript = Join-Path $ScriptPath "setup_tts_audio.py"
 if (Test-Path $AudioScript) {
     & $VenvPy "$AudioScript" 2>&1 | Out-Null
-    Write-Step "TTS audio assets configured." "Green"
+    Write-Step "TTS audio assets configured (ComfyUI + Mockingbird speaker)." "Green"
+}
+
+function Install-MockingbirdRuntime {
+    param(
+        [string]$RootPath,
+        [string]$SpeakerSource
+    )
+
+    $GitExe = (Get-Command git -ErrorAction Stop).Source
+    $MockDir = Join-Path $RootPath "mockingbird_tts"
+    $PythonRoot = Join-Path $MockDir "python310"
+    $PythonExe = Join-Path $PythonRoot "python.exe"
+    $VenvDir = Join-Path $MockDir "venv"
+    $VenvPy = Join-Path $VenvDir "Scripts\python.exe"
+    $RepoDir = Join-Path $MockDir "xtts-api-server"
+    $SpeakersDir = Join-Path $MockDir "speakers"
+    $OutputDir = Join-Path $MockDir "output"
+    $ModelsDir = Join-Path $MockDir "xtts_models"
+    $InstallerDir = Join-Path $MockDir "downloads"
+    $InstallerExe = Join-Path $InstallerDir "python-3.10.11-amd64.exe"
+
+    Write-Header "STEP 3.5/7 - Mockingbird XTTS Runtime"
+    New-Item -ItemType Directory -Path $MockDir, $SpeakersDir, $OutputDir, $ModelsDir, $InstallerDir -Force | Out-Null
+
+    if (-not (Test-Path $PythonExe)) {
+        Write-Step "Downloading dedicated Python 3.10 for Mockingbird..." "Yellow"
+        & curl.exe -L -o "$InstallerExe" "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe" --retry 3 --retry-delay 2 --progress-bar
+        if ($LASTEXITCODE -ne 0) { throw "Failed to download Python 3.10 installer for Mockingbird" }
+
+        Write-Step "Installing dedicated Python 3.10 runtime..." "Yellow"
+        $Args = @(
+            "/quiet",
+            "InstallAllUsers=0",
+            "PrependPath=0",
+            "Include_pip=1",
+            "Include_dev=1",
+            "Include_test=0",
+            "Include_tcltk=0",
+            "Include_doc=0",
+            "Include_launcher=0",
+            "AssociateFiles=0",
+            "Shortcuts=0",
+            "TargetDir=$PythonRoot"
+        )
+        $Proc = Start-Process -FilePath $InstallerExe -ArgumentList $Args -Wait -PassThru
+        if ($Proc.ExitCode -ne 0 -or -not (Test-Path $PythonExe)) {
+            throw "Dedicated Python 3.10 install failed with exit code $($Proc.ExitCode)"
+        }
+    } else {
+        Write-Step "Dedicated Mockingbird Python already installed." "Green"
+    }
+
+    if (-not (Test-Path $VenvPy)) {
+        Write-Step "Creating Mockingbird virtual environment..." "Yellow"
+        & $PythonExe -m venv "$VenvDir"
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $VenvPy)) {
+            throw "Failed to create Mockingbird virtual environment"
+        }
+    } else {
+        Write-Step "Mockingbird virtual environment already exists." "Green"
+    }
+
+    if (-not (Test-Path $RepoDir)) {
+        Write-Step "Cloning xtts-api-server..." "Yellow"
+        & $GitExe clone --depth 1 https://github.com/daswer123/xtts-api-server.git "$RepoDir" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Failed to clone xtts-api-server" }
+    } else {
+        Write-Step "xtts-api-server already present." "Green"
+    }
+
+    Write-Step "Installing Mockingbird XTTS dependencies..." "Yellow"
+    & $VenvPy -m pip install --upgrade pip wheel setuptools --no-warn-script-location 2>&1 | Out-Null
+    & $VenvPy -m pip install -r "$RepoDir\requirements.txt" --no-warn-script-location 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Mockingbird requirements install failed" }
+    & $VenvPy -m pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118 --no-warn-script-location 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Mockingbird torch install failed" }
+
+    if (Test-Path $SpeakerSource) {
+        Copy-Item -Path $SpeakerSource -Destination (Join-Path $SpeakersDir "charlotte.wav") -Force
+        Write-Step "Mockingbird default speaker installed." "Green"
+    } else {
+        Write-Step "WARNING: Mockingbird speaker source missing: $SpeakerSource" "Yellow"
+    }
+
+    Write-Step "Mockingbird XTTS runtime ready." "Green"
 }
 
 # ComfyUI-Manager config (weak security for auto-install)

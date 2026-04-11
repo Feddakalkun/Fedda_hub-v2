@@ -23,6 +23,14 @@ def setup_audio_files():
     else:
         print(f"[Audio Setup] ERROR: Source file not found at {src_path}")
 
+    # Mockingbird/XTTS default speaker destination
+    mockingbird_speaker_dir = root_dir / "mockingbird_tts" / "speakers"
+    mockingbird_speaker_dir.mkdir(parents=True, exist_ok=True)
+    mockingbird_dest = mockingbird_speaker_dir / "charlotte.wav"
+    if src_path.exists():
+        print(f"[Audio Setup] Copying {src_path.name} to Mockingbird speakers...")
+        shutil.copy2(src_path, mockingbird_dest)
+
     # Cleanup trash from previous tests
     trash_path = dest_dir / "reference_voice.wav"
     if trash_path.exists():

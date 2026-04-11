@@ -261,6 +261,9 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":8199"') do (taskkill
 timeout /t 1 /nobreak >nul
 
 cd /d "%COMFYUI_DIR%"
+if exist "%BASE_DIR%\scripts\patch_ltx23_video_vae.py" (
+    "%PYTHON%" "%BASE_DIR%\scripts\patch_ltx23_video_vae.py" >nul 2>&1
+)
 echo [%date% %time%] Starting ComfyUI...
 "%PYTHON%" -W ignore::FutureWarning -s -u main.py %COMFY_EXTRA_FLAGS% --port 8199 --listen 127.0.0.1 --reserve-vram 4 --disable-cuda-malloc --enable-cors-header * --preview-method auto --disable-auto-launch --enable-manager --enable-manager-legacy-ui
 

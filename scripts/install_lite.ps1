@@ -649,6 +649,12 @@ if (Test-Path $MathAliasScript) {
     Write-Step "ComfyUI-Custom-Scripts math alias patched." "Green"
 }
 
+$LtxVaePatchScript = Join-Path $ScriptPath "patch_ltx23_video_vae.py"
+if (Test-Path $LtxVaePatchScript) {
+    & $VenvPy "$LtxVaePatchScript" 2>&1 | Out-Null
+    Write-Step "LTX 2.3 video VAE compatibility patched." "Green"
+}
+
 # ComfyUI-Manager config (weak security for auto-install)
 $MgrDir = Join-Path $ComfyDir "user\__manager"
 if (-not (Test-Path $MgrDir)) { New-Item -ItemType Directory -Path $MgrDir -Force | Out-Null }

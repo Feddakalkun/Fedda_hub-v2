@@ -834,6 +834,12 @@ if (Test-Path $MathAliasScript) {
     Start-Process -FilePath $PyExe -ArgumentList "$MathAliasScript" -NoNewWindow -Wait
 }
 
+$LtxVaePatchScript = Join-Path $ScriptPath "patch_ltx23_video_vae.py"
+if (Test-Path $LtxVaePatchScript) {
+    Write-Log "[Custom Nodes] Patching LTX 2.3 video VAE compatibility..."
+    Start-Process -FilePath $PyExe -ArgumentList "$LtxVaePatchScript" -NoNewWindow -Wait
+}
+
 Pause-Step
 
 
